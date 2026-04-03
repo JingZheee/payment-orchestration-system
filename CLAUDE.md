@@ -262,7 +262,7 @@ Weights are configurable in `application.yml` under `routing.scorer.*`.
 
 | Field | Value |
 |---|---|
-| **Current module** | pos-common |
-| **Current task** | Define PaymentStatus, Region, Currency, Provider enums + ApiResponse<T> DTO + base exceptions |
-| **Last completed** | Full project scaffold — parent POM, 7 module POMs, docker-compose, application configs, entry point |
-| **Blockers** | None — verify prerequisites first (`java -version`, `mvn -version`, `docker compose up -d`) |
+| **Current module** | pos-routing |
+| **Current task** | RoutingStrategy interface + RegionBasedStrategy, SuccessRateStrategy, LowestFeeStrategy + ProviderScorer + RoutingEngine |
+| **Last completed** | pos-provider: PaymentProviderPort interface + MockProviderAdapter (all 4 modes) — BUILD SUCCESS |
+| **Blockers** | None |
