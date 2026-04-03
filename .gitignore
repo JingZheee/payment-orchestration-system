@@ -1,0 +1,30 @@
+# Maven
+target/
+*.class
+*.jar
+*.war
+
+# Spring Boot secrets — NEVER commit these
+**/application-dev.yml
+**/application-prod.yml
+.env
+*.env
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node / Angular
+payment-orchestration-frontend/node_modules/
+payment-orchestration-frontend/dist/
+payment-orchestration-frontend/.angular/
+
+# Logs
+*.log
+logs/
