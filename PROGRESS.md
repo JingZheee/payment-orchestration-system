@@ -20,11 +20,12 @@ Last updated: 2026-04-03
 - [x] pos-provider: 6 provider DTOs (PaymentRequest/Result, StatusResult, RefundRequest/Result, WebhookParseResult)
 - [x] pos-provider: PaymentProviderPort interface (7-method contract)
 - [x] pos-provider: MockProviderAdapter — all 4 modes (ALWAYS_SUCCESS/FAIL/RANDOM/DELAYED), runtime toggle
+- [x] pos-routing: RoutingStrategy interface + RegionBasedStrategy, SuccessRateStrategy, LowestFeeStrategy
+- [x] pos-routing: ProviderScorer (composite score: success_rate 50% + fee 30% + latency 20%)
+- [x] pos-routing: RoutingEngine (rule match first, then scorer fallback) + RoutingDecision/RoutingContext DTOs
+- [x] pos-routing: 16 unit tests (RoutingEngineTest, ProviderScorerTest, RegionBasedStrategyTest, LowestFeeStrategyTest) — BUILD SUCCESS
 
 ## Up next (start here next session)
-- [ ] pos-routing: RoutingStrategy interface + RegionBasedStrategy, SuccessRateStrategy, LowestFeeStrategy
-- [ ] pos-routing: ProviderScorer (composite score: success_rate 50% + fee 30% + latency 20%)
-- [ ] pos-routing: RoutingEngine (rule match first, then scorer fallback) + RoutingDecision DTO
 - [ ] pos-payment: PaymentService.initiatePayment() calling routing engine + writing transaction_events
 - [ ] pos-api: Spring Security config + JWT filter + /auth/login endpoint
 

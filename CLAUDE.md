@@ -262,7 +262,7 @@ Weights are configurable in `application.yml` under `routing.scorer.*`.
 
 | Field | Value |
 |---|---|
-| **Current module** | pos-routing |
-| **Current task** | RoutingStrategy interface + RegionBasedStrategy, SuccessRateStrategy, LowestFeeStrategy + ProviderScorer + RoutingEngine |
-| **Last completed** | pos-provider: PaymentProviderPort interface + MockProviderAdapter (all 4 modes) — BUILD SUCCESS |
+| **Current module** | pos-payment |
+| **Current task** | PaymentService.initiatePayment() + transaction_events writer + IdempotencyFilter + RetryPublisher |
+| **Last completed** | pos-routing: RoutingEngine + ProviderScorer + 3 strategies + 16 unit tests — BUILD SUCCESS |
 | **Blockers** | None |
