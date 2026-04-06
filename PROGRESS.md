@@ -24,10 +24,18 @@ Last updated: 2026-04-03
 - [x] pos-routing: ProviderScorer (composite score: success_rate 50% + fee 30% + latency 20%)
 - [x] pos-routing: RoutingEngine (rule match first, then scorer fallback) + RoutingDecision/RoutingContext DTOs
 - [x] pos-routing: 16 unit tests (RoutingEngineTest, ProviderScorerTest, RegionBasedStrategyTest, LowestFeeStrategyTest) — BUILD SUCCESS
+- [x] pos-payment: InitiatePaymentRequest/Response + RetryMessage DTOs
+- [x] pos-payment: PaymentService (initiatePayment, handleWebhook, getTransaction) + TransactionEvent writer
+- [x] pos-payment: IdempotencyFilter (SHA-256 hash, CachedBodyRequestWrapper, ContentCachingResponseWrapper)
+- [x] pos-payment: RetryPublisher → retry.q.30s / 60s / 120s / payment.dlq based on attempt number
+- [x] pos-payment: PaymentController (POST /initiate, GET /{id}) + WebhookController (POST /webhooks/{provider})
+- [x] pos-domain: added TransactionRepository.findByProviderTransactionId()
 
 ## Up next (start here next session)
-- [ ] pos-payment: PaymentService.initiatePayment() calling routing engine + writing transaction_events
-- [ ] pos-api: Spring Security config + JWT filter + /auth/login endpoint
+- [ ] pos-api: Spring Security config + JWT filter + /auth/login + /auth/refresh endpoints
+- [ ] pos-api: RabbitMqConfig (declare all exchanges, queues, TTL, DLX bindings)
+- [ ] pos-api: GlobalExceptionHandler (@RestControllerAdvice mapping PosException → ApiResponse)
+- [ ] pos-provider: Billplz, Midtrans, PayMongo adapter stubs (needs sandbox credentials)
 
 ## Decisions locked in
 - Maven multi-module (not Gradle) — lower learning curve, Spring Boot default, PRD specifies it

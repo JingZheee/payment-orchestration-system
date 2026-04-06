@@ -262,7 +262,7 @@ Weights are configurable in `application.yml` under `routing.scorer.*`.
 
 | Field | Value |
 |---|---|
-| **Current module** | pos-payment |
-| **Current task** | PaymentService.initiatePayment() + transaction_events writer + IdempotencyFilter + RetryPublisher |
-| **Last completed** | pos-routing: RoutingEngine + ProviderScorer + 3 strategies + 16 unit tests — BUILD SUCCESS |
+| **Current module** | pos-api |
+| **Current task** | Spring Security config + JWT filter + /auth/login + RabbitMqConfig + GlobalExceptionHandler |
+| **Last completed** | pos-payment: PaymentService + IdempotencyFilter + RetryPublisher + PaymentController + WebhookController — BUILD SUCCESS |
 | **Blockers** | None |
