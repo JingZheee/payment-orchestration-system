@@ -1,5 +1,5 @@
 # Progress Snapshot
-Last updated: 2026-04-03
+Last updated: 2026-04-11
 
 ## Completed
 - [x] PRD.md finalised (v1.1)
@@ -31,11 +31,25 @@ Last updated: 2026-04-03
 - [x] pos-payment: PaymentController (POST /initiate, GET /{id}) + WebhookController (POST /webhooks/{provider})
 - [x] pos-domain: added TransactionRepository.findByProviderTransactionId()
 
+- [x] pos-api: JwtTokenProvider (JJWT 0.12+: generate/validate/parse access tokens, UUID refresh tokens)
+- [x] pos-api: JwtAuthenticationFilter (OncePerRequestFilter — Bearer header → SecurityContext)
+- [x] pos-api: UserDetailsServiceImpl (loads User by email → Spring Security UserDetails)
+- [x] pos-api: SecurityConfig (STATELESS, CSRF off, role rules: MERCHANT/ADMIN/VIEWER, JWT filter wired)
+- [x] pos-api: RabbitMqConfig (webhook.exchange, retry.exchange, all 6 queues with TTL/DLX bindings)
+- [x] pos-api: GlobalExceptionHandler (@RestControllerAdvice — PosException, validation, auth, 500)
+- [x] pos-api: OpenApiConfig (bearerAuth SecurityScheme for Swagger Authorize button)
+- [x] pos-api: AuthController (POST /auth/login + POST /auth/refresh) + LoginRequest/Response/RefreshRequest DTOs
+
+- [x] pos-admin: RoutingRuleService (CRUD for routing_rules table)
+- [x] pos-admin: MetricsAggregator (@Scheduled fixedRate=15min — aggregates success rate + latency by provider/region)
+- [x] pos-admin: AdminController (GET /admin/metrics, GET|POST|PUT|DELETE /admin/routing-rules, GET /admin/transactions, GET|POST /admin/providers)
+- [x] pos-admin: DlqConsumer (@RabbitListener on payment.dlq — marks transaction RETRY_EXHAUSTED, writes TransactionEvent)
+
 ## Up next (start here next session)
-- [ ] pos-api: Spring Security config + JWT filter + /auth/login + /auth/refresh endpoints
-- [ ] pos-api: RabbitMqConfig (declare all exchanges, queues, TTL, DLX bindings)
-- [ ] pos-api: GlobalExceptionHandler (@RestControllerAdvice mapping PosException → ApiResponse)
-- [ ] pos-provider: Billplz, Midtrans, PayMongo adapter stubs (needs sandbox credentials)
+- [ ] pos-provider: Billplz adapter (FPX, HMAC-SHA256 webhook)
+- [ ] pos-provider: Midtrans adapter (Virtual Account, QRIS, HMAC-SHA256 webhook)
+- [ ] pos-provider: PayMongo adapter (Maya/cards/e-wallets, RSA webhook)
+- [ ] Angular frontend scaffold (ng new, routing, Material, auth guard, dashboard)
 
 ## Decisions locked in
 - Maven multi-module (not Gradle) — lower learning curve, Spring Boot default, PRD specifies it
