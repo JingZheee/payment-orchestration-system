@@ -54,9 +54,9 @@ public class ProviderScorer {
         BigDecimal successRate = latestSuccessRate(provider.getProvider(), region);
 
         // --- fee component ---
-        BigDecimal fee = provider.calculateFee(amount);
+        BigDecimal fee = provider.calculateFee(amount, context.getPaymentMethod());
         BigDecimal maxFee = eligibleProviders.stream()
-                .map(p -> p.calculateFee(amount))
+                .map(p -> p.calculateFee(amount, context.getPaymentMethod()))
                 .max(BigDecimal::compareTo)
                 .orElse(BigDecimal.ONE);
         BigDecimal normalizedFee = maxFee.compareTo(BigDecimal.ZERO) == 0

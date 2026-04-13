@@ -1,6 +1,7 @@
 package com.paymentorchestration.routing.strategy;
 
 import com.paymentorchestration.common.enums.Currency;
+import com.paymentorchestration.common.enums.PaymentMethod;
 import com.paymentorchestration.common.enums.Provider;
 import com.paymentorchestration.common.enums.Region;
 import com.paymentorchestration.provider.port.PaymentProviderPort;
@@ -70,7 +71,7 @@ class LowestFeeStrategyTest {
     private PaymentProviderPort providerWithFee(Provider provider, Region region, String fee) {
         PaymentProviderPort p = mock(PaymentProviderPort.class);
         when(p.getProvider()).thenReturn(provider);
-        when(p.calculateFee(any(BigDecimal.class))).thenReturn(new BigDecimal(fee));
+        when(p.calculateFee(any(BigDecimal.class), any())).thenReturn(new BigDecimal(fee));
         return p;
     }
 
@@ -79,6 +80,7 @@ class LowestFeeStrategyTest {
                 .amount(AMOUNT)
                 .currency(Currency.MYR)
                 .region(region)
+                .paymentMethod(PaymentMethod.FPX)
                 .availableProviders(providers)
                 .build();
     }

@@ -1,6 +1,7 @@
 package com.paymentorchestration.routing.scorer;
 
 import com.paymentorchestration.common.enums.Currency;
+import com.paymentorchestration.common.enums.PaymentMethod;
 import com.paymentorchestration.common.enums.Provider;
 import com.paymentorchestration.common.enums.Region;
 import com.paymentorchestration.domain.entity.ProviderMetrics;
@@ -102,7 +103,7 @@ class ProviderScorerTest {
     private PaymentProviderPort providerWithFee(Provider provider, String fee) {
         PaymentProviderPort p = mock(PaymentProviderPort.class);
         when(p.getProvider()).thenReturn(provider);
-        when(p.calculateFee(any(BigDecimal.class))).thenReturn(new BigDecimal(fee));
+        when(p.calculateFee(any(BigDecimal.class), any())).thenReturn(new BigDecimal(fee));
         return p;
     }
 
@@ -124,6 +125,7 @@ class ProviderScorerTest {
                 .amount(amount)
                 .currency(Currency.MYR)
                 .region(region)
+                .paymentMethod(PaymentMethod.FPX)
                 .availableProviders(List.of())
                 .build();
     }

@@ -262,7 +262,7 @@ Weights are configurable in `application.yml` under `routing.scorer.*`.
 
 | Field | Value |
 |---|---|
-| **Current module** | pos-provider / frontend |
-| **Current task** | Billplz/Midtrans/PayMongo adapter stubs OR Angular frontend scaffold |
-| **Last completed** | pos-admin: RoutingRuleService + MetricsAggregator + AdminController + DlqConsumer — BUILD SUCCESS |
+| **Current module** | frontend |
+| **Current task** | Angular scaffold — ng new, Angular Material, proxy config, AuthService, JwtInterceptor |
+| **Last completed** | pos-api: /auth/register endpoint + RegisterRequest DTO; fixed MockProviderAdapter compile error — BUILD SUCCESS |
 | **Blockers** | None |

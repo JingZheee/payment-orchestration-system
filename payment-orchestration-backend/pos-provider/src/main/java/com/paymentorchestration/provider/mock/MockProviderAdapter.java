@@ -1,6 +1,7 @@
 package com.paymentorchestration.provider.mock;
 
 import com.paymentorchestration.common.enums.MockProviderMode;
+import com.paymentorchestration.common.enums.PaymentMethod;
 import com.paymentorchestration.common.enums.PaymentStatus;
 import com.paymentorchestration.common.enums.Provider;
 import com.paymentorchestration.provider.dto.*;
@@ -11,6 +12,8 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
@@ -57,7 +60,7 @@ public class MockProviderAdapter implements PaymentProviderPort {
                 .providerTransactionId(providerTxnId)
                 .status(resultStatus)
                 .redirectUrl("http://localhost:8080/mock/pay/" + providerTxnId)
-                .fee(calculateFee(request.getAmount()))
+                .fee(calculateFee(request.getAmount(), request.getPaymentMethod()))
                 .rawResponse("{\"mock\":true,\"mode\":\"" + mode + "\",\"status\":\"" + resultStatus + "\"}")
                 .build();
     }
@@ -117,8 +120,13 @@ public class MockProviderAdapter implements PaymentProviderPort {
     }
 
     @Override
-    public BigDecimal calculateFee(BigDecimal amount) {
-        // Mock fee: 1% of transaction amount
+    public List<PaymentMethod> supportedMethods() {
+        return Arrays.asList(PaymentMethod.values()); // mock supports all methods
+    }
+
+    @Override
+    public BigDecimal calculateFee(BigDecimal amount, PaymentMethod paymentMethod) {
+        // Mock fee: flat 1% regardless of payment method
         return amount.multiply(BigDecimal.valueOf(0.01)).setScale(4, RoundingMode.HALF_UP);
     }
 

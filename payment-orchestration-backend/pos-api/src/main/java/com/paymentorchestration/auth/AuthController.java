@@ -23,6 +23,29 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
 
+    @PostMapping("/register")
+    public ResponseEntity<ApiResponse<LoginResponse>> register(@Valid @RequestBody RegisterRequest request) {
+        if (userRepository.findByEmail(request.email()).isPresent()) {
+            throw new PosException("Email already in use", HttpStatus.CONFLICT);
+        }
+
+        User user = new User();
+        user.setEmail(request.email());
+        user.setPasswordHash(passwordEncoder.encode(request.password()));
+        user.setRole(request.role());
+        userRepository.save(user);
+
+        String accessToken = jwtTokenProvider.generateAccessToken(user.getEmail(), user.getRole());
+        String refreshToken = jwtTokenProvider.generateRefreshToken();
+
+        user.setRefreshToken(refreshToken);
+        user.setTokenExpiresAt(Instant.now().plusSeconds(604800));
+        userRepository.save(user);
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.ok(new LoginResponse(accessToken, refreshToken, user.getRole())));
+    }
+
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request) {
         User user = userRepository.findByEmail(request.email())

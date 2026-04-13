@@ -69,6 +69,7 @@ public class PaymentService {
                 .amount(request.getAmount())
                 .currency(request.getCurrency())
                 .region(request.getRegion())
+                .paymentMethod(request.getPaymentMethod())
                 .availableProviders(allProviders)
                 .build();
 

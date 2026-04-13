@@ -1,9 +1,11 @@
 package com.paymentorchestration.provider.port;
 
+import com.paymentorchestration.common.enums.PaymentMethod;
 import com.paymentorchestration.common.enums.Provider;
 import com.paymentorchestration.provider.dto.*;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -52,10 +54,17 @@ public interface PaymentProviderPort {
     WebhookParseResult parseWebhookPayload(String rawBody);
 
     /**
-     * Calculate the fee for a given transaction amount.
-     * Used by ProviderScorer to compare provider costs.
+     * Returns the payment methods this provider supports.
+     * Used by the /payments/methods endpoint to present options to the user before routing.
      */
-    BigDecimal calculateFee(BigDecimal amount);
+    List<PaymentMethod> supportedMethods();
+
+    /**
+     * Calculate the exact fee for a transaction amount and payment method.
+     * Called after the user has selected their payment method, so the fee is precise.
+     * Also used by ProviderScorer to compare providers for the same method.
+     */
+    BigDecimal calculateFee(BigDecimal amount, PaymentMethod paymentMethod);
 
     /**
      * Health check. Returns false if the provider is disabled in provider_configs
