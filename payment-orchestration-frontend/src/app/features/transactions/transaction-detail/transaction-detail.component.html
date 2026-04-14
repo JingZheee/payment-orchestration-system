@@ -1,0 +1,102 @@
+<div class="detail-container">
+
+  <div class="header-row">
+    <button mat-button (click)="back()">
+      <mat-icon>arrow_back</mat-icon> Back to Demo
+    </button>
+  </div>
+
+  <div *ngIf="loading" class="loading-center">
+    <mat-spinner></mat-spinner>
+  </div>
+
+  <div *ngIf="error" class="error-state">
+    <mat-icon>error_outline</mat-icon>
+    <p>{{ error }}</p>
+  </div>
+
+  <div *ngIf="transaction && !loading">
+    <!-- Transaction Summary Card -->
+    <mat-card class="summary-card">
+      <mat-card-header>
+        <mat-card-title>Transaction Summary</mat-card-title>
+        <mat-card-subtitle>{{ transaction.id }}</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="summary-grid">
+          <div class="summary-item">
+            <span class="label">Status</span>
+            <span class="status-text" [style.color]="statusColors[transaction.status]">
+              {{ transaction.status }}
+            </span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Provider</span>
+            <span class="provider-chip" [style.background]="providerColors[transaction.provider]">
+              {{ transaction.provider }}
+            </span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Amount</span>
+            <span class="value">{{ transaction.amount }} {{ transaction.currency }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Fee</span>
+            <span class="value">{{ transaction.fee }} {{ transaction.currency }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Region</span>
+            <span class="value">{{ transaction.region }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Payment Method</span>
+            <span class="value">{{ transaction.paymentMethod }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Merchant Order</span>
+            <span class="value">{{ transaction.merchantOrderId }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Routing Strategy</span>
+            <span class="strategy-badge">{{ transaction.routingStrategy }}</span>
+          </div>
+          <div class="summary-item full-span">
+            <span class="label">Routing Reason</span>
+            <span class="reason-text">{{ transaction.routingReason }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Created</span>
+            <span class="value">{{ transaction.createdAt | date:'medium' }}</span>
+          </div>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Event Timeline Card -->
+    <mat-card class="timeline-card">
+      <mat-card-header>
+        <mat-card-title>Event Timeline</mat-card-title>
+        <mat-card-subtitle>Immutable audit log — {{ events.length }} events</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="timeline" *ngIf="events.length > 0; else noEvents">
+          <div class="timeline-item" *ngFor="let event of events; let last = last">
+            <div class="timeline-icon" [style.color]="getEventColor(event.eventType)">
+              <mat-icon>{{ getEventIcon(event.eventType) }}</mat-icon>
+            </div>
+            <div class="timeline-connector" *ngIf="!last"></div>
+            <div class="timeline-content">
+              <div class="event-type">{{ event.eventType }}</div>
+              <div class="event-description">{{ event.description }}</div>
+              <div class="event-time">{{ event.createdAt | date:'HH:mm:ss.SSS' }}</div>
+            </div>
+          </div>
+        </div>
+        <ng-template #noEvents>
+          <p class="no-events">No events recorded yet.</p>
+        </ng-template>
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+</div>

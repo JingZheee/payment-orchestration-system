@@ -17,9 +17,10 @@ server:
 # Routing engine weights (must sum to 1.0)
 routing:
   scorer:
-    success-rate-weight: 0.50
-    fee-weight: 0.30
-    latency-weight: 0.20
+    success-rate-weight: 0.40
+    fee-weight: 0.25
+    latency-weight: 0.15
+    fee-accuracy-weight: 0.20
   metrics:
     window-minutes: 60
     refresh-interval-minutes: 15

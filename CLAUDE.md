@@ -262,7 +262,7 @@ Weights are configurable in `application.yml` under `routing.scorer.*`.
 
 | Field | Value |
 |---|---|
-| **Current module** | frontend |
-| **Current task** | Angular scaffold — ng new, Angular Material, proxy config, AuthService, JwtInterceptor |
-| **Last completed** | pos-api: /auth/register endpoint + RegisterRequest DTO; fixed MockProviderAdapter compile error — BUILD SUCCESS |
+| **Current module** | frontend (admin pages) + integration testing |
+| **Current task** | Build Angular admin pages: /admin/fee-rates (inline-editable fee rate table) and /admin/recon (recon statements list with anomaly filter); add strategy dropdown to routing rules page |
+| **Last completed** | Routing enhancement — V10–V14 migrations, ProviderFeeRate + ReconStatement entities, all adapters DB-backed, volume-weighted fee scoring, per-rule strategy delegation in RoutingEngine, fee accuracy in MetricsAggregator, ProviderFeeRateController + ReconStatementController — BUILD SUCCESS all tests passing |
 | **Blockers** | None |

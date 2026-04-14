@@ -6,6 +6,7 @@ import com.paymentorchestration.common.enums.Region;
 import com.paymentorchestration.domain.entity.ProviderMetrics;
 import com.paymentorchestration.domain.entity.Transaction;
 import com.paymentorchestration.domain.repository.ProviderMetricsRepository;
+import com.paymentorchestration.domain.repository.ReconStatementRepository;
 import com.paymentorchestration.domain.repository.TransactionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +31,7 @@ public class MetricsAggregator {
 
     private final TransactionRepository transactionRepository;
     private final ProviderMetricsRepository providerMetricsRepository;
+    private final ReconStatementRepository reconStatementRepository;
 
     @Value("${routing.metrics.window-minutes:60}")
     private long windowMinutes;
@@ -75,12 +77,17 @@ public class MetricsAggregator {
                     .average()
                     .orElse(0);
 
+            BigDecimal feeAccuracy = reconStatementRepository
+                    .calculateAvgAccuracy(provider, windowStart)
+                    .orElse(BigDecimal.ONE);
+
             ProviderMetrics metrics = new ProviderMetrics();
             metrics.setProvider(provider);
             metrics.setRegion(region);
             metrics.setSuccessRate(successRate);
             metrics.setAvgLatencyMs(avgLatencyMs);
             metrics.setTransactionCount(total);
+            metrics.setFeeAccuracyRate(feeAccuracy);
             metrics.setWindowStart(windowStart);
             metrics.setWindowEnd(windowEnd);
 

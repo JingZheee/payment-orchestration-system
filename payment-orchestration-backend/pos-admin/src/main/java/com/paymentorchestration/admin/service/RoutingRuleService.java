@@ -47,6 +47,7 @@ public class RoutingRuleService {
         rule.setMinAmount(request.minAmount());
         rule.setMaxAmount(request.maxAmount());
         rule.setPreferredProvider(request.preferredProvider());
+        rule.setStrategy(request.strategy());
         rule.setEnabled(request.enabled());
     }
 }

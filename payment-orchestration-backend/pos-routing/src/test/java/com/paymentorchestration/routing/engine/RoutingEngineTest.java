@@ -48,7 +48,7 @@ class RoutingEngineTest {
         billplz      = availableProvider(Provider.BILLPLZ);
         mockProvider = availableProvider(Provider.MOCK);
 
-        engine = new RoutingEngine(ruleRepository, scorer, List.of(billplz, mockProvider));
+        engine = new RoutingEngine(ruleRepository, scorer, List.of(billplz, mockProvider), List.of());
     }
 
     @Test
@@ -86,7 +86,7 @@ class RoutingEngineTest {
         when(unavailable.isAvailable()).thenReturn(false);
 
         RoutingEngine engineWithUnavailable = new RoutingEngine(
-                ruleRepository, scorer, List.of(unavailable, mockProvider));
+                ruleRepository, scorer, List.of(unavailable, mockProvider), List.of());
 
         RoutingRule rule = ruleFor(Provider.PAYMONGO, Region.PH, null, null, null);
         when(ruleRepository.findByEnabledTrueOrderByPriorityAsc()).thenReturn(List.of(rule));
@@ -105,7 +105,7 @@ class RoutingEngineTest {
     void throwsWhenNoEligibleProvider() {
         // Engine with only BILLPLZ (MY), routing for PH — BILLPLZ won't match PH
         PaymentProviderPort billplzOnly = availableProvider(Provider.BILLPLZ);
-        RoutingEngine phEngine = new RoutingEngine(ruleRepository, scorer, List.of(billplzOnly));
+        RoutingEngine phEngine = new RoutingEngine(ruleRepository, scorer, List.of(billplzOnly), List.of());
         when(ruleRepository.findByEnabledTrueOrderByPriorityAsc()).thenReturn(List.of());
 
         RoutingContext context = contextFor(Region.PH, new BigDecimal("100.00"), Currency.PHP);

@@ -9,6 +9,8 @@ import com.paymentorchestration.routing.dto.RoutingContext;
 import com.paymentorchestration.routing.dto.RoutingDecision;
 import com.paymentorchestration.routing.scorer.ProviderScorer;
 import com.paymentorchestration.routing.strategy.ProviderRegionSupport;
+import com.paymentorchestration.routing.strategy.RoutingStrategy;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -17,6 +19,7 @@ import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -26,15 +29,12 @@ import java.util.stream.Collectors;
  * Decision flow:
  *   1. Filter all providers to those that support the region AND are available.
  *   2. Iterate enabled routing rules (ordered by priority ASC).
- *      – A rule matches if its region, currency, and amount range constraints
- *        are satisfied AND the preferred provider is in the eligible set.
- *      – First matching rule wins; its preferred provider is returned.
+ *      a. Rule with preferredProvider → return that provider directly (if eligible).
+ *      b. Rule with strategy → delegate to the named strategy class.
+ *      First matching rule wins.
  *   3. If no rule matches, score all eligible providers via ProviderScorer
- *      (composite: success_rate 50% + fee 30% + latency 20%) and pick the best.
+ *      (composite: success_rate 40% + volume-weighted fee 25% + latency 15% + fee accuracy 20%).
  *   4. If the eligible set is empty, throw RoutingException.
- *
- * Spring auto-wires all PaymentProviderPort beans (one per adapter) into the
- * List<PaymentProviderPort> constructor parameter.
  */
 @Component
 @RequiredArgsConstructor
@@ -43,15 +43,18 @@ public class RoutingEngine {
 
     private final RoutingRuleRepository ruleRepository;
     private final ProviderScorer scorer;
-
-    /** All registered provider adapters — injected by Spring from the application context. */
     private final List<PaymentProviderPort> allProviders;
 
-    /**
-     * Select the best provider for the given routing context.
-     *
-     * @throws RoutingException if no eligible provider is available
-     */
+    /** All RoutingStrategy beans — injected by Spring, keyed by their type enum. */
+    private final List<RoutingStrategy> strategyBeans;
+    private Map<com.paymentorchestration.common.enums.RoutingStrategy, RoutingStrategy> strategyMap = Map.of();
+
+    @PostConstruct
+    void buildStrategyMap() {
+        strategyMap = strategyBeans.stream()
+                .collect(Collectors.toMap(RoutingStrategy::getType, Function.identity()));
+    }
+
     public RoutingDecision route(RoutingContext context) {
         List<PaymentProviderPort> eligible = eligibleProviders(context);
 
@@ -88,18 +91,43 @@ public class RoutingEngine {
         Map<Provider, PaymentProviderPort> byProvider = eligible.stream()
                 .collect(Collectors.toMap(PaymentProviderPort::getProvider, Function.identity()));
 
+        // Build a RoutingContext copy that carries the eligible providers for strategy use
+        RoutingContext contextWithProviders = RoutingContext.builder()
+                .amount(context.getAmount())
+                .currency(context.getCurrency())
+                .region(context.getRegion())
+                .paymentMethod(context.getPaymentMethod())
+                .availableProviders(eligible)
+                .build();
+
         for (RoutingRule rule : ruleRepository.findByEnabledTrueOrderByPriorityAsc()) {
             if (!matches(rule, context)) continue;
 
-            PaymentProviderPort provider = byProvider.get(rule.getPreferredProvider());
-            if (provider == null) continue; // preferred provider not eligible right now
+            // a) Specific provider override
+            if (rule.getPreferredProvider() != null) {
+                PaymentProviderPort provider = byProvider.get(rule.getPreferredProvider());
+                if (provider == null) continue;
 
-            return RoutingDecision.builder()
-                    .provider(rule.getPreferredProvider())
-                    .strategy(com.paymentorchestration.common.enums.RoutingStrategy.REGION_BASED)
-                    .reason("Rule #" + rule.getId() + " (priority=" + rule.getPriority()
-                            + "): preferred=" + rule.getPreferredProvider())
-                    .build();
+                return RoutingDecision.builder()
+                        .provider(rule.getPreferredProvider())
+                        .strategy(com.paymentorchestration.common.enums.RoutingStrategy.REGION_BASED)
+                        .reason("Rule #" + rule.getId() + " (priority=" + rule.getPriority()
+                                + "): preferred=" + rule.getPreferredProvider())
+                        .build();
+            }
+
+            // b) Strategy-based selection
+            if (rule.getStrategy() != null) {
+                RoutingStrategy strategy = strategyMap.get(rule.getStrategy());
+                if (strategy == null) continue;
+
+                Optional<RoutingDecision> decision = strategy.select(contextWithProviders);
+                if (decision.isPresent()) {
+                    RoutingDecision d = decision.get();
+                    log.info("[routing] rule #{} strategy={} → {}", rule.getId(), rule.getStrategy(), d.getProvider());
+                    return d;
+                }
+            }
         }
         return null;
     }

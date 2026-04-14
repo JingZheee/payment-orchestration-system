@@ -5,7 +5,9 @@ import com.paymentorchestration.common.enums.PaymentStatus;
 import com.paymentorchestration.common.enums.Provider;
 import com.paymentorchestration.common.exception.ProviderException;
 import com.paymentorchestration.domain.entity.ProviderConfig;
+import com.paymentorchestration.domain.entity.ProviderFeeRate;
 import com.paymentorchestration.domain.repository.ProviderConfigRepository;
+import com.paymentorchestration.domain.repository.ProviderFeeRateRepository;
 import com.paymentorchestration.provider.dto.*;
 import com.paymentorchestration.provider.port.PaymentProviderPort;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +40,7 @@ public class BillplzAdapter implements PaymentProviderPort {
 
     private final BillplzProperties properties;
     private final ProviderConfigRepository providerConfigRepository;
+    private final ProviderFeeRateRepository providerFeeRateRepository;
     private final WebClient.Builder webClientBuilder;
 
     @Override
@@ -58,7 +61,7 @@ public class BillplzAdapter implements PaymentProviderPort {
         formData.add("name", "Customer");
         formData.add("amount", String.valueOf(amountInCents));
         formData.add("callback_url", "http://localhost:8080/api/v1/webhooks/BILLPLZ");
-        formData.add("redirect_url", "http://localhost:8080/payment/complete");
+        formData.add("redirect_url", request.getRedirectUrl() != null ? request.getRedirectUrl() : "http://localhost:4200/payment-result");
         formData.add("description", request.getDescription() != null ? request.getDescription() : request.getMerchantOrderId());
         formData.add("reference_1", request.getTransactionId().toString());
 
@@ -182,12 +185,10 @@ public class BillplzAdapter implements PaymentProviderPort {
     @Override
     public BigDecimal calculateFee(BigDecimal amount, PaymentMethod paymentMethod) {
         if (paymentMethod == null) paymentMethod = PaymentMethod.FPX;
-        return switch (paymentMethod) {
-            case FPX     -> new BigDecimal("1.25");                                              // MYR 1.25 fixed (B2C)
-            case CARD    -> amount.multiply(new BigDecimal("0.015")).setScale(4, RoundingMode.HALF_UP); // 1.5%
-            case EWALLET -> amount.multiply(new BigDecimal("0.015")).setScale(4, RoundingMode.HALF_UP); // 1.5%
-            default      -> new BigDecimal("1.25");
-        };
+        return providerFeeRateRepository
+                .findByProviderAndPaymentMethodAndActiveTrue(Provider.BILLPLZ, paymentMethod)
+                .map(rate -> rate.compute(amount))
+                .orElse(BigDecimal.ZERO);
     }
 
     @Override

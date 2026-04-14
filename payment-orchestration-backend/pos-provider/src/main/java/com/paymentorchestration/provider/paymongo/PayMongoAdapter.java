@@ -6,7 +6,9 @@ import com.paymentorchestration.common.enums.PaymentStatus;
 import com.paymentorchestration.common.enums.Provider;
 import com.paymentorchestration.common.exception.ProviderException;
 import com.paymentorchestration.domain.entity.ProviderConfig;
+import com.paymentorchestration.domain.entity.ProviderFeeRate;
 import com.paymentorchestration.domain.repository.ProviderConfigRepository;
+import com.paymentorchestration.domain.repository.ProviderFeeRateRepository;
 import com.paymentorchestration.provider.dto.*;
 import com.paymentorchestration.provider.port.PaymentProviderPort;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +36,7 @@ public class PayMongoAdapter implements PaymentProviderPort {
 
     private final PayMongoProperties properties;
     private final ProviderConfigRepository providerConfigRepository;
+    private final ProviderFeeRateRepository providerFeeRateRepository;
     private final WebClient.Builder webClientBuilder;
     private final ObjectMapper objectMapper;
 
@@ -229,17 +232,11 @@ public class PayMongoAdapter implements PaymentProviderPort {
 
     @Override
     public BigDecimal calculateFee(BigDecimal amount, PaymentMethod paymentMethod) {
-        if (paymentMethod == null) paymentMethod = PaymentMethod.CARD;
-        return switch (paymentMethod) {
-            case CARD    -> amount.multiply(new BigDecimal("0.03125"))
-                                  .add(new BigDecimal("13.39")).setScale(4, RoundingMode.HALF_UP); // 3.125% + PHP 13.39
-            case MAYA    -> amount.multiply(new BigDecimal("0.0179")).setScale(4, RoundingMode.HALF_UP);  // 1.79%
-            case GCASH   -> amount.multiply(new BigDecimal("0.0223")).setScale(4, RoundingMode.HALF_UP);  // 2.23%
-            case GRABPAY -> amount.multiply(new BigDecimal("0.0196")).setScale(4, RoundingMode.HALF_UP);  // 1.96%
-            case EWALLET -> amount.multiply(new BigDecimal("0.0223")).setScale(4, RoundingMode.HALF_UP);  // default GCash rate
-            default      -> amount.multiply(new BigDecimal("0.03125"))
-                                  .add(new BigDecimal("13.39")).setScale(4, RoundingMode.HALF_UP);
-        };
+        if (paymentMethod == null) paymentMethod = PaymentMethod.MAYA;
+        return providerFeeRateRepository
+                .findByProviderAndPaymentMethodAndActiveTrue(Provider.PAYMONGO, paymentMethod)
+                .map(rate -> rate.compute(amount))
+                .orElse(BigDecimal.ZERO);
     }
 
     @Override

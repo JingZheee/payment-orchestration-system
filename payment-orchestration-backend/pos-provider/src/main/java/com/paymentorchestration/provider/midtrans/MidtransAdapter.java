@@ -6,7 +6,9 @@ import com.paymentorchestration.common.enums.PaymentStatus;
 import com.paymentorchestration.common.enums.Provider;
 import com.paymentorchestration.common.exception.ProviderException;
 import com.paymentorchestration.domain.entity.ProviderConfig;
+import com.paymentorchestration.domain.entity.ProviderFeeRate;
 import com.paymentorchestration.domain.repository.ProviderConfigRepository;
+import com.paymentorchestration.domain.repository.ProviderFeeRateRepository;
 import com.paymentorchestration.provider.dto.*;
 import com.paymentorchestration.provider.port.PaymentProviderPort;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +35,7 @@ public class MidtransAdapter implements PaymentProviderPort {
 
     private final MidtransProperties properties;
     private final ProviderConfigRepository providerConfigRepository;
+    private final ProviderFeeRateRepository providerFeeRateRepository;
     private final WebClient.Builder webClientBuilder;
     private final ObjectMapper objectMapper;
 
@@ -212,14 +215,10 @@ public class MidtransAdapter implements PaymentProviderPort {
     @Override
     public BigDecimal calculateFee(BigDecimal amount, PaymentMethod paymentMethod) {
         if (paymentMethod == null) paymentMethod = PaymentMethod.VIRTUAL_ACCOUNT;
-        return switch (paymentMethod) {
-            case VIRTUAL_ACCOUNT -> new BigDecimal("4000");                                          // IDR 4,000 fixed
-            case QRIS            -> amount.multiply(new BigDecimal("0.007")).setScale(4, RoundingMode.HALF_UP);  // 0.7%
-            case CARD            -> amount.multiply(new BigDecimal("0.029"))
-                                          .add(new BigDecimal("2000")).setScale(4, RoundingMode.HALF_UP);        // 2.9% + IDR 2,000
-            case GOPAY, EWALLET  -> amount.multiply(new BigDecimal("0.020")).setScale(4, RoundingMode.HALF_UP);  // 2.0%
-            default              -> new BigDecimal("4000");
-        };
+        return providerFeeRateRepository
+                .findByProviderAndPaymentMethodAndActiveTrue(Provider.MIDTRANS, paymentMethod)
+                .map(rate -> rate.compute(amount))
+                .orElse(BigDecimal.ZERO);
     }
 
     @Override

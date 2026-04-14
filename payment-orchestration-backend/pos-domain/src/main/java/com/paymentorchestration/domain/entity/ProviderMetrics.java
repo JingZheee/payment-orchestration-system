@@ -41,4 +41,7 @@ public class ProviderMetrics {
 
     @Column(name = "window_end", nullable = false)
     private Instant windowEnd;
+
+    @Column(name = "fee_accuracy_rate", nullable = false, precision = 5, scale = 4)
+    private BigDecimal feeAccuracyRate = BigDecimal.ONE;
 }
