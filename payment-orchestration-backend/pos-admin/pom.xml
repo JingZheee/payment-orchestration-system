@@ -26,6 +26,10 @@
             <groupId>com.paymentorchestration</groupId>
             <artifactId>pos-payment</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.paymentorchestration</groupId>
+            <artifactId>pos-provider</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>

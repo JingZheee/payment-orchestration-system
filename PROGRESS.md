@@ -14,23 +14,28 @@ Last updated: 2026-04-15
 - [x] pos-common: 8 enums + FeeType enum added
 - [x] pos-common: ApiResponse<T> DTO + PosException base + 5 typed exceptions
 - [x] pos-domain: 9 JPA entities + 2 new (ProviderFeeRate, ReconStatement), 11 repositories
-- [x] pos-domain: Flyway migrations V1–V14 (V10=fee rates, V11=recon, V12=fee accuracy metric, V13=routing rule strategy, V14=dummy data + demo rules)
-- [x] pos-domain: V15 — added `region` to provider_fee_rates; unique key now (provider, region, payment_method)
-- [x] pos-domain: V16 — added `region` to recon_statements; single-region providers backfilled, MOCK rows NULL
-- [x] pos-provider: PaymentProviderPort.calculateFee() now takes (amount, region, paymentMethod)
-- [x] pos-provider: All 4 adapters updated — calculateFee passes region; single-region adapters hardcode their region, MOCK uses passed region
-- [x] pos-routing: ProviderScorer volumeWeightedFee now region-scoped (countByPaymentMethodForProviderAndRegion)
+- [x] pos-domain: Flyway migrations V1–V16 (V15=region to fee rates, V16=region to recon)
+- [x] pos-provider: PaymentProviderPort.calculateFee() takes (amount, region, paymentMethod)
+- [x] pos-provider: All 4 adapters updated — region-scoped fee lookup
+- [x] pos-routing: ProviderScorer volumeWeightedFee region-scoped
 - [x] pos-routing: LowestFeeStrategy passes region to calculateFee
-- [x] pos-payment: PaymentMethodController passes region to calculateFee
+- [x] pos-payment: IdempotencyFilter (SHA-256 body hash, DB-backed, 24h TTL)
+- [x] pos-payment: PaymentService + RetryPublisher (TTL queue scheduling)
+- [x] pos-payment: WebhookController (HMAC/RSA signature verify, returns 200 on bad sig)
+- [x] pos-admin: DlqConsumer (marks RETRY_EXHAUSTED after attempt 4+)
+- [x] pos-admin: RetryConsumer — NEW: @RabbitListener on webhook.queue, polls queryPaymentStatus(), resolves or re-publishes
+- [x] pos-admin/pom.xml: added pos-provider dependency for RetryConsumer
+- [x] ROUTING.md — full routing strategy, fee rates, region-scoped docs
+- [x] IDEMPOTENCY_RETRY.md — full idempotency + retry mechanism docs
+- [x] Postman collection (postman/POS.postman_collection.json) — all endpoints
 - [x] All unit tests passing — BUILD SUCCESS
-- [x] ROUTING.md created — full routing strategy, fee rates, and payment method selection docs
 
 ## Up next (start here next session)
-- [ ] Frontend admin pages: /admin/fee-rates (table + inline edit, region column now visible)
+- [ ] Frontend admin pages: /admin/fee-rates (inline-editable table with region column)
 - [ ] Frontend routing rules page: add strategy dropdown column (LOWEST_FEE / SUCCESS_RATE / —)
 - [ ] Frontend: /admin/recon (recon statements list + anomaly filter)
-- [ ] Test end-to-end: initiate MY payment → verify BILLPLZ vs MOCK scoring uses region-scoped fee
-- [ ] Verify recon anomaly record is flagged (MIDTRANS/GOPAY 10% variance in seed data)
+- [ ] End-to-end test: initiate MY payment → verify BILLPLZ vs MOCK scoring uses region-scoped fee
+- [ ] End-to-end test: verify recon anomaly record flagged (MIDTRANS/GOPAY 10% variance in seed data)
 
 ## Decisions locked in
 - Maven multi-module (not Gradle)
@@ -39,12 +44,12 @@ Last updated: 2026-04-15
 - No DB mocking in tests — Testcontainers with real PostgreSQL only
 - spring-boot-maven-plugin only in pos-api
 - Secrets gitignored (application-dev.yml, application-prod.yml)
-- Fee rates stored in DB (provider_fee_rates) — not hardcoded in adapters
-- Fee rates are region-scoped: unique key is (provider, region, payment_method) — do not revert to (provider, payment_method)
-- ProviderConfig PK stays as provider only (no region) — availability is provider-level, not region-level
-- calculateFee always receives region explicitly — adapters hardcode their region, MOCK uses the passed value
-- Volume-weighted fee scoring: method distribution from recon history, scoped to region
+- Fee rates region-scoped: unique key (provider, region, payment_method) — do not revert
+- calculateFee always receives region explicitly
+- Volume-weighted fee scoring scoped to region
 - Routing rules: preferredProvider XOR strategy — not both
+- Webhook signature failure → return HTTP 200 (prevent provider retry storms), rely on RetryConsumer to poll actual status
+- RetryConsumer poll failure treated as still-pending (safe fallback, not FAILED)
 
 ## Blockers
 - None

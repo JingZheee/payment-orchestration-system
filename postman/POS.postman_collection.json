@@ -1,0 +1,830 @@
+{
+  "info": {
+    "name": "Payment Orchestration System",
+    "_postman_id": "pos-collection-v1",
+    "description": "Full API collection for the Payment Orchestration System FYP demo.\n\nQuick start:\n1. Run 'Auth / Login' — accessToken and refreshToken are saved automatically.\n2. Run 'Payments / Initiate Payment (MY)' — transactionId is saved automatically.\n3. Explore Dashboard and Admin endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl",              "value": "http://localhost:8080/api/v1", "type": "string" },
+    { "key": "accessToken",          "value": "", "type": "string" },
+    { "key": "refreshToken",         "value": "", "type": "string" },
+    { "key": "transactionId",        "value": "", "type": "string" },
+    { "key": "providerTransactionId","value": "", "type": "string" },
+    { "key": "feeRateId",            "value": "1", "type": "string" },
+    { "key": "routingRuleId",        "value": "1", "type": "string" }
+  ],
+  "item": [
+
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register (ADMIN)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@demo.com\",\n  \"password\": \"password123\",\n  \"role\": \"ADMIN\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth","register"] }
+          }
+        },
+        {
+          "name": "Register (MERCHANT)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"merchant@demo.com\",\n  \"password\": \"password123\",\n  \"role\": \"MERCHANT\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth","register"] }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.data) {",
+                  "  pm.collectionVariables.set('accessToken',  json.data.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', json.data.refreshToken);",
+                  "  console.log('Token saved:', json.data.accessToken.substring(0,20) + '...');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@demo.com\",\n  \"password\": \"password123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth","login"] }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.data) {",
+                  "  pm.collectionVariables.set('accessToken', json.data.accessToken);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/refresh", "host": ["{{baseUrl}}"], "path": ["auth","refresh"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "Get Payment Methods — MY",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/payments/methods?region=MY&amount=500.00",
+              "host": ["{{baseUrl}}"], "path": ["payments","methods"],
+              "query": [
+                { "key": "region", "value": "MY" },
+                { "key": "amount", "value": "500.00" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Payment Methods — ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/payments/methods?region=ID&amount=100000",
+              "host": ["{{baseUrl}}"], "path": ["payments","methods"],
+              "query": [
+                { "key": "region", "value": "ID" },
+                { "key": "amount", "value": "100000" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Payment Methods — PH",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/payments/methods?region=PH&amount=1000.00",
+              "host": ["{{baseUrl}}"], "path": ["payments","methods"],
+              "query": [
+                { "key": "region", "value": "PH" },
+                { "key": "amount", "value": "1000.00" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Initiate Payment — MY (FPX)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('idempotencyKey', pm.utils.guid());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.data) {",
+                  "  pm.collectionVariables.set('transactionId',         json.data.transactionId);",
+                  "  pm.collectionVariables.set('providerTransactionId', json.data.providerTransactionId || '');",
+                  "  console.log('Transaction ID:', json.data.transactionId);",
+                  "  console.log('Routed to:', json.data.provider, 'via', json.data.routingStrategy);",
+                  "  console.log('Reason:', json.data.routingReason);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization",   "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type",    "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{idempotencyKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"merchantOrderId\": \"ORDER-MY-001\",\n  \"amount\": \"500.00\",\n  \"currency\": \"MYR\",\n  \"region\": \"MY\",\n  \"paymentMethod\": \"FPX\",\n  \"customerEmail\": \"customer@test.com\",\n  \"description\": \"Test payment Malaysia FPX\",\n  \"redirectUrl\": \"http://localhost:4200/payment/result\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/payments/initiate", "host": ["{{baseUrl}}"], "path": ["payments","initiate"] }
+          }
+        },
+        {
+          "name": "Initiate Payment — ID (Virtual Account)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.collectionVariables.set('idempotencyKey', pm.utils.guid());"]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.data) {",
+                  "  pm.collectionVariables.set('transactionId',         json.data.transactionId);",
+                  "  pm.collectionVariables.set('providerTransactionId', json.data.providerTransactionId || '');",
+                  "  console.log('Routed to:', json.data.provider, 'via', json.data.routingStrategy);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization",   "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type",    "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{idempotencyKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"merchantOrderId\": \"ORDER-ID-001\",\n  \"amount\": \"150000\",\n  \"currency\": \"IDR\",\n  \"region\": \"ID\",\n  \"paymentMethod\": \"VIRTUAL_ACCOUNT\",\n  \"customerEmail\": \"customer@test.com\",\n  \"description\": \"Test payment Indonesia Virtual Account\",\n  \"redirectUrl\": \"http://localhost:4200/payment/result\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/payments/initiate", "host": ["{{baseUrl}}"], "path": ["payments","initiate"] }
+          }
+        },
+        {
+          "name": "Initiate Payment — PH (Maya)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.collectionVariables.set('idempotencyKey', pm.utils.guid());"]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.data) {",
+                  "  pm.collectionVariables.set('transactionId',         json.data.transactionId);",
+                  "  pm.collectionVariables.set('providerTransactionId', json.data.providerTransactionId || '');",
+                  "  console.log('Routed to:', json.data.provider, 'via', json.data.routingStrategy);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization",   "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type",    "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{idempotencyKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"merchantOrderId\": \"ORDER-PH-001\",\n  \"amount\": \"1000.00\",\n  \"currency\": \"PHP\",\n  \"region\": \"PH\",\n  \"paymentMethod\": \"MAYA\",\n  \"customerEmail\": \"customer@test.com\",\n  \"description\": \"Test payment Philippines Maya\",\n  \"redirectUrl\": \"http://localhost:4200/payment/result\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/payments/initiate", "host": ["{{baseUrl}}"], "path": ["payments","initiate"] }
+          }
+        },
+        {
+          "name": "Get Transaction + Event Log",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{baseUrl}}/payments/{{transactionId}}", "host": ["{{baseUrl}}"], "path": ["payments","{{transactionId}}"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Admin — Providers",
+      "item": [
+        {
+          "name": "List All Providers",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{baseUrl}}/admin/providers", "host": ["{{baseUrl}}"], "path": ["admin","providers"] }
+          }
+        },
+        {
+          "name": "Disable BILLPLZ",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/admin/providers/BILLPLZ/toggle?enabled=false",
+              "host": ["{{baseUrl}}"], "path": ["admin","providers","BILLPLZ","toggle"],
+              "query": [{ "key": "enabled", "value": "false" }]
+            }
+          }
+        },
+        {
+          "name": "Enable BILLPLZ",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/admin/providers/BILLPLZ/toggle?enabled=true",
+              "host": ["{{baseUrl}}"], "path": ["admin","providers","BILLPLZ","toggle"],
+              "query": [{ "key": "enabled", "value": "true" }]
+            }
+          }
+        },
+        {
+          "name": "Disable MOCK",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/admin/providers/MOCK/toggle?enabled=false",
+              "host": ["{{baseUrl}}"], "path": ["admin","providers","MOCK","toggle"],
+              "query": [{ "key": "enabled", "value": "false" }]
+            }
+          }
+        },
+        {
+          "name": "Enable MOCK",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/admin/providers/MOCK/toggle?enabled=true",
+              "host": ["{{baseUrl}}"], "path": ["admin","providers","MOCK","toggle"],
+              "query": [{ "key": "enabled", "value": "true" }]
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Admin — Fee Rates",
+      "item": [
+        {
+          "name": "List All Fee Rates (with region)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.data && json.data.length > 0) {",
+                  "  pm.collectionVariables.set('feeRateId', String(json.data[0].id));",
+                  "  console.log('First fee rate ID saved:', json.data[0].id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{baseUrl}}/admin/fee-rates", "host": ["{{baseUrl}}"], "path": ["admin","fee-rates"] }
+          }
+        },
+        {
+          "name": "Update Fee Rate (percentage)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"percentage\": 0.020000\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/admin/fee-rates/{{feeRateId}}", "host": ["{{baseUrl}}"], "path": ["admin","fee-rates","{{feeRateId}}"] }
+          }
+        },
+        {
+          "name": "Update Fee Rate (fixed amount)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fixedAmount\": 2.0000\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/admin/fee-rates/{{feeRateId}}", "host": ["{{baseUrl}}"], "path": ["admin","fee-rates","{{feeRateId}}"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Admin — Routing Rules",
+      "item": [
+        {
+          "name": "List All Rules",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.data && json.data.length > 0) {",
+                  "  pm.collectionVariables.set('routingRuleId', String(json.data[0].id));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{baseUrl}}/admin/routing-rules", "host": ["{{baseUrl}}"], "path": ["admin","routing-rules"] }
+          }
+        },
+        {
+          "name": "Create Rule — Force BILLPLZ for MY",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.data) pm.collectionVariables.set('routingRuleId', String(json.data.id));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"priority\": 1,\n  \"region\": \"MY\",\n  \"preferredProvider\": \"BILLPLZ\",\n  \"enabled\": true\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/admin/routing-rules", "host": ["{{baseUrl}}"], "path": ["admin","routing-rules"] }
+          }
+        },
+        {
+          "name": "Create Rule — LOWEST_FEE for large ID payments",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.data) pm.collectionVariables.set('routingRuleId', String(json.data.id));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"priority\": 2,\n  \"region\": \"ID\",\n  \"minAmount\": 500000,\n  \"strategy\": \"LOWEST_FEE\",\n  \"enabled\": true\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/admin/routing-rules", "host": ["{{baseUrl}}"], "path": ["admin","routing-rules"] }
+          }
+        },
+        {
+          "name": "Create Rule — SUCCESS_RATE catch-all for PH",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"priority\": 10,\n  \"region\": \"PH\",\n  \"strategy\": \"SUCCESS_RATE\",\n  \"enabled\": true\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/admin/routing-rules", "host": ["{{baseUrl}}"], "path": ["admin","routing-rules"] }
+          }
+        },
+        {
+          "name": "Update Rule",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"priority\": 1,\n  \"region\": \"MY\",\n  \"strategy\": \"SUCCESS_RATE\",\n  \"enabled\": true\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/admin/routing-rules/{{routingRuleId}}", "host": ["{{baseUrl}}"], "path": ["admin","routing-rules","{{routingRuleId}}"] }
+          }
+        },
+        {
+          "name": "Delete Rule",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{baseUrl}}/admin/routing-rules/{{routingRuleId}}", "host": ["{{baseUrl}}"], "path": ["admin","routing-rules","{{routingRuleId}}"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Admin — Transactions",
+      "item": [
+        {
+          "name": "List All (paginated)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/admin/transactions?page=0&size=20&sort=createdAt,desc",
+              "host": ["{{baseUrl}}"], "path": ["admin","transactions"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" },
+                { "key": "sort", "value": "createdAt,desc" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Filter by Status — COMPLETED",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/admin/transactions?status=COMPLETED",
+              "host": ["{{baseUrl}}"], "path": ["admin","transactions"],
+              "query": [{ "key": "status", "value": "COMPLETED" }]
+            }
+          }
+        },
+        {
+          "name": "Filter by Status — FAILED",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/admin/transactions?status=FAILED",
+              "host": ["{{baseUrl}}"], "path": ["admin","transactions"],
+              "query": [{ "key": "status", "value": "FAILED" }]
+            }
+          }
+        },
+        {
+          "name": "Filter by Provider — MOCK",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/admin/transactions?provider=MOCK",
+              "host": ["{{baseUrl}}"], "path": ["admin","transactions"],
+              "query": [{ "key": "provider", "value": "MOCK" }]
+            }
+          }
+        },
+        {
+          "name": "Filter by Region — MY",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/admin/transactions?region=MY",
+              "host": ["{{baseUrl}}"], "path": ["admin","transactions"],
+              "query": [{ "key": "region", "value": "MY" }]
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Admin — Metrics",
+      "item": [
+        {
+          "name": "Provider Metrics (last 60 min)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{baseUrl}}/admin/metrics", "host": ["{{baseUrl}}"], "path": ["admin","metrics"] }
+          }
+        },
+        {
+          "name": "Provider Metrics (last 24 hours)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/admin/metrics?windowMinutes=1440",
+              "host": ["{{baseUrl}}"], "path": ["admin","metrics"],
+              "query": [{ "key": "windowMinutes", "value": "1440" }]
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "Transaction Summary",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{baseUrl}}/admin/dashboard/transactions/summary", "host": ["{{baseUrl}}"], "path": ["admin","dashboard","transactions","summary"] }
+          }
+        },
+        {
+          "name": "Live Scores — MY",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/admin/dashboard/scores?region=MY&amount=500.00&currency=MYR&paymentMethod=FPX",
+              "host": ["{{baseUrl}}"], "path": ["admin","dashboard","scores"],
+              "query": [
+                { "key": "region",        "value": "MY" },
+                { "key": "amount",        "value": "500.00" },
+                { "key": "currency",      "value": "MYR" },
+                { "key": "paymentMethod", "value": "FPX" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Live Scores — ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/admin/dashboard/scores?region=ID&amount=100000&currency=IDR&paymentMethod=VIRTUAL_ACCOUNT",
+              "host": ["{{baseUrl}}"], "path": ["admin","dashboard","scores"],
+              "query": [
+                { "key": "region",        "value": "ID" },
+                { "key": "amount",        "value": "100000" },
+                { "key": "currency",      "value": "IDR" },
+                { "key": "paymentMethod", "value": "VIRTUAL_ACCOUNT" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Live Scores — PH",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/admin/dashboard/scores?region=PH&amount=1000.00&currency=PHP&paymentMethod=MAYA",
+              "host": ["{{baseUrl}}"], "path": ["admin","dashboard","scores"],
+              "query": [
+                { "key": "region",        "value": "PH" },
+                { "key": "amount",        "value": "1000.00" },
+                { "key": "currency",      "value": "PHP" },
+                { "key": "paymentMethod", "value": "MAYA" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Strategy Comparison — MY",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/admin/dashboard/strategy-comparison?region=MY&amount=500.00&currency=MYR&paymentMethod=FPX",
+              "host": ["{{baseUrl}}"], "path": ["admin","dashboard","strategy-comparison"],
+              "query": [
+                { "key": "region",        "value": "MY" },
+                { "key": "amount",        "value": "500.00" },
+                { "key": "currency",      "value": "MYR" },
+                { "key": "paymentMethod", "value": "FPX" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Strategy Comparison — ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/admin/dashboard/strategy-comparison?region=ID&amount=100000&currency=IDR&paymentMethod=VIRTUAL_ACCOUNT",
+              "host": ["{{baseUrl}}"], "path": ["admin","dashboard","strategy-comparison"],
+              "query": [
+                { "key": "region",        "value": "ID" },
+                { "key": "amount",        "value": "100000" },
+                { "key": "currency",      "value": "IDR" },
+                { "key": "paymentMethod", "value": "VIRTUAL_ACCOUNT" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Strategy Comparison — PH",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/admin/dashboard/strategy-comparison?region=PH&amount=1000.00&currency=PHP&paymentMethod=MAYA",
+              "host": ["{{baseUrl}}"], "path": ["admin","dashboard","strategy-comparison"],
+              "query": [
+                { "key": "region",        "value": "PH" },
+                { "key": "amount",        "value": "1000.00" },
+                { "key": "currency",      "value": "PHP" },
+                { "key": "paymentMethod", "value": "MAYA" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Recon Statements",
+      "item": [
+        {
+          "name": "List All",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{baseUrl}}/admin/recon?page=0&size=20", "host": ["{{baseUrl}}"], "path": ["admin","recon"],
+              "query": [{ "key": "page", "value": "0" }, { "key": "size", "value": "20" }]
+            }
+          }
+        },
+        {
+          "name": "Filter by Provider — MIDTRANS",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/admin/recon?provider=MIDTRANS",
+              "host": ["{{baseUrl}}"], "path": ["admin","recon"],
+              "query": [{ "key": "provider", "value": "MIDTRANS" }]
+            }
+          }
+        },
+        {
+          "name": "Anomalies Only",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{baseUrl}}/admin/recon/anomalies", "host": ["{{baseUrl}}"], "path": ["admin","recon","anomalies"] }
+          }
+        },
+        {
+          "name": "Anomalies — MIDTRANS only",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/admin/recon/anomalies?provider=MIDTRANS",
+              "host": ["{{baseUrl}}"], "path": ["admin","recon","anomalies"],
+              "query": [{ "key": "provider", "value": "MIDTRANS" }]
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Webhooks (no auth)",
+      "item": [
+        {
+          "name": "MOCK Webhook — COMPLETED",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactionId\": \"{{providerTransactionId}}\",\n  \"status\": \"COMPLETED\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/webhooks/MOCK", "host": ["{{baseUrl}}"], "path": ["webhooks","MOCK"] }
+          }
+        },
+        {
+          "name": "MOCK Webhook — FAILED",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactionId\": \"{{providerTransactionId}}\",\n  \"status\": \"FAILED\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/webhooks/MOCK", "host": ["{{baseUrl}}"], "path": ["webhooks","MOCK"] }
+          }
+        }
+      ]
+    }
+
+  ]
+}

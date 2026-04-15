@@ -263,6 +263,6 @@ Weights are configurable in `application.yml` under `routing.scorer.*`.
 | Field | Value |
 |---|---|
 | **Current module** | frontend (admin pages) + integration testing |
-| **Current task** | Build Angular admin pages: /admin/fee-rates (inline-editable table — now shows region column), /admin/recon (recon statements list with anomaly filter); add strategy dropdown to routing rules page |
-| **Last completed** | Region-scoped fee rates — V15/V16 migrations, ProviderFeeRate + ReconStatement entities updated, calculateFee interface takes region, all 4 adapters updated, ProviderScorer + LowestFeeStrategy region-scoped, ROUTING.md fully updated — BUILD SUCCESS all tests passing |
+| **Current task** | Build Angular admin pages: /admin/fee-rates (inline-editable table with region column), /admin/recon (recon statements list + anomaly filter); add strategy dropdown to routing rules page |
+| **Last completed** | RetryConsumer implemented (webhook.queue @RabbitListener — polls queryPaymentStatus, resolves or re-publishes); IDEMPOTENCY_RETRY.md created — BUILD SUCCESS |
 | **Blockers** | None |
