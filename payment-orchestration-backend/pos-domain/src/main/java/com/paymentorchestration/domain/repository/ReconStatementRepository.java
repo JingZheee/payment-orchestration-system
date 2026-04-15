@@ -1,6 +1,7 @@
 package com.paymentorchestration.domain.repository;
 
 import com.paymentorchestration.common.enums.Provider;
+import com.paymentorchestration.common.enums.Region;
 import com.paymentorchestration.domain.entity.ReconStatement;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -24,10 +25,12 @@ public interface ReconStatementRepository extends JpaRepository<ReconStatement, 
     Page<ReconStatement> findByProviderAndAnomalyTrueOrderByCreatedAtDesc(Provider provider, Pageable pageable);
 
     /**
-     * Returns [paymentMethod, count] pairs for volume-weighted fee calculation.
+     * Returns [paymentMethod, count] pairs for volume-weighted fee calculation, scoped to a region.
+     * Historical MOCK rows with NULL region are excluded by the WHERE clause.
      */
-    @Query("SELECT r.paymentMethod, COUNT(r) FROM ReconStatement r WHERE r.provider = :provider GROUP BY r.paymentMethod")
-    List<Object[]> countByPaymentMethodForProvider(@Param("provider") Provider provider);
+    @Query("SELECT r.paymentMethod, COUNT(r) FROM ReconStatement r WHERE r.provider = :provider AND r.region = :region GROUP BY r.paymentMethod")
+    List<Object[]> countByPaymentMethodForProviderAndRegion(@Param("provider") Provider provider,
+                                                            @Param("region") Region region);
 
     /**
      * Average fee accuracy for a provider since a given timestamp.

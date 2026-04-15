@@ -21,12 +21,12 @@ public class ProviderFeeRateController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<ProviderFeeRate>>> getAll() {
-        return ResponseEntity.ok(ApiResponse.ok(feeRateRepository.findAllByOrderByProviderAscPaymentMethodAsc()));
+        return ResponseEntity.ok(ApiResponse.ok(feeRateRepository.findAllByOrderByProviderAscRegionAscPaymentMethodAsc()));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<ProviderFeeRate>> update(
-            @PathVariable Long id,
+            @PathVariable("id") Long id,
             @RequestBody FeeRateUpdateRequest request) {
 
         ProviderFeeRate rate = feeRateRepository.findById(id)

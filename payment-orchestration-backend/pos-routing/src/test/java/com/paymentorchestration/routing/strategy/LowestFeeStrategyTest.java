@@ -71,7 +71,7 @@ class LowestFeeStrategyTest {
     private PaymentProviderPort providerWithFee(Provider provider, Region region, String fee) {
         PaymentProviderPort p = mock(PaymentProviderPort.class);
         when(p.getProvider()).thenReturn(provider);
-        when(p.calculateFee(any(BigDecimal.class), any())).thenReturn(new BigDecimal(fee));
+        when(p.calculateFee(any(BigDecimal.class), any(), any())).thenReturn(new BigDecimal(fee));
         return p;
     }
 

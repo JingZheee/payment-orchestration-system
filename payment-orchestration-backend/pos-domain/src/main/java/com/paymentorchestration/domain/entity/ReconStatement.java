@@ -2,6 +2,7 @@ package com.paymentorchestration.domain.entity;
 
 import com.paymentorchestration.common.enums.PaymentMethod;
 import com.paymentorchestration.common.enums.Provider;
+import com.paymentorchestration.common.enums.Region;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -27,6 +28,10 @@ public class ReconStatement {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Provider provider;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "region")
+    private Region region;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_method")

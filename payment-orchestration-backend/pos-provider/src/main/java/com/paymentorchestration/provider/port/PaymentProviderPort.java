@@ -2,6 +2,7 @@ package com.paymentorchestration.provider.port;
 
 import com.paymentorchestration.common.enums.PaymentMethod;
 import com.paymentorchestration.common.enums.Provider;
+import com.paymentorchestration.common.enums.Region;
 import com.paymentorchestration.provider.dto.*;
 
 import java.math.BigDecimal;
@@ -41,17 +42,32 @@ public interface PaymentProviderPort {
      * Uses HMAC-SHA256 for Billplz and Midtrans, RSA for PayMongo.
      * Always returns true for Mock provider.
      *
-     * @param rawBody   raw request body bytes (before any parsing)
-     * @param headers   all HTTP headers from the webhook request
+     * @param rawBody    raw request body bytes — used by JSON-body providers (Midtrans, PayMongo)
+     * @param headers    all HTTP request headers (lowercased)
+     * @param formParams Tomcat-decoded form parameters — populated for
+     *                   application/x-www-form-urlencoded requests (Billplz), empty otherwise
      * @return true if the signature is valid, false otherwise
      */
-    boolean verifyWebhookSignature(byte[] rawBody, Map<String, String> headers);
+    boolean verifyWebhookSignature(byte[] rawBody, Map<String, String> headers,
+                                   Map<String, String> formParams);
 
     /**
-     * Parse a raw webhook payload into a normalized result.
-     * Called after signature verification passes.
+     * Parse a raw webhook payload into a normalized result (JSON-body providers).
      */
     WebhookParseResult parseWebhookPayload(String rawBody);
+
+    /**
+     * Parse a form-encoded webhook payload into a normalized result.
+     * Default delegates to the String overload by joining key=value pairs.
+     * Override in adapters that handle form-encoded webhooks (Billplz).
+     */
+    default WebhookParseResult parseWebhookPayload(Map<String, String> formParams) {
+        return parseWebhookPayload(
+                formParams.entrySet().stream()
+                        .map(e -> e.getKey() + "=" + e.getValue())
+                        .collect(java.util.stream.Collectors.joining("&"))
+        );
+    }
 
     /**
      * Returns the payment methods this provider supports.
@@ -60,11 +76,12 @@ public interface PaymentProviderPort {
     List<PaymentMethod> supportedMethods();
 
     /**
-     * Calculate the exact fee for a transaction amount and payment method.
-     * Called after the user has selected their payment method, so the fee is precise.
-     * Also used by ProviderScorer to compare providers for the same method.
+     * Calculate the exact fee for a transaction amount, region, and payment method.
+     * Region is required because MOCK covers multiple regions and may have different
+     * fee rates per region. Single-region providers (BILLPLZ, MIDTRANS, PAYMONGO)
+     * accept the parameter for interface consistency but ignore it.
      */
-    BigDecimal calculateFee(BigDecimal amount, PaymentMethod paymentMethod);
+    BigDecimal calculateFee(BigDecimal amount, Region region, PaymentMethod paymentMethod);
 
     /**
      * Health check. Returns false if the provider is disabled in provider_configs

@@ -3,6 +3,7 @@ package com.paymentorchestration.domain.entity;
 import com.paymentorchestration.common.enums.FeeType;
 import com.paymentorchestration.common.enums.PaymentMethod;
 import com.paymentorchestration.common.enums.Provider;
+import com.paymentorchestration.common.enums.Region;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -12,7 +13,13 @@ import java.math.RoundingMode;
 import java.time.Instant;
 
 @Entity
-@Table(name = "provider_fee_rates")
+@Table(
+    name = "provider_fee_rates",
+    uniqueConstraints = @UniqueConstraint(
+        name = "uq_provider_region_payment_method",
+        columnNames = {"provider", "region", "payment_method"}
+    )
+)
 @Getter
 @Setter
 public class ProviderFeeRate {
@@ -24,6 +31,10 @@ public class ProviderFeeRate {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Provider provider;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Region region;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_method", nullable = false)

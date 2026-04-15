@@ -9,6 +9,7 @@ import com.paymentorchestration.domain.repository.ProviderMetricsRepository;
 import com.paymentorchestration.domain.repository.ReconStatementRepository;
 import com.paymentorchestration.provider.port.PaymentProviderPort;
 import com.paymentorchestration.routing.dto.RoutingContext;
+import com.paymentorchestration.routing.dto.ScoreDetail;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -49,6 +50,17 @@ public class ProviderScorer {
     public BigDecimal score(PaymentProviderPort provider,
                             RoutingContext context,
                             List<PaymentProviderPort> eligibleProviders) {
+        return scoreDetail(provider, context, eligibleProviders).totalScore();
+    }
+
+    /**
+     * Full score breakdown for a single provider.
+     * Returns all raw inputs and weighted components so the admin dashboard
+     * can display a per-provider score explanation.
+     */
+    public ScoreDetail scoreDetail(PaymentProviderPort provider,
+                                   RoutingContext context,
+                                   List<PaymentProviderPort> eligibleProviders) {
 
         Region region = context.getRegion();
         BigDecimal amount = context.getAmount();
@@ -79,7 +91,7 @@ public class ProviderScorer {
         // --- fee accuracy ---
         BigDecimal feeAccuracy = latestFeeAccuracyRate(provider.getProvider(), region);
 
-        // --- composite ---
+        // --- weighted components ---
         BigDecimal srComponent       = successRate.multiply(BigDecimal.valueOf(properties.getSuccessRateWeight()));
         BigDecimal feeComponent      = BigDecimal.ONE.subtract(normalizedFee)
                                                      .multiply(BigDecimal.valueOf(properties.getFeeWeight()));
@@ -87,24 +99,41 @@ public class ProviderScorer {
                                                      .multiply(BigDecimal.valueOf(properties.getLatencyWeight()));
         BigDecimal accuracyComponent = feeAccuracy.multiply(BigDecimal.valueOf(properties.getFeeAccuracyWeight()));
 
-        return srComponent.add(feeComponent).add(latencyComponent).add(accuracyComponent)
-                          .setScale(6, RoundingMode.HALF_UP);
+        BigDecimal totalScore = srComponent.add(feeComponent).add(latencyComponent).add(accuracyComponent)
+                                           .setScale(6, RoundingMode.HALF_UP);
+
+        return new ScoreDetail(
+                provider.getProvider(),
+                totalScore,
+                successRate,
+                fee,
+                latencyMs,
+                feeAccuracy,
+                srComponent.setScale(6, RoundingMode.HALF_UP),
+                feeComponent.setScale(6, RoundingMode.HALF_UP),
+                latencyComponent.setScale(6, RoundingMode.HALF_UP),
+                accuracyComponent.setScale(6, RoundingMode.HALF_UP)
+        );
     }
 
     /**
-     * Volume-weighted average fee for a provider, based on real payment method
-     * distribution observed in recon_statements.
+     * Volume-weighted average fee for a provider, scoped to the transaction's region.
      *
-     * If no recon data exists, falls back to calculateFee() using the context's
-     * payment method (the "default" method for the region).
+     * Uses recon_statements filtered by (provider, region) to find the real payment method
+     * distribution, then weights fee rates accordingly. This ensures MOCK's MY history
+     * doesn't contaminate its ID or PH fee estimates.
+     *
+     * If no recon data exists for the region, falls back to the fee rate for the
+     * context's payment method from provider_fee_rates.
      */
     private BigDecimal volumeWeightedFee(Provider provider, RoutingContext context, BigDecimal amount) {
-        List<Object[]> methodCounts = reconRepository.countByPaymentMethodForProvider(provider);
+        Region region = context.getRegion();
+        List<Object[]> methodCounts = reconRepository.countByPaymentMethodForProviderAndRegion(provider, region);
 
         if (methodCounts.isEmpty()) {
-            // No recon history — use the context's default method as a stand-in
+            // No recon history for this region — use the context's payment method as a stand-in
             return feeRateRepository
-                    .findByProviderAndPaymentMethodAndActiveTrue(provider, context.getPaymentMethod())
+                    .findByProviderAndRegionAndPaymentMethodAndActiveTrue(provider, region, context.getPaymentMethod())
                     .map(rate -> rate.compute(amount))
                     .orElse(BigDecimal.ZERO);
         }
@@ -119,7 +148,7 @@ public class ProviderScorer {
             BigDecimal share = BigDecimal.valueOf(count).divide(BigDecimal.valueOf(total), 6, RoundingMode.HALF_UP);
 
             BigDecimal methodFee = feeRateRepository
-                    .findByProviderAndPaymentMethodAndActiveTrue(provider, method)
+                    .findByProviderAndRegionAndPaymentMethodAndActiveTrue(provider, region, method)
                     .map(rate -> rate.compute(amount))
                     .orElse(BigDecimal.ZERO);
 

@@ -26,9 +26,9 @@ public class LowestFeeStrategy implements RoutingStrategy {
     public Optional<RoutingDecision> select(RoutingContext context) {
         return context.getAvailableProviders().stream()
                 .filter(p -> ProviderRegionSupport.supportsRegion(p.getProvider(), context.getRegion()))
-                .min(Comparator.comparing(p -> p.calculateFee(context.getAmount(), context.getPaymentMethod())))
+                .min(Comparator.comparing(p -> p.calculateFee(context.getAmount(), context.getRegion(), context.getPaymentMethod())))
                 .map(p -> {
-                    BigDecimal fee = p.calculateFee(context.getAmount(), context.getPaymentMethod());
+                    BigDecimal fee = p.calculateFee(context.getAmount(), context.getRegion(), context.getPaymentMethod());
                     return RoutingDecision.builder()
                             .provider(p.getProvider())
                             .strategy(com.paymentorchestration.common.enums.RoutingStrategy.LOWEST_FEE)

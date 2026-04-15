@@ -4,6 +4,7 @@ import com.paymentorchestration.common.enums.MockProviderMode;
 import com.paymentorchestration.common.enums.PaymentMethod;
 import com.paymentorchestration.common.enums.PaymentStatus;
 import com.paymentorchestration.common.enums.Provider;
+import com.paymentorchestration.common.enums.Region;
 import com.paymentorchestration.domain.repository.ProviderFeeRateRepository;
 import com.paymentorchestration.provider.dto.*;
 import com.paymentorchestration.provider.port.PaymentProviderPort;
@@ -62,7 +63,7 @@ public class MockProviderAdapter implements PaymentProviderPort {
                 .providerTransactionId(providerTxnId)
                 .status(resultStatus)
                 .redirectUrl("http://localhost:8080/mock/pay/" + providerTxnId)
-                .fee(calculateFee(request.getAmount(), request.getPaymentMethod()))
+                .fee(calculateFee(request.getAmount(), request.getRegion(), request.getPaymentMethod()))
                 .rawResponse("{\"mock\":true,\"mode\":\"" + mode + "\",\"status\":\"" + resultStatus + "\"}")
                 .build();
     }
@@ -95,7 +96,8 @@ public class MockProviderAdapter implements PaymentProviderPort {
     }
 
     @Override
-    public boolean verifyWebhookSignature(byte[] rawBody, Map<String, String> headers) {
+    public boolean verifyWebhookSignature(byte[] rawBody, Map<String, String> headers,
+                                          Map<String, String> formParams) {
         return true; // Mock always passes verification
     }
 
@@ -127,10 +129,10 @@ public class MockProviderAdapter implements PaymentProviderPort {
     }
 
     @Override
-    public BigDecimal calculateFee(BigDecimal amount, PaymentMethod paymentMethod) {
+    public BigDecimal calculateFee(BigDecimal amount, Region region, PaymentMethod paymentMethod) {
         if (paymentMethod == null) paymentMethod = PaymentMethod.FPX;
         return providerFeeRateRepository
-                .findByProviderAndPaymentMethodAndActiveTrue(Provider.MOCK, paymentMethod)
+                .findByProviderAndRegionAndPaymentMethodAndActiveTrue(Provider.MOCK, region, paymentMethod)
                 .map(rate -> rate.compute(amount))
                 .orElseGet(() -> amount.multiply(BigDecimal.valueOf(0.01)).setScale(4, RoundingMode.HALF_UP));
     }

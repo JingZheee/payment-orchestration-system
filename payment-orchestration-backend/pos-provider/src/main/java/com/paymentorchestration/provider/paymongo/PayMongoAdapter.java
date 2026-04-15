@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.paymentorchestration.common.enums.PaymentMethod;
 import com.paymentorchestration.common.enums.PaymentStatus;
 import com.paymentorchestration.common.enums.Provider;
+import com.paymentorchestration.common.enums.Region;
 import com.paymentorchestration.common.exception.ProviderException;
 import com.paymentorchestration.domain.entity.ProviderConfig;
 import com.paymentorchestration.domain.entity.ProviderFeeRate;
@@ -88,7 +89,7 @@ public class PayMongoAdapter implements PaymentProviderPort {
                     .providerTransactionId(intentId)
                     .status(PaymentStatus.PROCESSING)
                     .redirectUrl(checkoutUrl)
-                    .fee(calculateFee(request.getAmount(), request.getPaymentMethod()))
+                    .fee(calculateFee(request.getAmount(), request.getRegion(), request.getPaymentMethod()))
                     .rawResponse(objectMapper.writeValueAsString(response))
                     .build();
 
@@ -168,7 +169,8 @@ public class PayMongoAdapter implements PaymentProviderPort {
     }
 
     @Override
-    public boolean verifyWebhookSignature(byte[] rawBody, Map<String, String> headers) {
+    public boolean verifyWebhookSignature(byte[] rawBody, Map<String, String> headers,
+                                          Map<String, String> formParams) {
         // PayMongo signature header: "paymongo-signature: t=<timestamp>,te=<hmac>,li=<hmac>"
         String signatureHeader = headers.get("paymongo-signature");
         if (signatureHeader == null) {
@@ -231,10 +233,11 @@ public class PayMongoAdapter implements PaymentProviderPort {
     }
 
     @Override
-    public BigDecimal calculateFee(BigDecimal amount, PaymentMethod paymentMethod) {
+    public BigDecimal calculateFee(BigDecimal amount, Region region, PaymentMethod paymentMethod) {
         if (paymentMethod == null) paymentMethod = PaymentMethod.MAYA;
+        // PAYMONGO only operates in PH; region parameter accepted for interface consistency
         return providerFeeRateRepository
-                .findByProviderAndPaymentMethodAndActiveTrue(Provider.PAYMONGO, paymentMethod)
+                .findByProviderAndRegionAndPaymentMethodAndActiveTrue(Provider.PAYMONGO, Region.PH, paymentMethod)
                 .map(rate -> rate.compute(amount))
                 .orElse(BigDecimal.ZERO);
     }

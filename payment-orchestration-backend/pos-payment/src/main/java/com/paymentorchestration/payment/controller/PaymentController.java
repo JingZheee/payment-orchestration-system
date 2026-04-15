@@ -46,7 +46,7 @@ public class PaymentController {
      */
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<TransactionDetail>> getTransaction(
-            @PathVariable UUID id) {
+            @PathVariable("id") UUID id) {
 
         Transaction transaction = paymentService.getTransaction(id);
         List<TransactionEvent> events =

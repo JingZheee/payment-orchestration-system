@@ -3,6 +3,7 @@ package com.paymentorchestration.provider.billplz;
 import com.paymentorchestration.common.enums.PaymentMethod;
 import com.paymentorchestration.common.enums.PaymentStatus;
 import com.paymentorchestration.common.enums.Provider;
+import com.paymentorchestration.common.enums.Region;
 import com.paymentorchestration.common.exception.ProviderException;
 import com.paymentorchestration.domain.entity.ProviderConfig;
 import com.paymentorchestration.domain.entity.ProviderFeeRate;
@@ -60,7 +61,7 @@ public class BillplzAdapter implements PaymentProviderPort {
         formData.add("email", request.getCustomerEmail() != null ? request.getCustomerEmail() : "customer@example.com");
         formData.add("name", "Customer");
         formData.add("amount", String.valueOf(amountInCents));
-        formData.add("callback_url", "http://localhost:8080/api/v1/webhooks/BILLPLZ");
+        formData.add("callback_url", "https://expansion-palm-molecule.ngrok-free.dev/api/v1/webhooks/BILLPLZ");
         formData.add("redirect_url", request.getRedirectUrl() != null ? request.getRedirectUrl() : "http://localhost:4200/payment-result");
         formData.add("description", request.getDescription() != null ? request.getDescription() : request.getMerchantOrderId());
         formData.add("reference_1", request.getTransactionId().toString());
@@ -87,7 +88,7 @@ public class BillplzAdapter implements PaymentProviderPort {
                     .providerTransactionId(billId)
                     .status(PaymentStatus.PROCESSING)
                     .redirectUrl(billUrl)
-                    .fee(calculateFee(request.getAmount(), request.getPaymentMethod()))
+                    .fee(calculateFee(request.getAmount(), request.getRegion(), request.getPaymentMethod()))
                     .rawResponse(response.toString())
                     .build();
 
@@ -132,26 +133,28 @@ public class BillplzAdapter implements PaymentProviderPort {
     }
 
     @Override
-    public boolean verifyWebhookSignature(byte[] rawBody, Map<String, String> headers) {
-        String receivedSignature = headers.get("x-signature");
-        if (receivedSignature == null) {
-            log.warn("[billplz] Missing X-Signature header");
-            return false;
-        }
-
+    public boolean verifyWebhookSignature(byte[] rawBody, Map<String, String> headers,
+                                          Map<String, String> formParams) {
+        // Billplz puts the signature in the form body as x_signature.
+        // formParams is already decoded by Tomcat — no manual URL-decoding needed.
         try {
-            // Parse form-encoded body into sorted map
-            String bodyStr = new String(rawBody, StandardCharsets.UTF_8);
-            Map<String, String> params = parseFormEncoded(bodyStr);
+            String receivedSignature = formParams.get("x_signature");
+            if (receivedSignature == null) {
+                log.warn("[billplz] No x_signature in form params");
+                return false;
+            }
 
-            // Build signature data: sort keys, join values with pipe
-            String signatureData = params.entrySet().stream()
-                    .sorted(Map.Entry.comparingByKey())
-                    .map(Map.Entry::getValue)
+            // Sort by key (case-insensitive), concatenate key+value, join with "|"
+            String signatureData = formParams.entrySet().stream()
+                    .filter(e -> !e.getKey().equals("x_signature"))
+                    .sorted(Map.Entry.comparingByKey(String.CASE_INSENSITIVE_ORDER))
+                    .map(e -> e.getKey() + e.getValue())
                     .reduce((a, b) -> a + "|" + b)
                     .orElse("");
 
             String expected = hmacSha256(properties.getWebhookSecret(), signatureData);
+            log.debug("[billplz] signatureData='{}' expected='{}' received='{}'",
+                    signatureData, expected, receivedSignature);
             return secureEquals(expected, receivedSignature);
 
         } catch (Exception e) {
@@ -161,20 +164,26 @@ public class BillplzAdapter implements PaymentProviderPort {
     }
 
     @Override
-    public WebhookParseResult parseWebhookPayload(String rawBody) {
-        // Form-encoded: billplz[id]=xxx&billplz[paid]=true&billplz[paid_amount]=xxx
-        Map<String, String> params = parseFormEncoded(rawBody);
-
-        String billId = params.get("billplz[id]");
-        boolean paid = "true".equalsIgnoreCase(params.get("billplz[paid]"));
+    public WebhookParseResult parseWebhookPayload(Map<String, String> formParams) {
+        String billId = formParams.get("id");
+        boolean paid = "true".equalsIgnoreCase(formParams.get("paid"));
         PaymentStatus status = paid ? PaymentStatus.SUCCESS : PaymentStatus.FAILED;
+
+        log.debug("[billplz] parseWebhookPayload: id={} paid={} state={}",
+                billId, formParams.get("paid"), formParams.get("state"));
 
         return WebhookParseResult.builder()
                 .provider(Provider.BILLPLZ)
                 .providerTransactionId(billId)
                 .status(status)
-                .rawPayload(rawBody)
+                .rawPayload(formParams.toString())
                 .build();
+    }
+
+    @Override
+    public WebhookParseResult parseWebhookPayload(String rawBody) {
+        // Not used for Billplz — form-encoded path goes through parseWebhookPayload(Map)
+        return parseWebhookPayload(java.util.Collections.emptyMap());
     }
 
     @Override
@@ -183,10 +192,11 @@ public class BillplzAdapter implements PaymentProviderPort {
     }
 
     @Override
-    public BigDecimal calculateFee(BigDecimal amount, PaymentMethod paymentMethod) {
+    public BigDecimal calculateFee(BigDecimal amount, Region region, PaymentMethod paymentMethod) {
         if (paymentMethod == null) paymentMethod = PaymentMethod.FPX;
+        // BILLPLZ only operates in MY; region parameter accepted for interface consistency
         return providerFeeRateRepository
-                .findByProviderAndPaymentMethodAndActiveTrue(Provider.BILLPLZ, paymentMethod)
+                .findByProviderAndRegionAndPaymentMethodAndActiveTrue(Provider.BILLPLZ, Region.MY, paymentMethod)
                 .map(rate -> rate.compute(amount))
                 .orElse(BigDecimal.ZERO);
     }
@@ -230,8 +240,12 @@ public class BillplzAdapter implements PaymentProviderPort {
         for (String pair : body.split("&")) {
             int idx = pair.indexOf('=');
             if (idx > 0) {
-                String key = URLDecoder.decode(pair.substring(0, idx), StandardCharsets.UTF_8);
-                String value = URLDecoder.decode(pair.substring(idx + 1), StandardCharsets.UTF_8);
+                String key = URLDecoder.decode(
+                        pair.substring(0, idx).replace("+", "%2B"),
+                        StandardCharsets.UTF_8);
+                String value = URLDecoder.decode(
+                        pair.substring(idx + 1).replace("+", "%2B"),
+                        StandardCharsets.UTF_8);
                 params.put(key, value);
             }
         }

@@ -27,6 +27,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -46,8 +47,8 @@ class ProviderScorerTest {
         // use new defaults: sr=0.40, fee=0.25, latency=0.15, accuracy=0.20
         scorer = new ProviderScorer(metricsRepository, reconRepository, feeRateRepository, props);
 
-        // Default: no recon history (triggers fallback to feeRateRepository)
-        when(reconRepository.countByPaymentMethodForProvider(any())).thenReturn(List.of());
+        // Default: no recon history for region (triggers fallback to feeRateRepository)
+        when(reconRepository.countByPaymentMethodForProviderAndRegion(any(), any())).thenReturn(List.of());
     }
 
     @Test
@@ -119,7 +120,7 @@ class ProviderScorerTest {
         ProviderFeeRate rate = new ProviderFeeRate();
         rate.setFeeType(FeeType.FIXED);
         rate.setFixedAmount(new BigDecimal(fixedFee));
-        when(feeRateRepository.findByProviderAndPaymentMethodAndActiveTrue(provider, method))
+        when(feeRateRepository.findByProviderAndRegionAndPaymentMethodAndActiveTrue(eq(provider), any(), any()))
                 .thenReturn(Optional.of(rate));
     }
 

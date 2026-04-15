@@ -7,13 +7,15 @@ import com.paymentorchestration.payment.service.PaymentService;
 import com.paymentorchestration.provider.dto.WebhookParseResult;
 import com.paymentorchestration.provider.port.PaymentProviderPort;
 import jakarta.annotation.PostConstruct;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-import java.util.Map;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -52,9 +54,36 @@ public class WebhookController {
 
     @PostMapping("/{provider}")
     public ResponseEntity<ApiResponse<Void>> handleWebhook(
-            @PathVariable String provider,
-            @RequestBody byte[] rawBody,
-            @RequestHeader Map<String, String> headers) {
+            @PathVariable("provider") String provider,
+            HttpServletRequest request) {
+
+        // For form-encoded requests (Billplz), use Tomcat's getParameterMap() directly.
+        // This gives properly decoded values without any manual URL-decoding that could
+        // produce different results. For JSON bodies (Midtrans, PayMongo) read the stream.
+        Map<String, String> formParams = new LinkedHashMap<>();
+        byte[] rawBody;
+        String contentType = request.getContentType() != null ? request.getContentType() : "";
+        if (contentType.contains("application/x-www-form-urlencoded")) {
+            request.getParameterMap().forEach((k, v) -> formParams.put(k, v.length > 0 ? v[0] : ""));
+            rawBody = new byte[0];
+        } else {
+            try {
+                rawBody = request.getInputStream().readAllBytes();
+            } catch (IOException e) {
+                log.error("[webhook] failed to read request body", e);
+                rawBody = new byte[0];
+            }
+        }
+
+        // Lowercase all header names so adapters can do case-insensitive lookups.
+        Map<String, String> headers = new HashMap<>();
+        Enumeration<String> headerNames = request.getHeaderNames();
+        if (headerNames != null) {
+            while (headerNames.hasMoreElements()) {
+                String name = headerNames.nextElement();
+                headers.put(name.toLowerCase(Locale.ROOT), request.getHeader(name));
+            }
+        }
 
         Provider providerEnum;
         try {
@@ -70,14 +99,15 @@ public class WebhookController {
             return ResponseEntity.ok(ApiResponse.ok(null, "Accepted"));
         }
 
-        boolean signatureValid = adapter.verifyWebhookSignature(rawBody, headers);
+        boolean signatureValid = adapter.verifyWebhookSignature(rawBody, headers, formParams);
         if (!signatureValid) {
             log.warn("[webhook] invalid signature from provider {}", providerEnum);
             // Still parse and log, but PaymentService will not update the transaction
         }
 
-        String rawBodyStr = new String(rawBody, java.nio.charset.StandardCharsets.UTF_8);
-        WebhookParseResult parsed = adapter.parseWebhookPayload(rawBodyStr);
+        WebhookParseResult parsed = formParams.isEmpty()
+                ? adapter.parseWebhookPayload(new String(rawBody, StandardCharsets.UTF_8))
+                : adapter.parseWebhookPayload(formParams);
 
         paymentService.handleWebhook(parsed, signatureValid);
 

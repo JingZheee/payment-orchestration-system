@@ -63,13 +63,13 @@ public class AdminController {
 
     @PutMapping("/routing-rules/{id}")
     public ResponseEntity<ApiResponse<RoutingRule>> updateRoutingRule(
-            @PathVariable Long id,
+            @PathVariable("id") Long id,
             @Valid @RequestBody RoutingRuleRequest request) {
         return ResponseEntity.ok(ApiResponse.ok(routingRuleService.update(id, request)));
     }
 
     @DeleteMapping("/routing-rules/{id}")
-    public ResponseEntity<ApiResponse<Void>> deleteRoutingRule(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<Void>> deleteRoutingRule(@PathVariable("id") Long id) {
         routingRuleService.delete(id);
         return ResponseEntity.ok(ApiResponse.ok(null, "Routing rule deleted"));
     }
@@ -106,8 +106,8 @@ public class AdminController {
 
     @PostMapping("/providers/{provider}/toggle")
     public ResponseEntity<ApiResponse<ProviderConfig>> toggleProvider(
-            @PathVariable Provider provider,
-            @RequestParam boolean enabled) {
+            @PathVariable("provider") Provider provider,
+            @RequestParam("enabled") boolean enabled) {
         ProviderConfig config = providerConfigRepository.findById(provider)
                 .orElseThrow(() -> new PosException("Provider config not found: " + provider, HttpStatus.NOT_FOUND));
         config.setEnabled(enabled);

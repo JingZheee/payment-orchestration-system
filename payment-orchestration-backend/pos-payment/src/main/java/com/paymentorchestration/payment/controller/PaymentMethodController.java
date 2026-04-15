@@ -50,7 +50,7 @@ public class PaymentMethodController {
             if (!ProviderRegionSupport.supportsRegion(provider.getProvider(), region)) continue;
 
             for (PaymentMethod method : provider.supportedMethods()) {
-                BigDecimal fee = provider.calculateFee(amount, method);
+                BigDecimal fee = provider.calculateFee(amount, region, method);
                 result.add(new AvailableMethod(
                         method,
                         provider.getProvider(),

@@ -1,5 +1,5 @@
 # Progress Snapshot
-Last updated: 2026-04-14
+Last updated: 2026-04-15
 
 ## Completed
 - [x] PRD.md finalised (v1.1)
@@ -15,28 +15,22 @@ Last updated: 2026-04-14
 - [x] pos-common: ApiResponse<T> DTO + PosException base + 5 typed exceptions
 - [x] pos-domain: 9 JPA entities + 2 new (ProviderFeeRate, ReconStatement), 11 repositories
 - [x] pos-domain: Flyway migrations V1–V14 (V10=fee rates, V11=recon, V12=fee accuracy metric, V13=routing rule strategy, V14=dummy data + demo rules)
-- [x] pos-provider: 6 provider DTOs + PaymentProviderPort interface
-- [x] pos-provider: All 4 adapters — calculateFee() now reads from ProviderFeeRateRepository (not hardcoded)
-- [x] pos-provider: MOCK now covers MY, ID, PH (was ID, PH only)
-- [x] pos-routing: RegionBasedStrategy, SuccessRateStrategy, LowestFeeStrategy (now wired into engine)
-- [x] pos-routing: ProviderScorer — volume-weighted fee (from recon history) + fee accuracy as 4th score component (sr 40%, fee 25%, latency 15%, accuracy 20%)
-- [x] pos-routing: RoutingEngine — per-rule strategy delegation (rule can have preferredProvider OR strategy)
-- [x] pos-payment: PaymentService, IdempotencyFilter, RetryPublisher, PaymentController, WebhookController
-- [x] pos-api: Security, Auth, RabbitMqConfig (Jackson2JsonMessageConverter — fixes AMQP serialisation error)
-- [x] pos-admin: MetricsAggregator now computes feeAccuracyRate; RoutingRuleService supports strategy field
-- [x] pos-admin: ProviderFeeRateController (GET list, PUT update) + ReconStatementController (list + anomalies)
-- [x] Angular frontend scaffolded: login, demo payment page, transaction detail, payment result pages
-- [x] Frontend: AuthService, JwtInterceptor, AuthGuard, ApiService, PaymentService, core models
-- [x] Billplz redirect_url fix (uses request.getRedirectUrl(), not hardcoded)
+- [x] pos-domain: V15 — added `region` to provider_fee_rates; unique key now (provider, region, payment_method)
+- [x] pos-domain: V16 — added `region` to recon_statements; single-region providers backfilled, MOCK rows NULL
+- [x] pos-provider: PaymentProviderPort.calculateFee() now takes (amount, region, paymentMethod)
+- [x] pos-provider: All 4 adapters updated — calculateFee passes region; single-region adapters hardcode their region, MOCK uses passed region
+- [x] pos-routing: ProviderScorer volumeWeightedFee now region-scoped (countByPaymentMethodForProviderAndRegion)
+- [x] pos-routing: LowestFeeStrategy passes region to calculateFee
+- [x] pos-payment: PaymentMethodController passes region to calculateFee
 - [x] All unit tests passing — BUILD SUCCESS
+- [x] ROUTING.md created — full routing strategy, fee rates, and payment method selection docs
 
 ## Up next (start here next session)
-- [ ] Frontend admin pages: /admin/fee-rates (table + inline edit), /admin/recon (list + anomaly filter)
+- [ ] Frontend admin pages: /admin/fee-rates (table + inline edit, region column now visible)
 - [ ] Frontend routing rules page: add strategy dropdown column (LOWEST_FEE / SUCCESS_RATE / —)
-- [ ] Test end-to-end: initiate MY payment → verify BILLPLZ vs MOCK scoring uses volume-weighted fee
-- [ ] Test routing rule: create strategy=LOWEST_FEE rule for MY → verify it fires
+- [ ] Frontend: /admin/recon (recon statements list + anomaly filter)
+- [ ] Test end-to-end: initiate MY payment → verify BILLPLZ vs MOCK scoring uses region-scoped fee
 - [ ] Verify recon anomaly record is flagged (MIDTRANS/GOPAY 10% variance in seed data)
-- [ ] Stage 2: CSV statement upload → auto-populate recon_statements
 
 ## Decisions locked in
 - Maven multi-module (not Gradle)
@@ -46,8 +40,10 @@ Last updated: 2026-04-14
 - spring-boot-maven-plugin only in pos-api
 - Secrets gitignored (application-dev.yml, application-prod.yml)
 - Fee rates stored in DB (provider_fee_rates) — not hardcoded in adapters
-- Reconciliation in separate table (recon_statements) — transactions table untouched
-- Volume-weighted fee scoring: method distribution from recon history, not assumed at routing time
+- Fee rates are region-scoped: unique key is (provider, region, payment_method) — do not revert to (provider, payment_method)
+- ProviderConfig PK stays as provider only (no region) — availability is provider-level, not region-level
+- calculateFee always receives region explicitly — adapters hardcode their region, MOCK uses the passed value
+- Volume-weighted fee scoring: method distribution from recon history, scoped to region
 - Routing rules: preferredProvider XOR strategy — not both
 
 ## Blockers

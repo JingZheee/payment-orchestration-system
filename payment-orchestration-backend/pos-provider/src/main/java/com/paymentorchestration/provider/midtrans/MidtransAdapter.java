@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.paymentorchestration.common.enums.PaymentMethod;
 import com.paymentorchestration.common.enums.PaymentStatus;
 import com.paymentorchestration.common.enums.Provider;
+import com.paymentorchestration.common.enums.Region;
 import com.paymentorchestration.common.exception.ProviderException;
 import com.paymentorchestration.domain.entity.ProviderConfig;
 import com.paymentorchestration.domain.entity.ProviderFeeRate;
@@ -87,7 +88,7 @@ public class MidtransAdapter implements PaymentProviderPort {
                     .providerTransactionId(transactionId)
                     .status(PaymentStatus.PROCESSING)
                     .redirectUrl(null) // VA-based; VA number is in rawResponse
-                    .fee(calculateFee(request.getAmount(), request.getPaymentMethod()))
+                    .fee(calculateFee(request.getAmount(), request.getRegion(), request.getPaymentMethod()))
                     .rawResponse(rawJson)
                     .build();
 
@@ -159,7 +160,8 @@ public class MidtransAdapter implements PaymentProviderPort {
     }
 
     @Override
-    public boolean verifyWebhookSignature(byte[] rawBody, Map<String, String> headers) {
+    public boolean verifyWebhookSignature(byte[] rawBody, Map<String, String> headers,
+                                          Map<String, String> formParams) {
         try {
             // Midtrans signature: SHA512(order_id + status_code + gross_amount + serverKey)
             // The signature_key is in the JSON body itself
@@ -213,10 +215,11 @@ public class MidtransAdapter implements PaymentProviderPort {
     }
 
     @Override
-    public BigDecimal calculateFee(BigDecimal amount, PaymentMethod paymentMethod) {
+    public BigDecimal calculateFee(BigDecimal amount, Region region, PaymentMethod paymentMethod) {
         if (paymentMethod == null) paymentMethod = PaymentMethod.VIRTUAL_ACCOUNT;
+        // MIDTRANS only operates in ID; region parameter accepted for interface consistency
         return providerFeeRateRepository
-                .findByProviderAndPaymentMethodAndActiveTrue(Provider.MIDTRANS, paymentMethod)
+                .findByProviderAndRegionAndPaymentMethodAndActiveTrue(Provider.MIDTRANS, Region.ID, paymentMethod)
                 .map(rate -> rate.compute(amount))
                 .orElse(BigDecimal.ZERO);
     }
