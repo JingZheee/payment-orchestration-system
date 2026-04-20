@@ -8,9 +8,9 @@
 
 ## 1. Executive Summary
 
-The Payment Orchestration System (POS) is a backend-driven platform that intelligently routes payment transactions across multiple payment providers in Southeast Asia — specifically Malaysia, Indonesia, and the Philippines. Rather than integrating directly with a single gateway, the system acts as an intelligent routing layer that sits *above* providers, deciding in real time which provider to use for each transaction based on region, provider success rate, transaction fees, and configurable business rules.
+The Payment Orchestration System (POS) is a backend-driven platform that intelligently routes insurance payment transactions across multiple payment providers in Southeast Asia — specifically Malaysia, Indonesia, and the Philippines. Rather than integrating directly with a single gateway, the system acts as an intelligent routing layer that sits *above* providers, deciding in real time which provider to use for each transaction based on region, provider success rate, transaction fees, and configurable business rules.
 
-The core value proposition is **resilience and cost optimization**: when a provider is degraded or expensive, the system automatically reroutes to the best available alternative — without the merchant changing anything. This mirrors how large-scale platforms like Grab, Gojek, and Shopee manage payments internally, but packaged as a demonstrable, configurable system with a visual admin dashboard.
+The primary use case is **insurance** — premium collection from policyholders and claims payouts to beneficiaries, where routing reliability directly affects policyholder trust and regulatory compliance. The core value proposition is **resilience and cost optimization**: when a provider is degraded or expensive, the system automatically reroutes to the best available alternative — without the insurance operator changing anything. This mirrors how large-scale platforms like Grab, Gojek, and Shopee manage payments internally, but packaged as a demonstrable, configurable system with a visual admin dashboard.
 
 The MVP goal is a fully functional routing engine integrated with real sandbox providers (Billplz for Malaysia, Midtrans for Indonesia, PayMongo for the Philippines), with a Mock provider for controlled testing, and an Angular admin dashboard that makes the routing intelligence *visible* — showing live decisions, failover events, cost comparisons, and provider health in real time.
 
@@ -18,7 +18,7 @@ The MVP goal is a fully functional routing engine integrated with real sandbox p
 
 ## 2. Mission
 
-**Mission Statement:** Demonstrate that intelligent payment routing — not just payment processing — is the differentiating layer for multi-region merchants, by building a configurable orchestration engine that maximizes success rates and minimizes fees across Southeast Asian payment providers.
+**Mission Statement:** Demonstrate that intelligent payment routing — not just payment processing — is the differentiating layer for insurance operators, by building a configurable orchestration engine that maximizes success rates and minimizes fees across Southeast Asian payment providers for both premium collection and claims disbursement.
 
 ### Core Principles
 
@@ -28,6 +28,8 @@ The MVP goal is a fully functional routing engine integrated with real sandbox p
 4. **Sandbox-first realism** — all providers are backed by real sandbox APIs; the Mock provider simulates failure scenarios.
 5. **Built to be demonstrated** — every architectural decision should produce something visible in the admin dashboard.
 6. **Async by design** — webhook processing and payment retries run through a message queue, not synchronous DB polling — failures are visible, recoverable, and demonstrable.
+7. **Every payment has a policy context** — transactions must be traceable to a policy number or claim reference for regulatory audit.
+8. **Payout is as important as collection** — the system handles both inbound premium collection from policyholders and outbound claims disbursement to beneficiaries.
 
 ---
 
@@ -38,10 +40,11 @@ The MVP goal is a fully functional routing engine integrated with real sandbox p
 - Expects to see intelligent behavior, not just a CRUD app
 - Key need: understand *what is novel* within 10 minutes of the demo
 
-### Secondary Persona: Merchant Admin (Demo Role)
-- A fictional e-commerce operator managing payments across MY/ID/PH
-- Wants to configure routing rules without writing code
-- Key need: visibility into why transactions succeed or fail, and ability to tune behavior
+### Secondary Persona: Insurance Payment Operations Manager (Demo Role)
+- A fictional insurance operator managing premium collection and claims payouts across MY/ID/PH
+- Manages premium collection campaigns for policyholders and processes outbound claim disbursements
+- Wants to configure routing rules without writing code and generate fee reconciliation reports for compliance
+- Key need: visibility into why transactions succeed or fail, traceability by policy/claim reference, and ability to tune routing behavior
 
 ### Technical Context
 - The developer (student) is the sole builder
@@ -53,6 +56,11 @@ The MVP goal is a fully functional routing engine integrated with real sandbox p
 ## 4. MVP Scope
 
 ### Core Functionality
+- ✅ Insurance premium collection with intelligent provider routing
+- ✅ Claims disbursement (outbound payout) via `POST /payments/disburse`
+- ✅ Policy/claim reference fields on transactions (`policy_number`, `claim_reference`, `payment_type`)
+- ✅ `PaymentType` enum: `PREMIUM_COLLECTION`, `CLAIM_PAYOUT`, `REFUND`
+- ✅ Admin transaction filter by `paymentType`
 - ✅ Payment initiation with intelligent provider routing
 - ✅ Routing engine with three strategies: region-based, success-rate-based, lowest-fee
 - ✅ Composite provider scoring (success rate 50%, fee 30%, latency 20%)
@@ -95,7 +103,9 @@ The MVP goal is a fully functional routing engine integrated with real sandbox p
 - ❌ Real money transactions
 - ❌ PCI DSS compliance
 - ❌ Card tokenization / vaulting
-- ❌ Subscription / recurring billing
+- ❌ Subscription / recurring billing (no scheduler infrastructure — future phase)
+- ❌ Grace period / policy lapse logic (insurance business rules — future phase)
+- ❌ Beneficiary bank account management (out of scope — FYP demo)
 
 ### Deployment
 - ✅ Local development with Docker Compose (PostgreSQL + RabbitMQ)
@@ -180,6 +190,33 @@ The MVP goal is a fully functional routing engine integrated with real sandbox p
 
 ---
 
+### US-10: Insurance Policy Context
+**As an** insurance admin reviewing transactions,
+**I want** every payment to carry a policy number or claim reference,
+**so that** I can trace any transaction back to a specific policy in the audit log.
+
+*Example:* POST `/payments/initiate` with `policyNumber: "POL-2026-MY-00123"` → stored on transaction → visible in admin transaction detail → reconciliation report links fee to that policy.
+
+---
+
+### US-11: Claims Disbursement
+**As an** insurance operator,
+**I want** to initiate outbound claim payouts to policyholders via the same routing layer,
+**so that** the system selects the lowest-fee provider for the disbursement region automatically.
+
+*Example:* POST `/payments/disburse` with `claimReference: "CLM-456"`, `amount: 5000 MYR`, `region: MY` → routing engine selects Billplz FPX for lowest-fee MYR payout → returns disbursement status and transaction ID.
+
+---
+
+### US-12: Payment Type Filtering
+**As an** admin,
+**I want** to filter the transaction list by payment type (premium collection vs claim payout),
+**so that** I can generate separate reconciliation reports for underwriting and claims departments.
+
+*Example:* GET `/admin/transactions?paymentType=CLAIM_PAYOUT` → returns only outbound payout transactions → admin exports for claims department compliance reporting.
+
+---
+
 ### US-8: Mock Provider Demo Control
 **As a** developer demoing the system,
 **I want** to configure the Mock provider to simulate failures, delays, or specific responses,
@@ -216,15 +253,19 @@ pos-common → pos-domain → pos-provider ┐
 ```
 payment-orchestration-frontend/src/app/
 ├── core/           (auth service, JWT interceptor, guards, models)
-├── shared/         (status-badge, data-table, currency-format pipe, has-role directive)
-├── layout/         (sidebar, topbar, main-layout shell)
 └── features/
-    ├── auth/           (/auth — login)
-    ├── dashboard/      (/dashboard — KPIs, charts)
-    ├── transactions/   (/transactions — list + detail with event timeline)
-    ├── routing-rules/  (/admin/routing-rules — CRUD + simulate panel)
-    ├── providers/      (/admin/providers — health, toggle, fee config)
-    └── payment-demo/   (/demo — trigger test payments, watch routing in real time)
+    ├── auth/           (/login)
+    ├── demo/           (/demo — trigger test payments, watch routing in real time)
+    ├── transactions/   (/transactions/:id — event timeline detail)
+    └── admin/          (/admin/* — admin shell with sidenav layout)
+        ├── admin-shell/     (MatSidenav layout + router-outlet)
+        ├── dashboard/       (/admin/dashboard — KPIs, charts, live scoring widget)
+        ├── transactions/    (/admin/transactions — paginated filterable list)
+        ├── routing-rules/   (/admin/routing-rules — CRUD + simulate panel)
+        ├── providers/       (/admin/providers — health, toggle)
+        ├── fee-rates/       (/admin/fee-rates — inline-editable table by provider/region)
+        ├── metrics/         (/admin/metrics — success rate gauges, latency charts)
+        └── recon/           (/admin/recon — reconciliation + anomaly filter)
 ```
 
 ### Key Design Patterns
@@ -484,13 +525,16 @@ Base URL: `/api/v1`
 ```json
 {
   "merchantOrderId": "ORDER-001",
+  "policyNumber": "POL-2026-MY-00123",
+  "claimReference": null,
+  "paymentType": "PREMIUM_COLLECTION",
   "amount": 50.00,
   "currency": "MYR",
   "region": "MY",
   "customerEmail": "user@example.com",
-  "description": "Order #001",
-  "redirectUrl": "https://merchant.com/payment/result",
-  "metadata": { "itemCount": "3" }
+  "description": "Monthly premium — Policy POL-2026-MY-00123",
+  "redirectUrl": "https://insurer.com/payment/result",
+  "metadata": { "policyType": "life", "coveragePeriod": "2026-04" }
 }
 ```
 
@@ -500,12 +544,21 @@ Base URL: `/api/v1`
   "transactionId": "txn_uuid",
   "status": "PENDING",
   "provider": "BILLPLZ",
+  "paymentType": "PREMIUM_COLLECTION",
+  "policyNumber": "POL-2026-MY-00123",
   "routingReason": "Rule #2 matched: MY region, amount < RM100",
   "redirectUrl": "https://billplz.com/bills/abc123",
   "fee": 0.30,
   "createdAt": "2026-03-30T10:00:00Z"
 }
 ```
+
+### Payments — Disbursement (Claims Payout)
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/payments/disburse` | Bearer | Initiate outbound claim payout. Requires `Idempotency-Key` header. `paymentType` defaults to `CLAIM_PAYOUT`. |
+
+Request mirrors `/payments/initiate` with `claimReference` (required) and `policyNumber` (optional). `paymentType` is automatically set to `CLAIM_PAYOUT`.
 
 ### Webhooks (No JWT — HMAC verified)
 | Method | Path |
@@ -518,7 +571,7 @@ Base URL: `/api/v1`
 ### Admin — Transactions
 | Method | Path | Description |
 |---|---|---|
-| GET | `/admin/transactions` | Filter: status, provider, region, currency, dateFrom, dateTo, page, size |
+| GET | `/admin/transactions` | Filter: status, provider, region, currency, paymentType, dateFrom, dateTo, page, size |
 | GET | `/admin/transactions/{id}` | Detail + event timeline |
 | GET | `/admin/transactions/export` | CSV export |
 
@@ -679,7 +732,11 @@ The system is considered MVP-complete when an examiner can watch a 10-minute dem
 
 ## 13. Future Considerations
 
-- **Multi-tenant support** — multiple merchant accounts with isolated routing rules
+- **Multi-tenant support** — multiple insurance company accounts with isolated routing rules
+- **Recurring premium billing** — scheduled payment plans linked to policy renewal dates, with automatic retry on failure
+- **Grace period / policy lapse engine** — if premium payment fails, hold policy active for N days before triggering a lapse event, integrating with the existing retry queue
+- **Beneficiary management** — store and validate payout bank accounts for claim disbursements
+- **Regulatory reporting** — export transaction ledger by policy/claim reference for OJK (Indonesia), BNM (Malaysia), IC (Philippines) compliance audits
 - **Machine learning routing** — replace the heuristic scorer with a trained model on historical approval data
 - **Real-time dashboard** — WebSocket push for live transaction updates instead of polling
 - **A/B routing** — split traffic between providers to empirically measure success rates
@@ -726,17 +783,25 @@ where:
 ```
 
 ### Database Module Map
-| Flyway Migration | Table | Module |
+| Flyway Migration | Table | Key Columns / Notes |
 |---|---|---|
-| V1 | users | pos-domain |
-| V2 | transactions | pos-domain |
-| V3 | transaction_events | pos-domain |
-| V4 | provider_configs | pos-domain |
-| V5 | routing_rules | pos-domain |
-| V6 | provider_metrics | pos-domain |
-| V7 | webhook_logs | pos-domain |
-| V8 | idempotency_records | pos-domain |
-| V9 | audit_logs | pos-domain |
+| V1 | `users` | id, email, password_hash, role, refresh_token, token_expires_at |
+| V2 | `transactions` | id, merchant_order_id, amount, currency, region, status, provider, routing_reason, fee, idempotency_key |
+| V3 | `transaction_events` | id, transaction_id, event_type, description, created_at |
+| V4 | `provider_configs` | provider, is_enabled, fee_percentage, webhook_secret, updated_at |
+| V5 | `routing_rules` | id, priority, region, currency, max_amount, min_amount, preferred_provider, is_enabled |
+| V6 | `provider_metrics` | id, provider, region, success_rate, avg_latency_ms, transaction_count, window_start, window_end |
+| V7 | `webhook_logs` | id, provider, transaction_id, raw_body, signature_valid, received_at |
+| V8 | `idempotency_records` | idempotency_key, request_hash, response_body, created_at, expires_at |
+| V9 | `audit_logs` | id, admin_user, action, entity_type, entity_id, old_value, new_value, created_at |
+| V10 | `provider_fee_rates` | provider, region, payment_method, fee_type, fixed_amount, percentage, currency, active |
+| V11 | `recon_statements` | transaction_id, provider, region, expected_fee, actual_fee, variance, anomaly |
+| V12 | `provider_metrics` (alter) | fee_accuracy_rate column added |
+| V13 | `routing_rules` (alter) | strategy column added |
+| V14 | seed data | dummy recon + metrics rows |
+| V15 | `provider_fee_rates` (alter) | region column added |
+| V16 | `recon_statements` (alter) | region column added |
+| V17 | `transactions` (alter) | policy_number VARCHAR(100), claim_reference VARCHAR(100), payment_type VARCHAR(30) DEFAULT 'PREMIUM_COLLECTION' |
 
 ### RabbitMQ Queue Topology (Implementation Reference)
 ```yaml
@@ -763,3 +828,4 @@ retry.exchange      → direct → retry.q.30s  (x-message-ttl: 30000,  DLX: ret
 3. **"What's novel about your routing algorithm?"** — The composite scorer with tunable weights, region-aware rule engine, and real-time success rate feedback loop. Show the simulate endpoint's breakdown table.
 4. **"Why RabbitMQ and not Kafka?"** — RabbitMQ is purpose-built for task queues with routing, TTL, and dead letter patterns. Kafka is a distributed log designed for event streaming at millions of events/second — using it here would be like using a freight train to deliver a letter. RabbitMQ's dead letter exchange gives us native exponential backoff with zero custom scheduling code.
 5. **"What happens when a payment gets stuck?"** — Show the DLQ panel. Walk through: provider failure → 3 retry attempts with increasing delays → RETRY_EXHAUSTED status → admin sees it → clicks Re-queue after provider recovers → payment completes. This is a production-grade failure recovery flow.
+6. **"Why insurance?"** — Insurance payments are uniquely demanding: premiums must reach the right provider to trigger policy coverage, claim payouts must be fast and traceable to avoid regulatory penalties, and failed payments have real consequences (policy lapse). This makes payment orchestration — not just payment processing — essential in insurance. The same routing engine that minimizes fees for a merchant minimizes delays for a claims payout.

@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Final Year Project (FYP). A Spring Boot 3 backend that intelligently routes payment transactions across multiple Southeast Asian payment providers (Malaysia, Indonesia, Philippines). The system acts as an orchestration layer — selecting the best provider per transaction based on region, composite scoring (success rate, fee, latency), and configurable routing rules.
+Final Year Project (FYP). A Spring Boot 3 backend that intelligently routes **insurance payment transactions** (premium collection + claims disbursement) across multiple Southeast Asian payment providers (Malaysia, Indonesia, Philippines). The system acts as an orchestration layer — selecting the best provider per transaction based on region, composite scoring (success rate, fee, latency), and configurable routing rules. The primary use case is insurance operations: routing policyholder premium payments and insurer claim payouts to the best available provider.
 
 **Demo goal:** A 10-minute examiner demo showing intelligent routing, live failover, and cost comparison — without explaining what "payment orchestration" means.
 
@@ -23,9 +23,13 @@ Final Year Project (FYP). A Spring Boot 3 backend that intelligently routes paym
 | API Docs | Springdoc OpenAPI | 2.x |
 | Boilerplate | Lombok + MapStruct | latest / 1.5+ |
 | Testing | Testcontainers | 1.19+ |
-| Frontend | Angular 17 (standalone) | 17 |
-| UI Library | Angular Material | 17 |
-| Charts | ngx-charts | latest |
+| Frontend | React + TypeScript | 18 / 5.x |
+| Build Tool | Vite | latest |
+| UI Library | Ant Design (antd) | 5.x |
+| Charts | Recharts | latest |
+| Routing | React Router | v6 |
+| Data Fetching | TanStack Query (React Query) | v5 |
+| HTTP | Axios | latest |
 
 ---
 
@@ -112,9 +116,9 @@ Backend at `http://localhost:8080`. Swagger UI at `http://localhost:8080/swagger
 ### 3. Start frontend
 ```bash
 cd payment-orchestration-frontend
-ng serve
+npm run dev
 ```
-Frontend at `http://localhost:4200`.
+Frontend at `http://localhost:5173`.
 
 ### 4. Expose webhooks (for sandbox providers)
 ```bash
@@ -194,6 +198,14 @@ providers:
 | V7 | `webhook_logs` | id, provider, transaction_id, raw_body, signature_valid, received_at, processed_at |
 | V8 | `idempotency_records` | idempotency_key, request_hash, response_body, created_at, expires_at |
 | V9 | `audit_logs` | id, admin_user, action, entity_type, entity_id, old_value, new_value, created_at |
+| V10 | `provider_fee_rates` | provider, region, payment_method, fee_type, fixed_amount, percentage, currency, active |
+| V11 | `recon_statements` | transaction_id, provider, region, expected_fee, actual_fee, variance, anomaly |
+| V12 | `provider_metrics` (alter) | fee_accuracy_rate column added |
+| V13 | `routing_rules` (alter) | strategy column added |
+| V14 | seed data | dummy recon + metrics rows |
+| V15 | `provider_fee_rates` (alter) | region column added |
+| V16 | `recon_statements` (alter) | region column added |
+| V17 | `transactions` (alter) | policy_number VARCHAR(100), claim_reference VARCHAR(100), payment_type VARCHAR(30) |
 
 ---
 
@@ -253,6 +265,52 @@ where:
 
 Weights are configurable in `application.yml` under `routing.scorer.*`.
 
+# Frontend Stack Configuration
+
+## Framework
+- React 18 + TypeScript 5.x (strict mode)
+- Vite as build tool
+- React Router v6 for client-side routing
+- TanStack Query v5 for server state, caching, and data fetching
+- Axios for HTTP requests (JWT interceptor via axios instance)
+
+## UI Library
+- Ant Design (antd) v5 — the React equivalent of ng-zorro
+- Import components individually, not the entire library
+- Use antd's built-in CSS-in-JS theming — no separate CSS imports needed in v5
+
+## Styling
+- No Tailwind, no Bootstrap, no MUI
+- Use antd built-in component styles only
+- Custom styles in component `.module.css` files (CSS Modules)
+- Global CSS variables in `src/styles/variables.css`
+
+## Color Tokens (always use these, never hardcode hex)
+- Primary accent: #FCB900 (amber)
+- Success: #86EFAC background, #166534 text
+- Failed: #FCA5A5 background, #991B1B text
+- Pending: #BAE6FD background, #075985 text
+- Text primary: #1C1C1E
+- Text secondary: #6B7280
+- Card border: #F3F4F6
+
+## Component Rules
+- Functional components only (no class components)
+- No jQuery, no direct DOM manipulation
+- Use controlled components for all forms
+- Keep components small — extract hooks for data-fetching logic
+
+## antd Conventions
+- Use `<Table>` for all tables
+- Use `<Card>` for all cards
+- Use `<Tag>` for all status badges/chips
+- Use `<Select>` for all dropdowns
+- Use `<Modal>` for all modals
+- Use `<Drawer>` for slide-in panels
+- Use `<Statistic>` for KPI numbers
+- Use `<Progress>` for progress bars
+- Use `<Layout>` + `<Sider>` + `<Menu>` for the admin shell sidebar
+
 ## References
 - PRD.md — full specs, read ONLY when starting a new module or feature
 
@@ -262,7 +320,7 @@ Weights are configurable in `application.yml` under `routing.scorer.*`.
 
 | Field | Value |
 |---|---|
-| **Current module** | frontend (admin pages) + integration testing |
-| **Current task** | Build Angular admin pages: /admin/fee-rates (inline-editable table with region column), /admin/recon (recon statements list + anomaly filter); add strategy dropdown to routing rules page |
-| **Last completed** | RetryConsumer implemented (webhook.queue @RabbitListener — polls queryPaymentStatus, resolves or re-publishes); IDEMPOTENCY_RETRY.md created — BUILD SUCCESS |
+| **Current module** | frontend (React) — remaining pages + V17 backend migration |
+| **Current task** | Build Dead Letter Queue page (/dead-letter-queue), then Payment Demo page (/payment-demo) |
+| **Last completed** | Reconciliation page, Metrics page, Fee Rates page, Providers page, Routing Rules page, Transactions page, Dashboard page, Login + RequireAuth, service layer + endpoints.ts, CORS config, 401 fix |
 | **Blockers** | None |

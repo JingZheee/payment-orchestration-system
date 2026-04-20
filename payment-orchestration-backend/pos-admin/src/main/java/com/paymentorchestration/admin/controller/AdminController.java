@@ -11,8 +11,10 @@ import com.paymentorchestration.domain.entity.ProviderConfig;
 import com.paymentorchestration.domain.entity.ProviderMetrics;
 import com.paymentorchestration.domain.entity.RoutingRule;
 import com.paymentorchestration.domain.entity.Transaction;
+import com.paymentorchestration.domain.entity.TransactionEvent;
 import com.paymentorchestration.domain.repository.ProviderConfigRepository;
 import com.paymentorchestration.domain.repository.ProviderMetricsRepository;
+import com.paymentorchestration.domain.repository.TransactionEventRepository;
 import com.paymentorchestration.domain.repository.TransactionRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +27,10 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/admin")
@@ -35,6 +40,7 @@ public class AdminController {
     private final RoutingRuleService routingRuleService;
     private final ProviderMetricsRepository providerMetricsRepository;
     private final TransactionRepository transactionRepository;
+    private final TransactionEventRepository transactionEventRepository;
     private final ProviderConfigRepository providerConfigRepository;
 
     // ── Metrics ────────────────────────────────────────────────────────────────
@@ -95,6 +101,19 @@ public class AdminController {
         }
 
         return ResponseEntity.ok(ApiResponse.ok(page));
+    }
+
+    @GetMapping("/transactions/{id}")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getTransaction(
+            @PathVariable("id") UUID id) {
+        Transaction tx = transactionRepository.findById(id)
+                .orElseThrow(() -> new PosException("Transaction not found: " + id, HttpStatus.NOT_FOUND));
+        List<TransactionEvent> events = transactionEventRepository
+                .findByTransactionIdOrderByCreatedAtAsc(id);
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("transaction", tx);
+        detail.put("events", events);
+        return ResponseEntity.ok(ApiResponse.ok(detail));
     }
 
     // ── Provider Config ─────────────────────────────────────────────────────────
