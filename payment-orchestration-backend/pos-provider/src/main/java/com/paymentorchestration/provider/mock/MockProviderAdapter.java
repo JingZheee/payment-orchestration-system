@@ -5,6 +5,8 @@ import com.paymentorchestration.common.enums.PaymentMethod;
 import com.paymentorchestration.common.enums.PaymentStatus;
 import com.paymentorchestration.common.enums.Provider;
 import com.paymentorchestration.common.enums.Region;
+import com.paymentorchestration.domain.entity.ProviderConfig;
+import com.paymentorchestration.domain.repository.ProviderConfigRepository;
 import com.paymentorchestration.domain.repository.ProviderFeeRateRepository;
 import com.paymentorchestration.provider.dto.*;
 import com.paymentorchestration.provider.port.PaymentProviderPort;
@@ -35,6 +37,7 @@ public class MockProviderAdapter implements PaymentProviderPort {
 
     private final MockProviderProperties properties;
     private final ProviderFeeRateRepository providerFeeRateRepository;
+    private final ProviderConfigRepository providerConfigRepository;
 
     /** In-memory store of mock transaction states for status polling. */
     private final Map<String, PaymentStatus> transactionStore = new ConcurrentHashMap<>();
@@ -139,7 +142,9 @@ public class MockProviderAdapter implements PaymentProviderPort {
 
     @Override
     public boolean isAvailable() {
-        return true;
+        return providerConfigRepository.findById(Provider.MOCK)
+                .map(ProviderConfig::isEnabled)
+                .orElse(false);
     }
 
     /** Switch mode at runtime (called by admin API). */
