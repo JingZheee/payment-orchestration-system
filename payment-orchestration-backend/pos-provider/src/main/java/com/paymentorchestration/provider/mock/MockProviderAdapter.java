@@ -1,7 +1,6 @@
 package com.paymentorchestration.provider.mock;
 
 import com.paymentorchestration.common.enums.MockProviderMode;
-import com.paymentorchestration.common.enums.PaymentMethod;
 import com.paymentorchestration.common.enums.PaymentStatus;
 import com.paymentorchestration.common.enums.Provider;
 import com.paymentorchestration.common.enums.Region;
@@ -16,7 +15,6 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -65,7 +63,7 @@ public class MockProviderAdapter implements PaymentProviderPort {
         return PaymentResult.builder()
                 .providerTransactionId(providerTxnId)
                 .status(resultStatus)
-                .redirectUrl("http://localhost:8080/mock/pay/" + providerTxnId)
+                .redirectUrl("http://localhost:9080/mock/pay/" + providerTxnId)
                 .fee(calculateFee(request.getAmount(), request.getRegion(), request.getPaymentMethod()))
                 .rawResponse("{\"mock\":true,\"mode\":\"" + mode + "\",\"status\":\"" + resultStatus + "\"}")
                 .build();
@@ -127,13 +125,13 @@ public class MockProviderAdapter implements PaymentProviderPort {
     }
 
     @Override
-    public List<PaymentMethod> supportedMethods() {
-        return Arrays.asList(PaymentMethod.values()); // mock supports all methods
+    public List<String> supportedMethods() {
+        return List.of("FPX", "VIRTUAL_ACCOUNT", "QRIS", "GOPAY", "MAYA", "GCASH", "GRABPAY", "CARD", "EWALLET");
     }
 
     @Override
-    public BigDecimal calculateFee(BigDecimal amount, Region region, PaymentMethod paymentMethod) {
-        if (paymentMethod == null) paymentMethod = PaymentMethod.FPX;
+    public BigDecimal calculateFee(BigDecimal amount, Region region, String paymentMethod) {
+        if (paymentMethod == null) paymentMethod = "FPX";
         return providerFeeRateRepository
                 .findByProviderAndRegionAndPaymentMethodAndActiveTrue(Provider.MOCK, region, paymentMethod)
                 .map(rate -> rate.compute(amount))

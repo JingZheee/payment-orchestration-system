@@ -1,7 +1,7 @@
 package com.paymentorchestration.payment.dto;
 
 import com.paymentorchestration.common.enums.Currency;
-import com.paymentorchestration.common.enums.PaymentMethod;
+import com.paymentorchestration.common.enums.PaymentType;
 import com.paymentorchestration.common.enums.Region;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
@@ -31,8 +31,8 @@ public class InitiatePaymentRequest {
     @NotNull
     private Region region;
 
-    @NotNull
-    private PaymentMethod paymentMethod;
+    @NotBlank
+    private String paymentMethod;
 
     @NotBlank
     @Email
@@ -42,4 +42,11 @@ public class InitiatePaymentRequest {
 
     @NotBlank
     private String redirectUrl;
+
+    /** Insurance payment classification. Defaults to PREMIUM_COLLECTION when not provided. */
+    private PaymentType paymentType;
+
+    private String policyNumber;
+
+    private String claimReference;
 }

@@ -1,6 +1,7 @@
 package com.paymentorchestration.payment.controller;
 
 import com.paymentorchestration.common.dto.ApiResponse;
+import com.paymentorchestration.common.enums.PaymentType;
 import com.paymentorchestration.domain.entity.Transaction;
 import com.paymentorchestration.domain.entity.TransactionEvent;
 import com.paymentorchestration.domain.repository.TransactionEventRepository;
@@ -39,6 +40,35 @@ public class PaymentController {
         InitiatePaymentResponse response = paymentService.initiatePayment(request, idempotencyKey);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.ok(response, "Payment initiated"));
+    }
+
+    /**
+     * Initiate a claims disbursement (insurer → claimant / hospital).
+     * Identical to /initiate but forces paymentType = CLAIMS_DISBURSEMENT so the routing engine
+     * applies the reliability-first (SUCCESS_RATE) rule automatically.
+     */
+    @PostMapping("/disburse")
+    public ResponseEntity<ApiResponse<InitiatePaymentResponse>> disburse(
+            @Valid @RequestBody InitiatePaymentRequest request,
+            @RequestHeader(IdempotencyFilter.IDEMPOTENCY_HEADER) String idempotencyKey) {
+
+        InitiatePaymentRequest disbursement = InitiatePaymentRequest.builder()
+                .merchantOrderId(request.getMerchantOrderId())
+                .amount(request.getAmount())
+                .currency(request.getCurrency())
+                .region(request.getRegion())
+                .paymentMethod(request.getPaymentMethod())
+                .customerEmail(request.getCustomerEmail())
+                .description(request.getDescription())
+                .redirectUrl(request.getRedirectUrl())
+                .paymentType(PaymentType.CLAIMS_DISBURSEMENT)
+                .policyNumber(request.getPolicyNumber())
+                .claimReference(request.getClaimReference())
+                .build();
+
+        InitiatePaymentResponse response = paymentService.initiatePayment(disbursement, idempotencyKey);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.ok(response, "Disbursement initiated"));
     }
 
     /**

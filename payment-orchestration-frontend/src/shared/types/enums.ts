@@ -25,14 +25,19 @@ export enum PaymentStatus {
   RETRY_EXHAUSTED = 'RETRY_EXHAUSTED',
 }
 
-export enum PaymentMethod {
-  FPX = 'FPX',
-  VIRTUAL_ACCOUNT = 'VIRTUAL_ACCOUNT',
-  QRIS = 'QRIS',
-  CARD = 'CARD',
-  E_WALLET = 'E_WALLET',
-  MAYA = 'MAYA',
-}
+// Payment methods are now DB-driven — use string literals instead of this enum.
+// Kept as a const object for display/label mapping only.
+export const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  FPX: 'FPX Bank Transfer',
+  VIRTUAL_ACCOUNT: 'Virtual Account',
+  QRIS: 'QRIS Payment',
+  GOPAY: 'GoPay',
+  MAYA: 'Maya Wallet',
+  GCASH: 'GCash',
+  GRABPAY: 'GrabPay',
+  CARD: 'Credit / Debit Card',
+  EWALLET: 'E-Wallet',
+};
 
 export enum RoutingStrategy {
   REGION_BASED = 'REGION_BASED',
@@ -49,8 +54,7 @@ export enum FeeType {
 
 export enum PaymentType {
   PREMIUM_COLLECTION = 'PREMIUM_COLLECTION',
-  CLAIM_PAYOUT = 'CLAIM_PAYOUT',
-  REFUND = 'REFUND',
+  CLAIMS_DISBURSEMENT = 'CLAIMS_DISBURSEMENT',
 }
 
 export enum UserRole {

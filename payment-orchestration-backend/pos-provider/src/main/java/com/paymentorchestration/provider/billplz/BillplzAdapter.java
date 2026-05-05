@@ -1,6 +1,5 @@
 package com.paymentorchestration.provider.billplz;
 
-import com.paymentorchestration.common.enums.PaymentMethod;
 import com.paymentorchestration.common.enums.PaymentStatus;
 import com.paymentorchestration.common.enums.Provider;
 import com.paymentorchestration.common.enums.Region;
@@ -187,13 +186,13 @@ public class BillplzAdapter implements PaymentProviderPort {
     }
 
     @Override
-    public List<PaymentMethod> supportedMethods() {
-        return List.of(PaymentMethod.FPX, PaymentMethod.CARD, PaymentMethod.EWALLET);
+    public List<String> supportedMethods() {
+        return List.of("FPX", "CARD", "EWALLET");
     }
 
     @Override
-    public BigDecimal calculateFee(BigDecimal amount, Region region, PaymentMethod paymentMethod) {
-        if (paymentMethod == null) paymentMethod = PaymentMethod.FPX;
+    public BigDecimal calculateFee(BigDecimal amount, Region region, String paymentMethod) {
+        if (paymentMethod == null) paymentMethod = "FPX";
         // BILLPLZ only operates in MY; region parameter accepted for interface consistency
         return providerFeeRateRepository
                 .findByProviderAndRegionAndPaymentMethodAndActiveTrue(Provider.BILLPLZ, Region.MY, paymentMethod)

@@ -1,7 +1,6 @@
 package com.paymentorchestration.provider.dto;
 
 import com.paymentorchestration.common.enums.Currency;
-import com.paymentorchestration.common.enums.PaymentMethod;
 import com.paymentorchestration.common.enums.Region;
 import lombok.Builder;
 import lombok.Getter;
@@ -19,7 +18,7 @@ public class PaymentRequest {
     private final BigDecimal amount;
     private final Currency currency;
     private final Region region;
-    private final PaymentMethod paymentMethod;
+    private final String paymentMethod;
     private final String customerEmail;
     private final String description;
     private final String redirectUrl;

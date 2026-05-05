@@ -137,6 +137,7 @@ public class RoutingEngine {
         if (rule.getCurrency() != null && rule.getCurrency() != context.getCurrency()) return false;
         if (rule.getMinAmount() != null && context.getAmount().compareTo(rule.getMinAmount()) < 0) return false;
         if (rule.getMaxAmount() != null && context.getAmount().compareTo(rule.getMaxAmount()) > 0) return false;
+        if (rule.getPaymentType() != null && rule.getPaymentType() != context.getPaymentType()) return false;
         return true;
     }
 

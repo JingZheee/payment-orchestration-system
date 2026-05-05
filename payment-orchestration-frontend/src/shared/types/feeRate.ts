@@ -1,10 +1,10 @@
-import type { Provider, Region, FeeType, PaymentMethod } from './enums';
+import type { Provider, Region, FeeType } from './enums';
 
 export interface FeeRate {
   id: number;
   provider: Provider;
   region: Region;
-  paymentMethod: PaymentMethod;
+  paymentMethod: string;
   feeType: FeeType;
   fixedAmount: number | null;
   percentage: number | null;

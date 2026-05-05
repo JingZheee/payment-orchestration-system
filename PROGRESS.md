@@ -1,49 +1,46 @@
 # Progress Snapshot
-Last updated: 2026-04-20
+Last updated: 2026-05-05
 
 ## Completed
-- [x] PRD.md finalised (v1.1) — insurance domain context, US-10/11/12, V17 migration entry
-- [x] CLAUDE.md updated — insurance overview, full DB migration table V1–V17, React frontend stack
-- [x] Maven multi-module backend — all 7 modules, Flyway V1–V16
-- [x] All backend modules — entities, repos, adapters, routing, payment, admin, DLQ/retry consumers
+- [x] PRD.md finalised — insurance domain, US-10/11/12, frontend pivoted to React, all migrations up to V20
+- [x] CLAUDE.md — full migration table V1–V20, PaymentProviderPort contract, React frontend stack, active session
+- [x] Maven multi-module backend — all 7 modules, Flyway V1–V20
+- [x] All backend modules — entities, repos, adapters, routing engine, payment service, admin, DLQ/retry consumers
 - [x] Spring Security + JWT (JwtAuthenticationFilter, JwtTokenProvider)
-- [x] CORS config added (CorsConfig.java — allows localhost:5173)
-- [x] 401 vs 403 fixed — SecurityConfig AuthenticationEntryPoint (expired token → 401 not 403)
-- [x] GET /admin/transactions/{id} endpoint added (transaction + event timeline)
-- [x] React + Vite frontend scaffolded — feature-based structure, antd v6, TanStack Query v5
-- [x] Shared types — all enums, ApiResponse, Page, Transaction, Dashboard, Routing, Provider, FeeRate, Metrics, Recon, Auth
-- [x] AppLayout — fixed sidebar (InsureRoute brand, NavLink active states), sticky topbar, logout dropdown
-- [x] Login page — JWT form, redirects back to intended page after auth
-- [x] RequireAuth guard — protects all admin routes, redirects to /login on missing token
-- [x] lib/axios.ts — JWT interceptor, 401 → clear storage + redirect to /login
-- [x] lib/endpoints.ts — centralised API path constants
-- [x] Service layer — authService, dashboardService, transactionService, routingRuleService, providerService, feeRateService, metricsService, reconService
-- [x] Dashboard page — 4 KPI cards, status donut, volume bar chart, routing intelligence panel
-- [x] Transactions page — paginated table, filters, slide-in drawer with event timeline
-- [x] Routing Rules page — full CRUD table, create/edit modal (provider XOR strategy)
-- [x] Providers page — card grid, enable/disable toggle per provider
-- [x] Fee Rates page — table, inline edit modal (fixed + percentage)
-- [x] Metrics page — time window selector, summary cards, bar + radar charts, detail table
-- [x] Reconciliation page — all statements + anomalies-only tab, variance colour coding
+- [x] CORS config, 401 vs 403 fix, GET /admin/transactions/{id} endpoint
+- [x] V17 migration — policy_number, claim_reference, payment_type on transactions
+- [x] V18 migration — payment_type column on routing_rules
+- [x] V19 migration — seed insurance-specific routing rules
+- [x] V20 migration — payment_methods table (composite PK code+region), 13 seed rows, composite FK
+- [x] DB-driven payment methods — PaymentMethodEntity, PaymentMethodId, PaymentMethodRepository
+- [x] PaymentMethod Java enum deleted — all fields/params use plain String throughout
+- [x] All 4 provider adapters updated — supportedMethods() returns List<String>, calculateFee takes String
+- [x] AdminPaymentMethodController — GET/POST/PUT/DELETE with 409 guard on FK violation
+- [x] React + Vite frontend — all 10 pages, service layer, TanStack Query hooks, AppLayout
+- [x] Login page, RequireAuth guard, JWT Axios interceptor
+- [x] Dashboard, Transactions, Routing Rules, Providers, Fee Rates pages
+- [x] Metrics, Reconciliation, Dead Letter Queue, Payment Demo pages
+- [x] PaymentMethods admin page — table grouped by region, add/edit modal, active toggle, delete with confirm
+- [x] Frontend types updated — PaymentMethod enum removed, replaced with PAYMENT_METHOD_LABELS const map
+- [x] endpoints.ts — PAYMENT_METHODS routes added; App.tsx + AppLayout.tsx wired
 
 ## Up next (start here next session)
-- [ ] Dead Letter Queue page (/dead-letter-queue) — list DLQ messages, retry/discard actions
-- [ ] Payment Demo page (/payment-demo) — trigger test payments, show live routing decision
-- [ ] V17 Flyway migration — add policy_number, claim_reference, payment_type to transactions
-- [ ] Wire policy/claim fields into PaymentService + transaction detail drawer
-- [ ] End-to-end smoke test — login → initiate MY payment → verify routing + recon record
+- [ ] End-to-end smoke test — login → initiate MY/ID/PH payment → verify routing decision, event timeline, recon record
+- [ ] Demo data seeding — ensure 100+ realistic transactions across all 3 regions for dashboard KPIs
+- [ ] Payment Demo page polish — confirm routing explanation displays score breakdown clearly
+- [ ] Viva prep — run through 10-minute demo script end-to-end, note any rough edges
 
 ## Decisions locked in
-- Maven multi-module (not Gradle); spring-boot-maven-plugin only in pos-api
+- Maven multi-module; spring-boot-maven-plugin only in pos-api
 - Hexagonal architecture — PaymentProviderPort is the core contract
 - RabbitMQ (not Kafka); webhook failure → return 200 to prevent retry storms
 - No DB mocking in tests — Testcontainers with real PostgreSQL only
+- Payment methods are DB-managed strings (not Java enum); composite PK (code, region)
 - Fee rates region-scoped: unique key (provider, region, payment_method)
 - Routing rules: preferredProvider XOR strategy — not both
-- Frontend: React + Vite + antd v6, feature-based (features/*/services/ + hooks/)
-- All API calls go through service files; hooks are thin TanStack Query wrappers
+- Frontend: React 18 + Vite + antd v5, feature-based structure
 - API paths centralised in lib/endpoints.ts — never hardcode in hooks
-- Session expiry → 401 (not 403); axios interceptor redirects to /login on 401
+- Session expiry → 401; axios interceptor redirects to /login on 401
 
 ## Blockers
 - None

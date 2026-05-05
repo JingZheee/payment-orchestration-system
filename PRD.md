@@ -48,7 +48,7 @@ The MVP goal is a fully functional routing engine integrated with real sandbox p
 
 ### Technical Context
 - The developer (student) is the sole builder
-- Tech stack is fixed: Spring Boot 3, Angular 17, PostgreSQL
+- Tech stack: Spring Boot 3, React 18 + TypeScript + Ant Design (frontend pivoted from Angular 17), PostgreSQL
 - Demo environment is a local machine or VPS with public webhook URL (e.g., via ngrok)
 
 ---
@@ -76,6 +76,8 @@ The MVP goal is a fully functional routing engine integrated with real sandbox p
 - ✅ Admin dashboard: KPI cards, transaction list, provider health, routing rule management
 - ✅ Live failover demo mode — disable a provider via dashboard, next payment auto-reroutes
 - ✅ Fee comparison display — show cost difference between providers for a given transaction
+- ✅ DB-driven payment methods — `payment_methods` table with composite PK (code, region); admins can add, rename, activate/deactivate methods per region without a code deploy
+- ✅ Payment methods admin page — CRUD UI grouped by region; independent per-region active toggle
 
 ### Providers
 - ✅ Billplz sandbox (Malaysia — FPX bank transfer)
@@ -92,7 +94,7 @@ The MVP goal is a fully functional routing engine integrated with real sandbox p
 - ✅ PostgreSQL with Flyway versioned migrations
 - ✅ Spring Security + JWT (stateless access token + DB-tracked refresh token)
 - ✅ REST API with OpenAPI/Swagger documentation
-- ✅ Angular 17 standalone components admin SPA
+- ✅ React 18 + TypeScript + Ant Design admin SPA (pivoted from Angular 17)
 - ✅ RabbitMQ for async webhook processing and retry queue
 - ✅ Dead Letter Queue (DLQ) for exhausted-retry transactions
 - ✅ Provider metrics aggregation (15-minute rolling window via scheduled job)
@@ -249,23 +251,26 @@ pos-common → pos-domain → pos-provider ┐
                         → pos-routing  ┤→ pos-payment → pos-admin → pos-api
 ```
 
-### Angular Project Structure
+### React Frontend Structure
 ```
-payment-orchestration-frontend/src/app/
-├── core/           (auth service, JWT interceptor, guards, models)
+payment-orchestration-frontend/src/
+├── lib/                   (axios instance, endpoints.ts)
+├── layouts/               (AppLayout — Sider + Header + Outlet)
+├── shared/
+│   ├── components/        (RequireAuth)
+│   └── types/             (transaction, feeRate, recon, paymentMethod, enums)
 └── features/
-    ├── auth/           (/login)
-    ├── demo/           (/demo — trigger test payments, watch routing in real time)
-    ├── transactions/   (/transactions/:id — event timeline detail)
-    └── admin/          (/admin/* — admin shell with sidenav layout)
-        ├── admin-shell/     (MatSidenav layout + router-outlet)
-        ├── dashboard/       (/admin/dashboard — KPIs, charts, live scoring widget)
-        ├── transactions/    (/admin/transactions — paginated filterable list)
-        ├── routing-rules/   (/admin/routing-rules — CRUD + simulate panel)
-        ├── providers/       (/admin/providers — health, toggle)
-        ├── fee-rates/       (/admin/fee-rates — inline-editable table by provider/region)
-        ├── metrics/         (/admin/metrics — success rate gauges, latency charts)
-        └── recon/           (/admin/recon — reconciliation + anomaly filter)
+    ├── auth/              (/login)
+    ├── dashboard/         (/dashboard — KPIs, charts, provider breakdown)
+    ├── transactions/      (/transactions — filterable table + event timeline)
+    ├── routing-rules/     (/routing-rules — CRUD table + simulate panel)
+    ├── providers/         (/providers — health, toggle, fee config)
+    ├── fee-rates/         (/fee-rates — inline-editable table by provider/region)
+    ├── payment-methods/   (/payment-methods — CRUD grouped by region, active toggle)
+    ├── metrics/           (/metrics — success rate + latency charts)
+    ├── reconciliation/    (/reconciliation — recon statements + anomaly filter)
+    ├── dead-letter-queue/ (/dead-letter-queue — RETRY_EXHAUSTED transactions)
+    └── payment-demo/      (/payment-demo — trigger test payments, show routing decision)
 ```
 
 ### Key Design Patterns
@@ -319,14 +324,17 @@ Routing Decision factors:
 ### Feature 2: PaymentProviderPort Contract
 Every provider implements:
 ```
-initiatePayment(request)       → redirect URL or direct result
-queryPaymentStatus(txnId)      → current status poll
-initiateRefund(request)        → refund result
-verifyWebhookSignature(body, headers) → boolean
-parseWebhookPayload(body)      → normalized WebhookParseResult
-calculateFee(amount, currency) → BigDecimal
-isAvailable()                  → boolean (circuit breaker backed)
+initiatePayment(request)                         → redirect URL or direct result
+queryPaymentStatus(txnId)                        → current status poll
+initiateRefund(request)                          → refund result
+verifyWebhookSignature(body, headers)            → boolean
+parseWebhookPayload(body)                        → normalized WebhookParseResult
+calculateFee(amount, currency, paymentMethod)    → BigDecimal (paymentMethod is String)
+supportedMethods()                               → List<String> (e.g. ["FPX","CARD","EWALLET"])
+isAvailable()                                    → boolean (circuit breaker backed)
 ```
+
+Payment methods are DB-managed strings, not a Java enum. The `payment_methods` table (V20) stores available codes per region with an `is_active` flag that admins can toggle at runtime.
 
 ### Feature 3: Mock Provider
 Configurable behavior via admin dashboard or `application.yml`:
@@ -424,11 +432,14 @@ Returns:
 ### Frontend
 | Technology | Version | Purpose |
 |---|---|---|
-| Angular | 17 | SPA framework |
+| React | 18 | SPA framework |
 | TypeScript | 5.x | Language |
-| ngx-charts | latest | Charts (volume, provider breakdown) |
-| Angular Material | 17 | UI component library |
-| RxJS | 7.x | Reactive data streams |
+| Vite | latest | Build tool |
+| React Router | v6 | Client-side routing |
+| TanStack Query | v5 | Server state / data fetching |
+| Axios | latest | HTTP client (JWT interceptor) |
+| Ant Design (antd) | 5.x | UI component library |
+| Recharts | latest | Charts (volume, provider breakdown) |
 
 ### Provider Sandbox Accounts
 | Provider | Region | Methods | Sandbox |
@@ -700,18 +711,22 @@ The system is considered MVP-complete when an examiner can watch a 10-minute dem
 
 ---
 
-### Phase 4 — Angular Admin Dashboard (Weeks 7–8)
+### Phase 4 — React Admin Dashboard (Weeks 7–8)
 **Goal:** Full system demonstrable through browser.
 
-- ✅ Project scaffold: standalone components, JWT interceptor, auth guard
+- ✅ Project scaffold: React 18 + TypeScript + Vite + Ant Design, JWT interceptor (Axios), RequireAuth guard
 - ✅ Login page + token storage
-- ✅ Layout shell: sidebar + topbar with active user display
-- ✅ Dashboard: KPI cards + ngx-charts volume chart + provider breakdown
-- ✅ Transaction list: filterable, paginated, status badges, CSV export
-- ✅ Transaction detail: event timeline component
+- ✅ Layout shell: Ant Design Sider + Header, NavLink sidebar, user dropdown
+- ✅ Dashboard: KPI cards + Recharts volume chart + provider breakdown
+- ✅ Transaction list: filterable, paginated, status badges
 - ✅ Routing rules: CRUD table + create/edit modal + simulate panel
 - ✅ Providers: health status, toggle, fee config edit
-- ✅ Payment demo: form to trigger test payments, shows routing decision result in real time
+- ✅ Fee Rates: inline-editable table per provider/region
+- ✅ Payment Methods: CRUD per region, active toggle (DB-driven)
+- ✅ Metrics: success rate + latency charts
+- ✅ Reconciliation: recon statement table + anomaly filter
+- ✅ Dead Letter Queue: RETRY_EXHAUSTED transactions with re-queue action
+- ✅ Payment Demo: form to trigger test payments, shows routing decision result in real time
 
 **Validation:** 10-minute demo walkthrough without touching Postman.
 
@@ -802,6 +817,9 @@ where:
 | V15 | `provider_fee_rates` (alter) | region column added |
 | V16 | `recon_statements` (alter) | region column added |
 | V17 | `transactions` (alter) | policy_number VARCHAR(100), claim_reference VARCHAR(100), payment_type VARCHAR(30) DEFAULT 'PREMIUM_COLLECTION' |
+| V18 | `routing_rules` (alter) | payment_type column added |
+| V19 | seed data | insurance-specific routing rules seeded |
+| V20 | `payment_methods` (new) | Composite PK (code, region), name VARCHAR(100), is_active BOOLEAN; 13 seed rows; composite FK from transactions, provider_fee_rates, recon_statements |
 
 ### RabbitMQ Queue Topology (Implementation Reference)
 ```yaml

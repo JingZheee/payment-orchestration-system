@@ -1,6 +1,5 @@
 package com.paymentorchestration.domain.entity;
 
-import com.paymentorchestration.common.enums.PaymentMethod;
 import com.paymentorchestration.common.enums.Provider;
 import com.paymentorchestration.common.enums.Region;
 import jakarta.persistence.*;
@@ -33,9 +32,8 @@ public class ReconStatement {
     @Column(name = "region")
     private Region region;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "payment_method")
-    private PaymentMethod paymentMethod;
+    @Column(name = "payment_method", length = 30)
+    private String paymentMethod;
 
     @Column(name = "transaction_amount", nullable = false, precision = 19, scale = 4)
     private BigDecimal transactionAmount;

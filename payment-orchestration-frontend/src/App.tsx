@@ -11,6 +11,7 @@ import Metrics from './features/metrics/Metrics';
 import Reconciliation from './features/reconciliation/Reconciliation';
 import DeadLetterQueue from './features/dead-letter-queue/DeadLetterQueue';
 import PaymentDemo from './features/payment-demo/PaymentDemo';
+import PaymentMethods from './features/payment-methods/PaymentMethods';
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="routing-rules"      element={<RoutingRules />} />
           <Route path="providers"          element={<Providers />} />
           <Route path="fee-rates"          element={<FeeRates />} />
+          <Route path="payment-methods"    element={<PaymentMethods />} />
           <Route path="metrics"            element={<Metrics />} />
           <Route path="reconciliation"     element={<Reconciliation />} />
           <Route path="dead-letter-queue"  element={<DeadLetterQueue />} />

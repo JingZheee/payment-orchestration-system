@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { path: '/routing-rules',    label: 'Routing Rules',    icon: 'account_tree' },
   { path: '/providers',        label: 'Providers',        icon: 'account_balance' },
   { path: '/fee-rates',        label: 'Fee Rates',        icon: 'percent' },
+  { path: '/payment-methods',  label: 'Payment Methods',  icon: 'credit_card' },
   { path: '/metrics',          label: 'Metrics',          icon: 'analytics' },
   { path: '/reconciliation',   label: 'Reconciliation',   icon: 'account_balance_wallet' },
   { path: '/dead-letter-queue',label: 'Dead Letter Queue',icon: 'error_outline' },

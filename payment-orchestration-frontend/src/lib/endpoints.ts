@@ -40,9 +40,15 @@ export const API = {
     ANOMALIES: '/admin/recon/anomalies',
   },
 
+  PAYMENT_METHODS: {
+    LIST:   '/admin/payment-methods',
+    BY_KEY: (region: string, code: string) => `/admin/payment-methods/${region}/${code}`,
+  },
+
   PAYMENTS: {
     INITIATE:  '/payments/initiate',
     DISBURSE:  '/payments/disburse',
     STATUS:    (id: string) => `/payments/${id}/status`,
+    METHODS:   '/payments/methods',
   },
 } as const;

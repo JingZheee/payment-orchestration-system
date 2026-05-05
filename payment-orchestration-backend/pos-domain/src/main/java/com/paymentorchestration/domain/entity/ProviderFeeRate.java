@@ -1,7 +1,6 @@
 package com.paymentorchestration.domain.entity;
 
 import com.paymentorchestration.common.enums.FeeType;
-import com.paymentorchestration.common.enums.PaymentMethod;
 import com.paymentorchestration.common.enums.Provider;
 import com.paymentorchestration.common.enums.Region;
 import jakarta.persistence.*;
@@ -36,9 +35,8 @@ public class ProviderFeeRate {
     @Column(nullable = false)
     private Region region;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "payment_method", nullable = false)
-    private PaymentMethod paymentMethod;
+    @Column(name = "payment_method", nullable = false, length = 30)
+    private String paymentMethod;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "fee_type", nullable = false)

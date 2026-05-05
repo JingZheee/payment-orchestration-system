@@ -1,6 +1,7 @@
 package com.paymentorchestration.domain.entity;
 
 import com.paymentorchestration.common.enums.Currency;
+import com.paymentorchestration.common.enums.PaymentType;
 import com.paymentorchestration.common.enums.Provider;
 import com.paymentorchestration.common.enums.Region;
 import com.paymentorchestration.common.enums.RoutingStrategy;
@@ -51,6 +52,10 @@ public class RoutingRule {
     @Enumerated(EnumType.STRING)
     @Column(name = "strategy")
     private RoutingStrategy strategy;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_type", length = 30)
+    private PaymentType paymentType;
 
     @Column(name = "is_enabled", nullable = false)
     private boolean enabled;

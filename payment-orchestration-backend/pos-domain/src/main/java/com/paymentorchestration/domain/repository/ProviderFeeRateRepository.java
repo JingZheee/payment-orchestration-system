@@ -1,6 +1,5 @@
 package com.paymentorchestration.domain.repository;
 
-import com.paymentorchestration.common.enums.PaymentMethod;
 import com.paymentorchestration.common.enums.Provider;
 import com.paymentorchestration.common.enums.Region;
 import com.paymentorchestration.domain.entity.ProviderFeeRate;
@@ -12,7 +11,7 @@ import java.util.Optional;
 public interface ProviderFeeRateRepository extends JpaRepository<ProviderFeeRate, Long> {
 
     Optional<ProviderFeeRate> findByProviderAndRegionAndPaymentMethodAndActiveTrue(
-            Provider provider, Region region, PaymentMethod paymentMethod);
+            Provider provider, Region region, String paymentMethod);
 
     List<ProviderFeeRate> findAllByOrderByProviderAscRegionAscPaymentMethodAsc();
 }

@@ -1,6 +1,7 @@
 package com.paymentorchestration.admin.dto;
 
 import com.paymentorchestration.common.enums.Currency;
+import com.paymentorchestration.common.enums.PaymentType;
 import com.paymentorchestration.common.enums.Provider;
 import com.paymentorchestration.common.enums.Region;
 import com.paymentorchestration.common.enums.RoutingStrategy;
@@ -20,7 +21,8 @@ public record RoutingRuleRequest(
         BigDecimal maxAmount,
         Provider preferredProvider,
         RoutingStrategy strategy,
-        boolean enabled
+        boolean enabled,
+        PaymentType paymentType
 ) {
     @AssertTrue(message = "Exactly one of preferredProvider or strategy must be set")
     boolean isValid() {

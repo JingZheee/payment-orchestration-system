@@ -1,6 +1,5 @@
 package com.paymentorchestration.provider.port;
 
-import com.paymentorchestration.common.enums.PaymentMethod;
 import com.paymentorchestration.common.enums.Provider;
 import com.paymentorchestration.common.enums.Region;
 import com.paymentorchestration.provider.dto.*;
@@ -73,7 +72,7 @@ public interface PaymentProviderPort {
      * Returns the payment methods this provider supports.
      * Used by the /payments/methods endpoint to present options to the user before routing.
      */
-    List<PaymentMethod> supportedMethods();
+    List<String> supportedMethods();
 
     /**
      * Calculate the exact fee for a transaction amount, region, and payment method.
@@ -81,7 +80,7 @@ public interface PaymentProviderPort {
      * fee rates per region. Single-region providers (BILLPLZ, MIDTRANS, PAYMONGO)
      * accept the parameter for interface consistency but ignore it.
      */
-    BigDecimal calculateFee(BigDecimal amount, Region region, PaymentMethod paymentMethod);
+    BigDecimal calculateFee(BigDecimal amount, Region region, String paymentMethod);
 
     /**
      * Health check. Returns false if the provider is disabled in provider_configs

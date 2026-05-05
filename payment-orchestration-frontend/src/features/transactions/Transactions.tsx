@@ -3,7 +3,7 @@ import { Table, Select, Button, Drawer, Tag, Spin, Tooltip } from 'antd';
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table';
 import { useTransactions } from './hooks/useTransactions';
 import { useTransactionDetail } from './hooks/useTransactionDetail';
-import { PaymentStatus, Provider, Region } from '../../shared/types/enums';
+import { PaymentStatus, Provider, Region, PaymentType } from '../../shared/types/enums';
 import type { Transaction } from '../../shared/types/transaction';
 
 const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
@@ -119,6 +119,25 @@ export default function Transactions() {
       render: (v: string) => (
         <Tag style={{ borderRadius: 6, fontSize: 11, fontWeight: 600 }}>{v}</Tag>
       ),
+    },
+    {
+      title: 'Type',
+      dataIndex: 'paymentType',
+      width: 160,
+      render: (v: string | null) => {
+        if (!v) return <span style={{ color: '#D1D5DB', fontSize: 12 }}>—</span>;
+        const isPremium = v === PaymentType.PREMIUM_COLLECTION;
+        return (
+          <span style={{
+            display: 'inline-block', padding: '2px 10px', borderRadius: 999,
+            fontSize: 11, fontWeight: 600,
+            background: isPremium ? 'rgba(252,185,0,0.15)' : 'rgba(147,51,234,0.1)',
+            color: isPremium ? '#7B5800' : '#6B21A8',
+          }}>
+            {isPremium ? 'Premium' : 'Claim'}
+          </span>
+        );
+      },
     },
     {
       title: 'Routing',
@@ -284,6 +303,7 @@ export default function Transactions() {
                   { label: 'Fee',          value: tx.fee != null ? formatAmount(tx.fee, tx.currency) : '—' },
                   { label: 'Method',       value: tx.paymentMethod ?? '—' },
                   { label: 'Retry count',  value: tx.retryCount },
+                  { label: 'Payment Type', value: tx.paymentType ? (tx.paymentType === PaymentType.PREMIUM_COLLECTION ? 'Premium Collection' : 'Claims Disbursement') : '—' },
                   { label: 'Policy #',     value: tx.policyNumber ?? '—' },
                   { label: 'Claim ref',    value: tx.claimReference ?? '—' },
                   { label: 'Created',      value: formatDate(tx.createdAt), full: true },

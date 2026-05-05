@@ -1,7 +1,6 @@
 package com.paymentorchestration.routing.scorer;
 
 import com.paymentorchestration.common.enums.Currency;
-import com.paymentorchestration.common.enums.PaymentMethod;
 import com.paymentorchestration.common.enums.Provider;
 import com.paymentorchestration.common.enums.Region;
 import com.paymentorchestration.domain.entity.ProviderFeeRate;
@@ -53,7 +52,7 @@ class ProviderScorerTest {
 
     @Test
     void scoreIsInZeroToOneRange() {
-        stubFeeRate(Provider.BILLPLZ, PaymentMethod.FPX, "2.50");
+        stubFeeRate(Provider.BILLPLZ, "FPX", "2.50");
         metricsStub(Provider.BILLPLZ, Region.MY, "0.95", 200L);
 
         PaymentProviderPort p = provider(Provider.BILLPLZ);
@@ -65,8 +64,8 @@ class ProviderScorerTest {
 
     @Test
     void higherSuccessRateProducesHigherScore() {
-        stubFeeRate(Provider.BILLPLZ, PaymentMethod.FPX, "2.50");
-        stubFeeRate(Provider.MOCK,    PaymentMethod.FPX, "2.50");
+        stubFeeRate(Provider.BILLPLZ, "FPX", "2.50");
+        stubFeeRate(Provider.MOCK,    "FPX", "2.50");
 
         metricsStub(Provider.BILLPLZ, Region.MY, "0.98", 300L);
         metricsStub(Provider.MOCK,    Region.MY, "0.60", 300L);
@@ -81,8 +80,8 @@ class ProviderScorerTest {
 
     @Test
     void lowerFeeProducesHigherScore() {
-        stubFeeRate(Provider.BILLPLZ, PaymentMethod.FPX, "1.00");
-        stubFeeRate(Provider.MOCK,    PaymentMethod.FPX, "5.00");
+        stubFeeRate(Provider.BILLPLZ, "FPX", "1.00");
+        stubFeeRate(Provider.MOCK,    "FPX", "5.00");
 
         metricsStub(Provider.BILLPLZ, Region.MY, "0.90", 300L);
         metricsStub(Provider.MOCK,    Region.MY, "0.90", 300L);
@@ -99,7 +98,7 @@ class ProviderScorerTest {
     void defaultsAppliedWhenNoMetricsExist() {
         when(metricsRepository.findTopByProviderAndRegionOrderByWindowEndDesc(any(), any()))
                 .thenReturn(Optional.empty());
-        stubFeeRate(Provider.BILLPLZ, PaymentMethod.FPX, "2.50");
+        stubFeeRate(Provider.BILLPLZ, "FPX", "2.50");
 
         PaymentProviderPort p = provider(Provider.BILLPLZ);
         RoutingContext context = contextFor(Region.MY, new BigDecimal("100.00"));
@@ -116,7 +115,7 @@ class ProviderScorerTest {
         return p;
     }
 
-    private void stubFeeRate(Provider provider, PaymentMethod method, String fixedFee) {
+    private void stubFeeRate(Provider provider, String method, String fixedFee) {
         ProviderFeeRate rate = new ProviderFeeRate();
         rate.setFeeType(FeeType.FIXED);
         rate.setFixedAmount(new BigDecimal(fixedFee));
@@ -143,7 +142,7 @@ class ProviderScorerTest {
                 .amount(amount)
                 .currency(Currency.MYR)
                 .region(region)
-                .paymentMethod(PaymentMethod.FPX)
+                .paymentMethod("FPX")
                 .availableProviders(List.of())
                 .build();
     }

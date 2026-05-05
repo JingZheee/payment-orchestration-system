@@ -1,7 +1,6 @@
 package com.paymentorchestration.provider.paymongo;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.paymentorchestration.common.enums.PaymentMethod;
 import com.paymentorchestration.common.enums.PaymentStatus;
 import com.paymentorchestration.common.enums.Provider;
 import com.paymentorchestration.common.enums.Region;
@@ -227,14 +226,13 @@ public class PayMongoAdapter implements PaymentProviderPort {
     }
 
     @Override
-    public List<PaymentMethod> supportedMethods() {
-        return List.of(PaymentMethod.CARD, PaymentMethod.MAYA, PaymentMethod.GCASH,
-                       PaymentMethod.GRABPAY, PaymentMethod.EWALLET);
+    public List<String> supportedMethods() {
+        return List.of("CARD", "MAYA", "GCASH", "GRABPAY", "EWALLET");
     }
 
     @Override
-    public BigDecimal calculateFee(BigDecimal amount, Region region, PaymentMethod paymentMethod) {
-        if (paymentMethod == null) paymentMethod = PaymentMethod.MAYA;
+    public BigDecimal calculateFee(BigDecimal amount, Region region, String paymentMethod) {
+        if (paymentMethod == null) paymentMethod = "MAYA";
         // PAYMONGO only operates in PH; region parameter accepted for interface consistency
         return providerFeeRateRepository
                 .findByProviderAndRegionAndPaymentMethodAndActiveTrue(Provider.PAYMONGO, Region.PH, paymentMethod)

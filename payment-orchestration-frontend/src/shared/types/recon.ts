@@ -1,11 +1,11 @@
-import type { Provider, Region, PaymentMethod } from './enums';
+import type { Provider, Region } from './enums';
 
 export interface ReconStatement {
   id: number;
   transactionId: string;
   provider: Provider;
   region: Region;
-  paymentMethod: PaymentMethod;
+  paymentMethod: string;
   transactionAmount: number;
   expectedFee: number | null;
   actualFee: number | null;

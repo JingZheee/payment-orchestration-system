@@ -2,7 +2,6 @@ package com.paymentorchestration.admin.controller;
 
 import com.paymentorchestration.common.dto.ApiResponse;
 import com.paymentorchestration.common.enums.Currency;
-import com.paymentorchestration.common.enums.PaymentMethod;
 import com.paymentorchestration.common.enums.PaymentStatus;
 import com.paymentorchestration.common.enums.Provider;
 import com.paymentorchestration.common.enums.Region;
@@ -97,7 +96,7 @@ public class DashboardController {
             @RequestParam Region region,
             @RequestParam BigDecimal amount,
             @RequestParam Currency currency,
-            @RequestParam(required = false) PaymentMethod paymentMethod) {
+            @RequestParam(required = false) String paymentMethod) {
 
         List<PaymentProviderPort> eligible = eligibleProviders(region);
 
@@ -129,7 +128,7 @@ public class DashboardController {
             @RequestParam Region region,
             @RequestParam BigDecimal amount,
             @RequestParam Currency currency,
-            @RequestParam(required = false) PaymentMethod paymentMethod) {
+            @RequestParam(required = false) String paymentMethod) {
 
         List<PaymentProviderPort> eligible = eligibleProviders(region);
 

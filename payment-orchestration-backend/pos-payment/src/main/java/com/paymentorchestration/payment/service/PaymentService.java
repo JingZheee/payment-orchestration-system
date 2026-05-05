@@ -1,6 +1,7 @@
 package com.paymentorchestration.payment.service;
 
 import com.paymentorchestration.common.enums.PaymentStatus;
+import com.paymentorchestration.common.enums.PaymentType;
 import com.paymentorchestration.common.enums.Provider;
 import com.paymentorchestration.common.exception.PaymentNotFoundException;
 import com.paymentorchestration.common.exception.ProviderException;
@@ -65,11 +66,16 @@ public class PaymentService {
     public InitiatePaymentResponse initiatePayment(InitiatePaymentRequest request,
                                                     String idempotencyKey) {
         // 1. Route
+        PaymentType paymentType = request.getPaymentType() != null
+                ? request.getPaymentType()
+                : PaymentType.PREMIUM_COLLECTION;
+
         RoutingContext context = RoutingContext.builder()
                 .amount(request.getAmount())
                 .currency(request.getCurrency())
                 .region(request.getRegion())
                 .paymentMethod(request.getPaymentMethod())
+                .paymentType(paymentType)
                 .availableProviders(allProviders)
                 .build();
 
@@ -92,6 +98,9 @@ public class PaymentService {
         transaction.setRoutingStrategy(decision.getStrategy());
         transaction.setRoutingReason(decision.getReason());
         transaction.setIdempotencyKey(idempotencyKey);
+        transaction.setPaymentType(paymentType);
+        transaction.setPolicyNumber(request.getPolicyNumber());
+        transaction.setClaimReference(request.getClaimReference());
         transactionRepository.save(transaction);
 
         writeEvent(transaction.getId(), "INITIATED",
@@ -210,6 +219,9 @@ public class PaymentService {
                 .fee(t.getFee())
                 .redirectUrl(t.getRedirectUrl())
                 .createdAt(t.getCreatedAt())
+                .paymentType(t.getPaymentType())
+                .policyNumber(t.getPolicyNumber())
+                .claimReference(t.getClaimReference())
                 .build();
     }
 }

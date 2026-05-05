@@ -73,25 +73,28 @@ pos-common
 
 Every provider implements:
 ```java
-initiatePayment(request)                        // → redirect URL or direct result
-queryPaymentStatus(transactionId)               // → current status
-initiateRefund(request)                         // → refund result
-verifyWebhookSignature(body, headers)           // → boolean (HMAC-SHA256 / RSA)
-parseWebhookPayload(body)                       // → normalized WebhookParseResult
-calculateFee(amount, currency)                  // → BigDecimal
-isAvailable()                                   // → boolean (used by routing engine)
+initiatePayment(request)                                    // → redirect URL or direct result
+queryPaymentStatus(transactionId)                           // → current status
+initiateRefund(request)                                     // → refund result
+verifyWebhookSignature(body, headers)                       // → boolean (HMAC-SHA256 / RSA)
+parseWebhookPayload(body)                                   // → normalized WebhookParseResult
+calculateFee(amount, currency, paymentMethod)               // → BigDecimal (paymentMethod is String)
+supportedMethods()                                          // → List<String> (e.g. ["FPX","CARD"])
+isAvailable()                                               // → boolean (used by routing engine)
 ```
+
+`PaymentMethod` is no longer a Java enum — it is a plain `String` throughout the codebase. Payment methods are managed at runtime in the `payment_methods` DB table.
 
 ---
 
 ## Payment Providers
 
-| Provider | Region | Methods | Webhook Verification |
+| Provider | Region | Methods (String codes) | Webhook Verification |
 |---|---|---|---|
-| Billplz | MY (Malaysia) | FPX bank transfer | HMAC-SHA256 |
-| Midtrans | ID (Indonesia) | Virtual Account, QRIS | HMAC-SHA256 |
-| PayMongo | PH (Philippines) | Maya, cards, e-wallets | RSA signature |
-| Mock | ALL | Configurable | Always passes |
+| Billplz | MY (Malaysia) | FPX, CARD, EWALLET | HMAC-SHA256 |
+| Midtrans | ID (Indonesia) | VIRTUAL_ACCOUNT, QRIS, GOPAY, CARD, EWALLET | HMAC-SHA256 |
+| PayMongo | PH (Philippines) | MAYA, GCASH, GRABPAY, CARD, EWALLET | RSA signature |
+| Mock | ALL | All 9 codes (reads active methods from DB) | Always passes |
 
 **Mock provider modes:** `ALWAYS_SUCCESS`, `ALWAYS_FAIL`, `RANDOM`, `DELAYED` — toggleable via admin dashboard or `application-dev.yml`.
 
@@ -206,6 +209,9 @@ providers:
 | V15 | `provider_fee_rates` (alter) | region column added |
 | V16 | `recon_statements` (alter) | region column added |
 | V17 | `transactions` (alter) | policy_number VARCHAR(100), claim_reference VARCHAR(100), payment_type VARCHAR(30) |
+| V18 | `routing_rules` (alter) | payment_type column added |
+| V19 | seed data | insurance-specific routing rules seeded |
+| V20 | `payment_methods` (new) | Composite PK (code, region); 13 seed rows; composite FK from transactions, provider_fee_rates, recon_statements |
 
 ---
 
@@ -320,7 +326,29 @@ Weights are configurable in `application.yml` under `routing.scorer.*`.
 
 | Field | Value |
 |---|---|
-| **Current module** | frontend (React) — remaining pages + V17 backend migration |
-| **Current task** | Build Dead Letter Queue page (/dead-letter-queue), then Payment Demo page (/payment-demo) |
-| **Last completed** | Reconciliation page, Metrics page, Fee Rates page, Providers page, Routing Rules page, Transactions page, Dashboard page, Login + RequireAuth, service layer + endpoints.ts, CORS config, 401 fix |
+| **Current module** | full-stack — all major features implemented |
+| **Current task** | End-to-end smoke test: login → initiate payment (MY/ID/PH) → verify routing decision, event timeline, recon record |
+| **Last completed** | CLAUDE.md + PRD.md updated to reflect V18–V20 migrations, DB-driven payment methods, React frontend stack |
 | **Blockers** | None |
+
+### Admin API Endpoints — Payment Methods
+```
+GET    /api/v1/admin/payment-methods               — list all rows (sorted by region, code)
+POST   /api/v1/admin/payment-methods               — create {code, region, name}
+PUT    /api/v1/admin/payment-methods/{region}/{code} — update {name?, active?}
+DELETE /api/v1/admin/payment-methods/{region}/{code} — delete (returns 409 if FK referenced)
+```
+
+### Frontend Routes (complete)
+| Path | Component |
+|---|---|
+| `/dashboard` | Dashboard |
+| `/transactions` | Transactions |
+| `/routing-rules` | RoutingRules |
+| `/providers` | Providers |
+| `/fee-rates` | FeeRates |
+| `/payment-methods` | PaymentMethods |
+| `/metrics` | Metrics |
+| `/reconciliation` | Reconciliation |
+| `/dead-letter-queue` | DeadLetterQueue |
+| `/payment-demo` | PaymentDemo |

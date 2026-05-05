@@ -1,6 +1,7 @@
 package com.paymentorchestration.payment.dto;
 
 import com.paymentorchestration.common.enums.PaymentStatus;
+import com.paymentorchestration.common.enums.PaymentType;
 import com.paymentorchestration.common.enums.Provider;
 import com.paymentorchestration.common.enums.RoutingStrategy;
 import lombok.Builder;
@@ -24,4 +25,7 @@ public class InitiatePaymentResponse {
     /** Redirect URL returned by the provider — null for server-side flows. */
     private final String redirectUrl;
     private final Instant createdAt;
+    private final PaymentType paymentType;
+    private final String policyNumber;
+    private final String claimReference;
 }

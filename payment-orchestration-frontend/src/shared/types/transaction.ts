@@ -1,4 +1,4 @@
-import type { Provider, Region, Currency, PaymentStatus, PaymentMethod, RoutingStrategy, PaymentType } from './enums';
+import type { Provider, Region, Currency, PaymentStatus, RoutingStrategy, PaymentType } from './enums';
 
 export interface Transaction {
   id: string;
@@ -11,7 +11,7 @@ export interface Transaction {
   region: Region;
   status: PaymentStatus;
   provider: Provider;
-  paymentMethod: PaymentMethod | null;
+  paymentMethod: string | null;
   routingReason: string | null;
   routingStrategy: RoutingStrategy | null;
   providerTransactionId: string | null;
@@ -46,7 +46,7 @@ export interface InitiatePaymentRequest {
   amount: number;
   currency: Currency;
   region: Region;
-  paymentMethod: PaymentMethod;
+  paymentMethod: string;
   customerEmail: string;
   description?: string;
   redirectUrl: string;

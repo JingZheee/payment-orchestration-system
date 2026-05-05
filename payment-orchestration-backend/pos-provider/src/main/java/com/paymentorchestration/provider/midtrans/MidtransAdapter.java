@@ -1,7 +1,6 @@
 package com.paymentorchestration.provider.midtrans;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.paymentorchestration.common.enums.PaymentMethod;
 import com.paymentorchestration.common.enums.PaymentStatus;
 import com.paymentorchestration.common.enums.Provider;
 import com.paymentorchestration.common.enums.Region;
@@ -47,22 +46,17 @@ public class MidtransAdapter implements PaymentProviderPort {
 
     @Override
     public PaymentResult initiatePayment(PaymentRequest request) {
-        log.info("[midtrans] Initiating payment for order {}", request.getMerchantOrderId());
+        String method = request.getPaymentMethod() != null
+                ? request.getPaymentMethod()
+                : "VIRTUAL_ACCOUNT";
+        log.info("[midtrans] Initiating {} payment for order {}", method, request.getMerchantOrderId());
 
-        // Midtrans uses full currency units (IDR has no sub-unit)
         long grossAmount = request.getAmount().longValue();
+        String customerEmail = request.getCustomerEmail() != null
+                ? request.getCustomerEmail()
+                : "customer@example.com";
 
-        Map<String, Object> body = Map.of(
-                "payment_type", "bank_transfer",
-                "transaction_details", Map.of(
-                        "order_id", request.getMerchantOrderId(),
-                        "gross_amount", grossAmount
-                ),
-                "bank_transfer", Map.of("bank", "bca"),
-                "customer_details", Map.of(
-                        "email", request.getCustomerEmail() != null ? request.getCustomerEmail() : "customer@example.com"
-                )
-        );
+        Map<String, Object> body = buildRequestBody(method, request.getMerchantOrderId(), grossAmount, customerEmail);
 
         try {
             Map<?, ?> response = webClientBuilder.build()
@@ -79,16 +73,15 @@ public class MidtransAdapter implements PaymentProviderPort {
 
             String transactionId = (String) response.get("transaction_id");
             String rawJson = objectMapper.writeValueAsString(response);
+            String redirectUrl = extractRedirectUrl(method, response);
 
-            // VA number is in va_numbers array
-            String vaNumber = extractVaNumber(response);
-            log.info("[midtrans] Charge created: txn={}, va={}", transactionId, vaNumber);
+            log.info("[midtrans] Charge created: txn={}, method={}, redirectUrl={}", transactionId, method, redirectUrl);
 
             return PaymentResult.builder()
                     .providerTransactionId(transactionId)
                     .status(PaymentStatus.PROCESSING)
-                    .redirectUrl(null) // VA-based; VA number is in rawResponse
-                    .fee(calculateFee(request.getAmount(), request.getRegion(), request.getPaymentMethod()))
+                    .redirectUrl(redirectUrl)
+                    .fee(calculateFee(request.getAmount(), request.getRegion(), method))
                     .rawResponse(rawJson)
                     .build();
 
@@ -96,6 +89,47 @@ public class MidtransAdapter implements PaymentProviderPort {
             throw e;
         } catch (Exception e) {
             throw new ProviderException(Provider.MIDTRANS, "Failed to create charge", e);
+        }
+    }
+
+    private Map<String, Object> buildRequestBody(String method, String orderId, long grossAmount, String email) {
+        Map<String, Object> transactionDetails = Map.of("order_id", orderId, "gross_amount", grossAmount);
+        Map<String, Object> customerDetails = Map.of("email", email);
+
+        if ("QRIS".equals(method)) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("payment_type", "qris");
+            body.put("transaction_details", transactionDetails);
+            body.put("customer_details", customerDetails);
+            return body;
+        } else if ("GOPAY".equals(method) || "EWALLET".equals(method)) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("payment_type", "gopay");
+            body.put("transaction_details", transactionDetails);
+            body.put("gopay", Map.of("enable_callback", true));
+            body.put("customer_details", customerDetails);
+            return body;
+        } else {
+            // VIRTUAL_ACCOUNT and anything else → BCA bank transfer
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("payment_type", "bank_transfer");
+            body.put("transaction_details", transactionDetails);
+            body.put("bank_transfer", Map.of("bank", "bca"));
+            body.put("customer_details", customerDetails);
+            return body;
+        }
+    }
+
+    private String extractRedirectUrl(String method, Map<?, ?> response) {
+        if ("QRIS".equals(method)) {
+            return extractActionUrl(response, "generate-qr-code");
+        } else if ("GOPAY".equals(method) || "EWALLET".equals(method)) {
+            return extractActionUrl(response, "deeplink-redirect");
+        } else {
+            // VA — no redirect; VA number goes into rawResponse
+            String vaNumber = extractVaNumber(response);
+            log.debug("[midtrans] VA number: {}", vaNumber);
+            return null;
         }
     }
 
@@ -209,14 +243,13 @@ public class MidtransAdapter implements PaymentProviderPort {
     }
 
     @Override
-    public List<PaymentMethod> supportedMethods() {
-        return List.of(PaymentMethod.VIRTUAL_ACCOUNT, PaymentMethod.QRIS,
-                       PaymentMethod.CARD, PaymentMethod.GOPAY, PaymentMethod.EWALLET);
+    public List<String> supportedMethods() {
+        return List.of("VIRTUAL_ACCOUNT", "QRIS", "CARD", "GOPAY", "EWALLET");
     }
 
     @Override
-    public BigDecimal calculateFee(BigDecimal amount, Region region, PaymentMethod paymentMethod) {
-        if (paymentMethod == null) paymentMethod = PaymentMethod.VIRTUAL_ACCOUNT;
+    public BigDecimal calculateFee(BigDecimal amount, Region region, String paymentMethod) {
+        if (paymentMethod == null) paymentMethod = "VIRTUAL_ACCOUNT";
         // MIDTRANS only operates in ID; region parameter accepted for interface consistency
         return providerFeeRateRepository
                 .findByProviderAndRegionAndPaymentMethodAndActiveTrue(Provider.MIDTRANS, Region.ID, paymentMethod)
@@ -272,6 +305,21 @@ public class MidtransAdapter implements PaymentProviderPort {
             if (vaNumbers != null && !vaNumbers.isEmpty()) {
                 Map<?, ?> va = (Map<?, ?>) vaNumbers.get(0);
                 return (String) va.get("va_number");
+            }
+        } catch (Exception ignored) {}
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private String extractActionUrl(Map<?, ?> response, String actionName) {
+        try {
+            List<?> actions = (List<?>) response.get("actions");
+            if (actions == null) return null;
+            for (Object item : actions) {
+                Map<?, ?> action = (Map<?, ?>) item;
+                if (actionName.equals(action.get("name"))) {
+                    return (String) action.get("url");
+                }
             }
         } catch (Exception ignored) {}
         return null;

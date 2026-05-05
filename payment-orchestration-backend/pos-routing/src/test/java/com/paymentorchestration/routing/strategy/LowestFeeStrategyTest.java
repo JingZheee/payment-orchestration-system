@@ -1,7 +1,6 @@
 package com.paymentorchestration.routing.strategy;
 
 import com.paymentorchestration.common.enums.Currency;
-import com.paymentorchestration.common.enums.PaymentMethod;
 import com.paymentorchestration.common.enums.Provider;
 import com.paymentorchestration.common.enums.Region;
 import com.paymentorchestration.provider.port.PaymentProviderPort;
@@ -80,7 +79,7 @@ class LowestFeeStrategyTest {
                 .amount(AMOUNT)
                 .currency(Currency.MYR)
                 .region(region)
-                .paymentMethod(PaymentMethod.FPX)
+                .paymentMethod("FPX")
                 .availableProviders(providers)
                 .build();
     }

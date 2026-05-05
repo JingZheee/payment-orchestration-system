@@ -49,5 +49,6 @@ public class RoutingRuleService {
         rule.setPreferredProvider(request.preferredProvider());
         rule.setStrategy(request.strategy());
         rule.setEnabled(request.enabled());
+        rule.setPaymentType(request.paymentType());
     }
 }

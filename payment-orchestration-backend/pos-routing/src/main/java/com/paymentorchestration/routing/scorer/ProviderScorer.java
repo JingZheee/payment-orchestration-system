@@ -1,6 +1,5 @@
 package com.paymentorchestration.routing.scorer;
 
-import com.paymentorchestration.common.enums.PaymentMethod;
 import com.paymentorchestration.common.enums.Provider;
 import com.paymentorchestration.common.enums.Region;
 import com.paymentorchestration.domain.entity.ProviderMetrics;
@@ -143,7 +142,7 @@ public class ProviderScorer {
 
         BigDecimal weightedFee = BigDecimal.ZERO;
         for (Object[] row : methodCounts) {
-            PaymentMethod method = (PaymentMethod) row[0];
+            String method = (String) row[0];
             long count = (Long) row[1];
             BigDecimal share = BigDecimal.valueOf(count).divide(BigDecimal.valueOf(total), 6, RoundingMode.HALF_UP);
 

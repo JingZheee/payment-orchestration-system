@@ -1,6 +1,11 @@
 package com.paymentorchestration.domain.entity;
 
-import com.paymentorchestration.common.enums.*;
+import com.paymentorchestration.common.enums.Currency;
+import com.paymentorchestration.common.enums.PaymentStatus;
+import com.paymentorchestration.common.enums.PaymentType;
+import com.paymentorchestration.common.enums.Provider;
+import com.paymentorchestration.common.enums.Region;
+import com.paymentorchestration.common.enums.RoutingStrategy;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -41,9 +46,8 @@ public class Transaction {
     @Column(nullable = false)
     private Provider provider;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "payment_method")
-    private PaymentMethod paymentMethod;
+    @Column(name = "payment_method", length = 30)
+    private String paymentMethod;
 
     @Column(name = "routing_reason")
     private String routingReason;
@@ -68,6 +72,16 @@ public class Transaction {
 
     @Column(name = "idempotency_key", unique = true)
     private String idempotencyKey;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_type", length = 30)
+    private PaymentType paymentType;
+
+    @Column(name = "policy_number", length = 100)
+    private String policyNumber;
+
+    @Column(name = "claim_reference", length = 100)
+    private String claimReference;
 
     @Column(name = "retry_count", nullable = false)
     private int retryCount = 0;

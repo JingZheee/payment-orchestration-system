@@ -1,7 +1,6 @@
 package com.paymentorchestration.payment.controller;
 
 import com.paymentorchestration.common.dto.ApiResponse;
-import com.paymentorchestration.common.enums.PaymentMethod;
 import com.paymentorchestration.common.enums.Provider;
 import com.paymentorchestration.common.enums.Region;
 import com.paymentorchestration.provider.port.PaymentProviderPort;
@@ -32,7 +31,7 @@ public class PaymentMethodController {
     private final List<PaymentProviderPort> allProviders;
 
     public record AvailableMethod(
-            PaymentMethod method,
+            String method,
             Provider provider,
             BigDecimal fee,
             String feeDescription
@@ -49,7 +48,7 @@ public class PaymentMethodController {
             if (!provider.isAvailable()) continue;
             if (!ProviderRegionSupport.supportsRegion(provider.getProvider(), region)) continue;
 
-            for (PaymentMethod method : provider.supportedMethods()) {
+            for (String method : provider.supportedMethods()) {
                 BigDecimal fee = provider.calculateFee(amount, region, method);
                 result.add(new AvailableMethod(
                         method,
@@ -63,10 +62,10 @@ public class PaymentMethodController {
         return ResponseEntity.ok(ApiResponse.ok(result));
     }
 
-    private String describeFee(PaymentMethod method, BigDecimal fee, BigDecimal amount) {
-        return switch (method) {
-            case FPX, VIRTUAL_ACCOUNT -> fee + " (fixed)";
-            default -> fee + " for amount " + amount;
-        };
+    private String describeFee(String method, BigDecimal fee, BigDecimal amount) {
+        if ("FPX".equals(method) || "VIRTUAL_ACCOUNT".equals(method)) {
+            return fee + " (fixed)";
+        }
+        return fee + " for amount " + amount;
     }
 }

@@ -2,13 +2,13 @@ import api from '../../../lib/axios';
 import { API } from '../../../lib/endpoints';
 import type { ApiResponse } from '../../../shared/types';
 import type { TransactionSummary, ScoreDetail, StrategyComparison } from '../../../shared/types/dashboard';
-import type { Region, Currency, PaymentMethod } from '../../../shared/types/enums';
+import type { Region, Currency } from '../../../shared/types/enums';
 
 export interface ScoreParams {
   region: Region;
   amount: number;
   currency: Currency;
-  paymentMethod?: PaymentMethod;
+  paymentMethod?: string;
 }
 
 export interface CompareParams {
