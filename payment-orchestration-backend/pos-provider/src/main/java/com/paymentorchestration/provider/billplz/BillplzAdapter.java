@@ -50,7 +50,19 @@ public class BillplzAdapter implements PaymentProviderPort {
 
     @Override
     public PaymentResult initiatePayment(PaymentRequest request) {
-        log.info("[billplz] Initiating payment for order {}", request.getMerchantOrderId());
+        String method = request.getPaymentMethod() != null
+                ? request.getPaymentMethod().toUpperCase()
+                : "FPX";
+
+        if ("CARD".equals(method)) {
+            throw new ProviderException(Provider.BILLPLZ,
+                    "Billplz does not support card payments; use FPX or EWALLET");
+        }
+
+        // FPX and EWALLET both use the same /bills endpoint.
+        // Which methods appear on the Billplz payment page depends on the collection's
+        // configured methods (FPX bank transfer vs TNG / Boost / ShopeePay for EWALLET).
+        log.info("[billplz] Initiating {} payment for order {}", method, request.getMerchantOrderId());
 
         // Billplz amount is in cents (sen)
         int amountInCents = request.getAmount().multiply(BigDecimal.valueOf(100)).intValue();
@@ -64,6 +76,7 @@ public class BillplzAdapter implements PaymentProviderPort {
         formData.add("redirect_url", request.getRedirectUrl() != null ? request.getRedirectUrl() : "http://localhost:4200/payment-result");
         formData.add("description", request.getDescription() != null ? request.getDescription() : request.getMerchantOrderId());
         formData.add("reference_1", request.getTransactionId().toString());
+        formData.add("reference_1_label", method);
 
         try {
             Map<?, ?> response = webClientBuilder.build()
@@ -87,7 +100,7 @@ public class BillplzAdapter implements PaymentProviderPort {
                     .providerTransactionId(billId)
                     .status(PaymentStatus.PROCESSING)
                     .redirectUrl(billUrl)
-                    .fee(calculateFee(request.getAmount(), request.getRegion(), request.getPaymentMethod()))
+                    .fee(calculateFee(request.getAmount(), request.getRegion(), method))
                     .rawResponse(response.toString())
                     .build();
 
@@ -187,15 +200,15 @@ public class BillplzAdapter implements PaymentProviderPort {
 
     @Override
     public List<String> supportedMethods() {
-        return List.of("FPX", "CARD", "EWALLET");
+        return List.of("FPX", "EWALLET");
     }
 
     @Override
     public BigDecimal calculateFee(BigDecimal amount, Region region, String paymentMethod) {
-        if (paymentMethod == null) paymentMethod = "FPX";
+        String method = (paymentMethod != null) ? paymentMethod.toUpperCase() : "FPX";
         // BILLPLZ only operates in MY; region parameter accepted for interface consistency
         return providerFeeRateRepository
-                .findByProviderAndRegionAndPaymentMethodAndActiveTrue(Provider.BILLPLZ, Region.MY, paymentMethod)
+                .findByProviderAndRegionAndPaymentMethodAndActiveTrue(Provider.BILLPLZ, Region.MY, method)
                 .map(rate -> rate.compute(amount))
                 .orElse(BigDecimal.ZERO);
     }

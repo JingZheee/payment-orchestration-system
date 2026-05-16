@@ -13,6 +13,7 @@ import com.paymentorchestration.domain.repository.TransactionRepository;
 import com.paymentorchestration.domain.repository.WebhookLogRepository;
 import com.paymentorchestration.payment.dto.InitiatePaymentRequest;
 import com.paymentorchestration.payment.dto.InitiatePaymentResponse;
+import com.paymentorchestration.payment.messaging.PaymentSucceededPublisher;
 import com.paymentorchestration.payment.messaging.RetryPublisher;
 import com.paymentorchestration.provider.dto.PaymentRequest;
 import com.paymentorchestration.provider.dto.PaymentResult;
@@ -44,6 +45,7 @@ public class PaymentService {
     private final TransactionEventRepository eventRepository;
     private final WebhookLogRepository webhookLogRepository;
     private final RetryPublisher retryPublisher;
+    private final PaymentSucceededPublisher paymentSucceededPublisher;
     private final List<PaymentProviderPort> allProviders;
 
     /** Built from allProviders on startup for O(1) lookup. */
@@ -142,6 +144,10 @@ public class PaymentService {
 
         writeEvent(transaction.getId(), "PROVIDER_RESPONSE", result.getRawResponse());
 
+        if (result.getStatus() == PaymentStatus.SUCCESS) {
+            paymentSucceededPublisher.publish(transaction);
+        }
+
         // 5. Schedule retry if payment is still pending a webhook
         if (result.getStatus() == PaymentStatus.PROCESSING
                 || result.getStatus() == PaymentStatus.PENDING) {
@@ -179,6 +185,10 @@ public class PaymentService {
                     writeEvent(transaction.getId(), "STATUS_UPDATED",
                             "Webhook: " + previous + " → " + parsed.getStatus()
                             + " (provider=" + parsed.getProvider() + ")");
+                    if (parsed.getStatus() == PaymentStatus.SUCCESS
+                            && previous != PaymentStatus.SUCCESS) {
+                        paymentSucceededPublisher.publish(transaction);
+                    }
                     webhookLog.setTransactionId(transaction.getId());
                     webhookLog.setProcessedAt(Instant.now());
                 });

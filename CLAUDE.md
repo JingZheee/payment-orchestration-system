@@ -212,6 +212,7 @@ providers:
 | V18 | `routing_rules` (alter) | payment_type column added |
 | V19 | seed data | insurance-specific routing rules seeded |
 | V20 | `payment_methods` (new) | Composite PK (code, region); 13 seed rows; composite FK from transactions, provider_fee_rates, recon_statements |
+| V21 | `demo_policies` (new) | id UUID PK, holder_name, holder_email, insurance_type, policy_number, claim_reference, amount, currency, region, payment_method, payment_type, status DEFAULT 'PENDING', transaction_id UUID; 6 seed rows |
 
 ---
 
@@ -327,8 +328,8 @@ Weights are configurable in `application.yml` under `routing.scorer.*`.
 | Field | Value |
 |---|---|
 | **Current module** | full-stack — all major features implemented |
-| **Current task** | End-to-end smoke test: login → initiate payment (MY/ID/PH) → verify routing decision, event timeline, recon record |
-| **Last completed** | CLAUDE.md + PRD.md updated to reflect V18–V20 migrations, DB-driven payment methods, React frontend stack |
+| **Current task** | End-to-end smoke test: login → click Pay on a demo policy row → verify routing decision, event timeline, PREMIUM_ACTIVATED event, policy row turns green; then test notification queue stop/start durability demo |
+| **Last completed** | PRD.md updated to v1.2 — documented notification queue, demo policies, US-13–16, V21 DB migration, new API endpoints, viva defense points 7–8 |
 | **Blockers** | None |
 
 ### Admin API Endpoints — Payment Methods

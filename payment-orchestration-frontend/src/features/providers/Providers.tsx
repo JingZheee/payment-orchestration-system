@@ -1,6 +1,7 @@
 import { Switch, message } from 'antd';
 import { useProviders, useToggleProvider } from './hooks/useProviders';
 import type { ProviderConfig } from '../../shared/types/provider';
+import NotificationQueuePanel from './NotificationQueuePanel';
 
 const PROVIDER_META: Record<string, {
   label: string;
@@ -187,6 +188,9 @@ export default function Providers() {
           Disabling a provider removes it from all routing decisions immediately. If all providers for a region are disabled, payments to that region will fail at routing time.
         </span>
       </div>
+
+      {/* Notification queue panel */}
+      <NotificationQueuePanel />
     </div>
   );
 }

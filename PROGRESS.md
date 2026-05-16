@@ -1,34 +1,43 @@
 # Progress Snapshot
-Last updated: 2026-05-05
+Last updated: 2026-05-16
 
 ## Completed
-- [x] PRD.md finalised — insurance domain, US-10/11/12, frontend pivoted to React, all migrations up to V20
-- [x] CLAUDE.md — full migration table V1–V20, PaymentProviderPort contract, React frontend stack, active session
-- [x] Maven multi-module backend — all 7 modules, Flyway V1–V20
+- [x] PRD.md v1.2 — notification queue, demo policies, US-13–16, new API endpoints, V21 DB map, viva points 7–8
+- [x] PRD.md v1.1 — insurance domain, US-10/11/12, frontend pivoted to React, all migrations up to V20
+- [x] CLAUDE.md — full migration table V1–V21, RabbitMQ topology, React frontend stack, active session
+- [x] Maven multi-module backend — all 7 modules, Flyway V1–V21
 - [x] All backend modules — entities, repos, adapters, routing engine, payment service, admin, DLQ/retry consumers
-- [x] Spring Security + JWT (JwtAuthenticationFilter, JwtTokenProvider)
-- [x] CORS config, 401 vs 403 fix, GET /admin/transactions/{id} endpoint
-- [x] V17 migration — policy_number, claim_reference, payment_type on transactions
-- [x] V18 migration — payment_type column on routing_rules
-- [x] V19 migration — seed insurance-specific routing rules
-- [x] V20 migration — payment_methods table (composite PK code+region), 13 seed rows, composite FK
-- [x] DB-driven payment methods — PaymentMethodEntity, PaymentMethodId, PaymentMethodRepository
-- [x] PaymentMethod Java enum deleted — all fields/params use plain String throughout
-- [x] All 4 provider adapters updated — supportedMethods() returns List<String>, calculateFee takes String
-- [x] AdminPaymentMethodController — GET/POST/PUT/DELETE with 409 guard on FK violation
+- [x] Spring Security + JWT (JwtAuthenticationFilter, JwtTokenProvider); CORS, 401/403 fix
+- [x] V17–V20 migrations — policy_number, claim_reference, payment_type, payment_methods table
+- [x] DB-driven payment methods — PaymentMethodEntity, composite PK; PaymentMethod enum deleted everywhere
+- [x] All 4 provider adapters updated — supportedMethods() and calculateFee use plain String
+- [x] AdminPaymentMethodController — GET/POST/PUT/DELETE with 409 guard
 - [x] React + Vite frontend — all 10 pages, service layer, TanStack Query hooks, AppLayout
-- [x] Login page, RequireAuth guard, JWT Axios interceptor
-- [x] Dashboard, Transactions, Routing Rules, Providers, Fee Rates pages
-- [x] Metrics, Reconciliation, Dead Letter Queue, Payment Demo pages
-- [x] PaymentMethods admin page — table grouped by region, add/edit modal, active toggle, delete with confirm
-- [x] Frontend types updated — PaymentMethod enum removed, replaced with PAYMENT_METHOD_LABELS const map
-- [x] endpoints.ts — PAYMENT_METHODS routes added; App.tsx + AppLayout.tsx wired
+- [x] Login, RequireAuth guard, JWT Axios interceptor; Dashboard, Transactions, Routing Rules pages
+- [x] Providers, Fee Rates, Metrics, Reconciliation, Dead Letter Queue pages
+- [x] PaymentMethods admin page — table grouped by region, add/edit modal, active toggle, delete
+- [x] PaymentSucceededEvent DTO + PaymentSucceededPublisher (pos-payment)
+- [x] NotificationConsumer — id="notificationConsumer", writes PREMIUM_ACTIVATED / CLAIM_DISBURSED events, activates demo policies
+- [x] NotificationQueueController — GET /status, POST /consumer/start, POST /consumer/stop
+- [x] RabbitMqConfig updated — notification.exchange + payment.notification.queue beans; RabbitAdmin bean
+- [x] application.yml — rabbitmq.exchanges.notification + rabbitmq.queues.notification added
+- [x] PaymentService — publishes PaymentSucceededEvent on direct SUCCESS (Mock path)
+- [x] PaymentService.handleWebhook — publishes with previous != SUCCESS guard
+- [x] RetryConsumer — publishes PaymentSucceededEvent on retry-resolved SUCCESS
+- [x] V21 migration — demo_policies table with 6 seed rows (4 premium MY/ID/PH, 2 claims MY/PH)
+- [x] DemoPolicy entity, DemoPolicyRepository (findByPolicyNumber, findByClaimReference)
+- [x] DemoPolicyController — GET/POST/DELETE /admin/demo-policies
+- [x] Frontend: notificationQueueService, useNotificationQueue hooks
+- [x] NotificationQueuePanel — live queue depth counter + consumer on/off switch (on Providers page)
+- [x] demoPolicyService, useDemoPolicies hooks (refetchInterval: 4000)
+- [x] PaymentDemo.tsx — full rewrite: policy/claim table, Pay button, pre-filled form, gateway redirect, duplicate prevention via submittedIds + optimistic cache update
+- [x] endpoints.ts — DEMO_POLICIES + NOTIFICATION_QUEUE routes added
 
 ## Up next (start here next session)
-- [ ] End-to-end smoke test — login → initiate MY/ID/PH payment → verify routing decision, event timeline, recon record
+- [ ] End-to-end smoke test — login → initiate MY/ID/PH payment via demo policy table → verify routing decision, event timeline, PREMIUM_ACTIVATED event, policy row turns green
+- [ ] Notification queue durability demo — stop consumer → initiate 5 payments → watch depth climb → start → drain to 0
 - [ ] Demo data seeding — ensure 100+ realistic transactions across all 3 regions for dashboard KPIs
-- [ ] Payment Demo page polish — confirm routing explanation displays score breakdown clearly
-- [ ] Viva prep — run through 10-minute demo script end-to-end, note any rough edges
+- [ ] Viva prep — run through 10-minute demo script end-to-end, note rough edges
 
 ## Decisions locked in
 - Maven multi-module; spring-boot-maven-plugin only in pos-api
@@ -41,6 +50,7 @@ Last updated: 2026-05-05
 - Frontend: React 18 + Vite + antd v5, feature-based structure
 - API paths centralised in lib/endpoints.ts — never hardcode in hooks
 - Session expiry → 401; axios interceptor redirects to /login on 401
+- notification.exchange is durable direct exchange; payment.notification.queue has no TTL/DLX — messages persist
 
 ## Blockers
 - None

@@ -6,6 +6,7 @@ import com.paymentorchestration.domain.entity.TransactionEvent;
 import com.paymentorchestration.domain.repository.TransactionEventRepository;
 import com.paymentorchestration.domain.repository.TransactionRepository;
 import com.paymentorchestration.payment.dto.RetryMessage;
+import com.paymentorchestration.payment.messaging.PaymentSucceededPublisher;
 import com.paymentorchestration.payment.messaging.RetryPublisher;
 import com.paymentorchestration.provider.dto.PaymentStatusResult;
 import com.paymentorchestration.provider.port.PaymentProviderPort;
@@ -40,6 +41,7 @@ public class RetryConsumer {
     private final TransactionEventRepository transactionEventRepository;
     private final List<PaymentProviderPort> providers;
     private final RetryPublisher retryPublisher;
+    private final PaymentSucceededPublisher paymentSucceededPublisher;
 
     @RabbitListener(queues = "${rabbitmq.queues.webhook}")
     @Transactional
@@ -70,6 +72,9 @@ public class RetryConsumer {
             transactionRepository.save(tx);
             writeEvent(txId, "RETRY_RESOLVED",
                     "Status confirmed as " + polledStatus + " on attempt " + attempt);
+            if (polledStatus == PaymentStatus.SUCCESS) {
+                paymentSucceededPublisher.publish(tx);
+            }
             log.info("[retry] transactionId={} resolved as {} on attempt={}", txId, polledStatus, attempt);
             return;
         }

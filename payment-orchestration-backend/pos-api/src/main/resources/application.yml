@@ -30,6 +30,7 @@ rabbitmq:
   exchanges:
     webhook: webhook.exchange
     retry: retry.exchange
+    notification: notification.exchange
   queues:
     webhook: webhook.queue
     webhook-dlq: webhook.dlq
@@ -37,6 +38,7 @@ rabbitmq:
     retry-60s: retry.q.60s
     retry-120s: retry.q.120s
     payment-dlq: payment.dlq
+    notification: payment.notification.queue
 
 # JWT config (secrets in application-dev.yml)
 jwt:

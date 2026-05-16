@@ -1,7 +1,7 @@
 # Product Requirements Document
 # Payment Orchestration System (POS)
-**Version:** 1.1
-**Date:** 2026-03-30
+**Version:** 1.2
+**Date:** 2026-05-16
 **Type:** Final Year Project (FYP)
 
 ---
@@ -30,6 +30,7 @@ The MVP goal is a fully functional routing engine integrated with real sandbox p
 6. **Async by design** — webhook processing and payment retries run through a message queue, not synchronous DB polling — failures are visible, recoverable, and demonstrable.
 7. **Every payment has a policy context** — transactions must be traceable to a policy number or claim reference for regulatory audit.
 8. **Payout is as important as collection** — the system handles both inbound premium collection from policyholders and outbound claims disbursement to beneficiaries.
+9. **Downstream actions are durable** — a successful payment publishes an event to a durable notification queue; downstream consumers (insurance activation, notifications) run independently and survive consumer restarts without message loss.
 
 ---
 
@@ -78,6 +79,12 @@ The MVP goal is a fully functional routing engine integrated with real sandbox p
 - ✅ Fee comparison display — show cost difference between providers for a given transaction
 - ✅ DB-driven payment methods — `payment_methods` table with composite PK (code, region); admins can add, rename, activate/deactivate methods per region without a code deploy
 - ✅ Payment methods admin page — CRUD UI grouped by region; independent per-region active toggle
+- ✅ Post-payment notification queue — durable RabbitMQ queue receives a `PaymentSucceededEvent` after every successful payment; consumer activates/disburses the linked insurance policy record
+- ✅ Notification consumer runtime toggle — admin can stop/start the consumer at runtime; messages accumulate visibly in the queue and drain cleanly on restart (proves durability for demo)
+- ✅ Insurance Payment Demo — admin-managed `demo_policies` table with seed records; a Pay button per row pre-fills the payment form and locks after submission to prevent duplicates
+- ✅ Policy status lifecycle — PENDING → ACTIVATED (premium) / DISBURSED (claim) driven by the notification consumer; optimistic UI update flips status instantly on payment success
+- ✅ Payment gateway redirect — successful initiation auto-opens the provider's hosted payment page in a new tab (non-localhost URLs only); a manual "Open Payment Page" button persists in the result card
+- ✅ Duplicate payment prevention — `submittedIds` set locks the Pay button the moment the form is submitted; only released on error so the user can retry; optimistic cache update prevents re-submit after success
 
 ### Providers
 - ✅ Billplz sandbox (Malaysia — FPX bank transfer)
@@ -95,7 +102,7 @@ The MVP goal is a fully functional routing engine integrated with real sandbox p
 - ✅ Spring Security + JWT (stateless access token + DB-tracked refresh token)
 - ✅ REST API with OpenAPI/Swagger documentation
 - ✅ React 18 + TypeScript + Ant Design admin SPA (pivoted from Angular 17)
-- ✅ RabbitMQ for async webhook processing and retry queue
+- ✅ RabbitMQ for async webhook processing, retry queue, and post-payment notification queue
 - ✅ Dead Letter Queue (DLQ) for exhausted-retry transactions
 - ✅ Provider metrics aggregation (15-minute rolling window via scheduled job)
 - ✅ Audit log for all admin actions
@@ -228,6 +235,42 @@ The MVP goal is a fully functional routing engine integrated with real sandbox p
 
 ---
 
+### US-13: Post-Payment Insurance Activation
+**As an** insurance operator,
+**I want** premium collection and claim disbursement payments to automatically trigger downstream insurance actions (policy activation, claim payout confirmation),
+**so that** the payment event drives insurance state changes without manual reconciliation.
+
+*Example:* Payment succeeds → `PaymentSucceededEvent` published → `NotificationConsumer` picks it up → writes `PREMIUM_ACTIVATED` event to transaction timeline → marks the linked demo policy as `ACTIVATED`.
+
+---
+
+### US-14: Notification Queue Durability Demo
+**As a** developer demoing the system to an examiner,
+**I want** to stop the notification consumer at runtime so queued messages visibly accumulate, then restart it so they drain instantly,
+**so that** I can prove RabbitMQ guarantees message durability — no events are lost when the consumer is offline.
+
+*Example:* Providers page → Notification Queue panel → toggle consumer OFF → initiate 5 payments → queue depth climbs to 5 → toggle ON → depth drains to 0 in seconds → transaction timelines each show `PREMIUM_ACTIVATED`.
+
+---
+
+### US-15: Insurance Payment Operations Demo
+**As a** demo user simulating an insurance operations manager,
+**I want** to see a table of pre-loaded policies and claims with a Pay button per row,
+**so that** the demo looks like a real insurance back-office system rather than a bare payment form.
+
+*Example:* Payment Demo page shows "Premium Collection" and "Claims Disbursement" tabs, each with a table of seeded records. Clicking Pay pre-fills the form with the policy number, region, and amount. After payment succeeds, the row turns green (ACTIVATED / DISBURSED) without any manual refresh.
+
+---
+
+### US-16: Duplicate Payment Prevention
+**As a** demo user,
+**I want** the Pay button to lock immediately after I click it — even before the API responds — and stay locked once a payment is submitted,
+**so that** I cannot accidentally create duplicate charges for the same policy by double-clicking or re-navigating.
+
+*Example:* Click Pay → button becomes disabled immediately → payment pending → success → policy status flips to ACTIVATED → button remains disabled. Navigating away and back still shows the locked state until the page reloads (or policy status refreshes from the DB).
+
+---
+
 ## 6. Core Architecture & Patterns
 
 ### Architecture Style
@@ -286,15 +329,21 @@ payment-orchestration-frontend/src/
 ```
 Exchanges & Queues:
 
-[Provider Webhook] → webhook.exchange (direct)
-                          └→ webhook.queue          (WebhookProcessorConsumer)
-                                └→ DLX on failure → webhook.dlq (manual review)
+[Provider Webhook]  → webhook.exchange (direct)
+                           └→ webhook.queue              (WebhookProcessorConsumer)
+                                 └→ DLX on failure → webhook.dlq (manual review)
 
-[Payment Retry]   → retry.exchange (direct)
-                          └→ retry.queue (TTL: 30s)  → retry on expiry
-                          └→ retry.queue (TTL: 60s)  → retry on expiry
-                          └→ retry.queue (TTL: 120s) → retry on expiry
-                                └→ after 3 attempts → payment.dlq (DLQ — admin visible)
+[Payment Retry]     → retry.exchange (direct)
+                           └→ retry.q.30s   (TTL: 30s,  DLX: retry.exchange)
+                           └→ retry.q.60s   (TTL: 60s,  DLX: retry.exchange)
+                           └→ retry.q.120s  (TTL: 120s, DLX: retry.exchange)
+                                 └→ after 3 attempts → payment.dlq (DLQ — admin visible)
+
+[Payment Success]   → notification.exchange (direct)
+                           └→ payment.notification.queue (NotificationConsumer — toggleable)
+                                 → writes TransactionEvent (PREMIUM_ACTIVATED / CLAIM_DISBURSED)
+                                 → marks linked demo_policy record ACTIVATED / DISBURSED
+                                 No TTL, no DLX — messages persist until consumer processes them
 ```
 
 **Why RabbitMQ, not Kafka:**
@@ -372,9 +421,9 @@ Key screens:
 - **Transaction List** — filterable by status/provider/region/currency/date range, CSV export
 - **Transaction Detail** — full event timeline, routing decision explanation, provider response
 - **Routing Rules** — priority-ordered list, create/edit modal, enable/disable toggle, drag-to-reorder, **simulate panel**
-- **Provider Config** — enable/disable, edit fee structure, view live health status
+- **Provider Config** — enable/disable, edit fee structure, view live health status; **Notification Queue Panel** at the bottom shows live queue depth and consumer on/off toggle
 - **Dead Letter Queue Panel** — list of transactions that exhausted all retries, with error history and "Re-queue" / "Mark Failed" actions
-- **Payment Demo** — form to trigger test payments, real-time result with routing explanation
+- **Payment Demo** — DB-backed policy/claim table with Pay button per row; clicking Pay pre-fills the form; routing decision result shown after initiation including provider redirect link
 
 ### Feature 6: Retry Queue with Dead Letter Queue (RabbitMQ)
 
@@ -406,6 +455,43 @@ Returns:
 - Provider score breakdown (success_rate contribution, fee contribution, latency contribution)
 - Fallback provider
 - Human-readable routing reason
+
+### Feature 8: Post-Payment Notification Queue
+After every successful payment, `PaymentService` publishes a `PaymentSucceededEvent` to a durable RabbitMQ queue (`payment.notification.queue`). Three call sites cover all success paths:
+
+1. **Direct success** (Mock ALWAYS_SUCCESS) — published immediately after provider responds SUCCESS in `initiatePayment()`
+2. **Webhook-resolved success** — published in `handleWebhook()` with a `previous != SUCCESS` guard to prevent double-publish if retry consumer already resolved it
+3. **Retry-resolved success** — published by `RetryConsumer` after a polled status flip to SUCCESS
+
+The `NotificationConsumer` processes each event and:
+- Writes a `PREMIUM_ACTIVATED` or `CLAIM_DISBURSED` entry to `transaction_events`
+- Locates the linked `demo_policy` record by `policy_number` (premium) or `claim_reference` (disbursement) and updates its status to `ACTIVATED` / `DISBURSED`
+
+The consumer is declared with `id = "notificationConsumer"` and `autoStartup = "true"`. At runtime, admin can call `POST /admin/notification-queue/consumer/stop` and `start` to toggle it. `GET /admin/notification-queue/status` returns `{ consumerActive, queueDepth }` polled every 3 seconds by the frontend Notification Queue Panel.
+
+**Queue characteristics:** Durable, no TTL, no DLX. Messages survive broker restarts and consumer outages — they simply accumulate until the consumer comes back online.
+
+**Demo moment:** Stop consumer → initiate 4–5 successful payments → watch queue depth climb in the panel → start consumer → depth drains to 0 in seconds → all policy rows turn green simultaneously.
+
+### Feature 9: Insurance Payment Demo
+The `/payment-demo` page is a simulated insurance back-office system, not just a raw payment form.
+
+**Policy table:** Admin-managed records from the `demo_policies` table. Two tabs:
+- **Premium Collection** — policyholder records with region, amount, policy number, status
+- **Claims Disbursement** — claim records with claim reference, region, amount, status
+
+**Pay button flow:**
+1. Admin clicks Pay on a pending row
+2. Form below the table is pre-filled (region, amount, currency, policy number / claim reference are read-only)
+3. Form submits → `Idempotency-Key` UUID generated → `POST /payments/initiate`
+4. On success: provider's payment page auto-opens in a new tab (non-localhost URLs); result card shows routing decision + "Open Payment Page" button
+5. Policy row status flips to ACTIVATED/DISBURSED via optimistic cache update (no page refresh needed); then confirmed from DB via `refetchInterval: 4000`
+
+**Duplicate prevention:**
+- Pay button is added to `submittedIds` set the moment the form submits — before the API responds
+- Button stays disabled as long as the policy is not PENDING or is in `submittedIds`
+- On API error: policy removed from `submittedIds` so the user can retry
+- Mutation variables carry the `policy` object to avoid React closure staleness in `onSuccess`/`onError`
 
 ---
 
@@ -632,6 +718,49 @@ Request mirrors `/payments/initiate` with `claimReference` (required) and `polic
 | GET | `/admin/dashboard/region-breakdown` |
 | GET | `/admin/dashboard/recent-failures` |
 
+### Admin — Demo Policies
+| Method | Path | Description |
+|---|---|---|
+| GET | `/admin/demo-policies` | List all demo policies ordered by created_at asc |
+| POST | `/admin/demo-policies` | Create a new policy or claim record for the demo |
+| DELETE | `/admin/demo-policies/{id}` | Delete a demo policy record |
+
+**Create Demo Policy Request:**
+```json
+{
+  "holderName": "Ahmad bin Yusof",
+  "holderEmail": "ahmad@example.com",
+  "insuranceType": "Life",
+  "policyNumber": "POL-2026-MY-00101",
+  "claimReference": null,
+  "amount": 120.00,
+  "currency": "MYR",
+  "region": "MY",
+  "paymentMethod": "FPX",
+  "paymentType": "PREMIUM_COLLECTION"
+}
+```
+
+**Demo Policy Status values:** `PENDING` → `ACTIVATED` (premium) or `DISBURSED` (claim disbursement)
+
+### Admin — Notification Queue
+| Method | Path | Description |
+|---|---|---|
+| GET | `/admin/notification-queue/status` | Returns `{ consumerActive: boolean, queueDepth: long }` |
+| POST | `/admin/notification-queue/consumer/start` | Starts the notification consumer |
+| POST | `/admin/notification-queue/consumer/stop` | Stops the notification consumer |
+
+**Status Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "consumerActive": true,
+    "queueDepth": 0
+  }
+}
+```
+
 ---
 
 ## 11. Success Criteria
@@ -652,12 +781,20 @@ The system is considered MVP-complete when an examiner can watch a 10-minute dem
 - ✅ DLQ panel in admin dashboard shows RETRY_EXHAUSTED transactions with re-queue action
 - ✅ All endpoints return consistent `ApiResponse<T>` envelope format
 - ✅ Swagger UI at `/swagger-ui.html` documents all endpoints with examples
+- ✅ Successful payment publishes `PaymentSucceededEvent` to durable `payment.notification.queue`
+- ✅ Notification consumer writes `PREMIUM_ACTIVATED` / `CLAIM_DISBURSED` event to transaction timeline
+- ✅ Stopping the consumer causes messages to queue up; restarting drains them without loss
+- ✅ Demo policy table shows PENDING → ACTIVATED / DISBURSED transition driven by the notification consumer
+- ✅ Pay button locks immediately on submission and cannot be re-clicked for the same policy
+- ✅ Successful non-localhost payments auto-open the provider's hosted payment page in a new tab
 
 ### Demo Quality Goals
 - ✅ Failover demo is reproducible on demand (Mock provider toggle)
 - ✅ Transaction event timeline shows every step with timestamp and routing reason
 - ✅ Dashboard loads with realistic seeded data (100+ transactions across all 3 regions)
 - ✅ Cost savings card shows dollar/ringgit/peso figures, not percentages alone
+- ✅ Notification queue depth counter updates live (3-second poll) during the consumer stop/start demo
+- ✅ Policy table rows change color instantly after payment success (optimistic update) without page refresh
 
 ---
 
@@ -726,7 +863,8 @@ The system is considered MVP-complete when an examiner can watch a 10-minute dem
 - ✅ Metrics: success rate + latency charts
 - ✅ Reconciliation: recon statement table + anomaly filter
 - ✅ Dead Letter Queue: RETRY_EXHAUSTED transactions with re-queue action
-- ✅ Payment Demo: form to trigger test payments, shows routing decision result in real time
+- ✅ Payment Demo: DB-backed policy/claim table + payment form + routing result card + gateway redirect
+- ✅ Notification Queue Panel: live queue depth counter + consumer on/off toggle (on Providers page)
 
 **Validation:** 10-minute demo walkthrough without touching Postman.
 
@@ -820,6 +958,7 @@ where:
 | V18 | `routing_rules` (alter) | payment_type column added |
 | V19 | seed data | insurance-specific routing rules seeded |
 | V20 | `payment_methods` (new) | Composite PK (code, region), name VARCHAR(100), is_active BOOLEAN; 13 seed rows; composite FK from transactions, provider_fee_rates, recon_statements |
+| V21 | `demo_policies` (new) | id UUID PK, holder_name, holder_email, insurance_type, policy_number, claim_reference, amount DECIMAL(19,4), currency, region, payment_method, payment_type, status VARCHAR(20) DEFAULT 'PENDING', transaction_id UUID, created_at, updated_at; 6 seed rows (4 premium + 2 claims across MY/ID/PH) |
 
 ### RabbitMQ Queue Topology (Implementation Reference)
 ```yaml
@@ -831,13 +970,25 @@ rabbitmq:
     - "15672:15672"  # Management UI (guest/guest in dev)
 
 # Exchanges declared on startup (RabbitMQ Config Bean)
-webhook.exchange    → direct → webhook.queue
-                                 DLX: webhook.dlx → webhook.dlq
+webhook.exchange       → direct → webhook.queue
+                                    DLX: webhook.dlx → webhook.dlq
 
-retry.exchange      → direct → retry.q.30s  (x-message-ttl: 30000,  DLX: retry.exchange)
-                             → retry.q.60s  (x-message-ttl: 60000,  DLX: retry.exchange)
-                             → retry.q.120s (x-message-ttl: 120000, DLX: retry.exchange)
-                             → payment.dlq  (terminal — after 3 attempts)
+retry.exchange         → direct → retry.q.30s  (x-message-ttl: 30000,  DLX: retry.exchange)
+                                → retry.q.60s  (x-message-ttl: 60000,  DLX: retry.exchange)
+                                → retry.q.120s (x-message-ttl: 120000, DLX: retry.exchange)
+                                → payment.dlq  (terminal — after 3 attempts)
+
+notification.exchange  → direct → payment.notification.queue
+                                    Durable, no TTL, no DLX
+                                    Consumer id: "notificationConsumer" (toggleable at runtime)
+                                    Routing key = queue name
+
+# application.yml additions (V1.2)
+rabbitmq:
+  exchanges:
+    notification: notification.exchange
+  queues:
+    notification: payment.notification.queue
 ```
 
 ### What Makes This Defensible in a Viva
@@ -847,3 +998,5 @@ retry.exchange      → direct → retry.q.30s  (x-message-ttl: 30000,  DLX: ret
 4. **"Why RabbitMQ and not Kafka?"** — RabbitMQ is purpose-built for task queues with routing, TTL, and dead letter patterns. Kafka is a distributed log designed for event streaming at millions of events/second — using it here would be like using a freight train to deliver a letter. RabbitMQ's dead letter exchange gives us native exponential backoff with zero custom scheduling code.
 5. **"What happens when a payment gets stuck?"** — Show the DLQ panel. Walk through: provider failure → 3 retry attempts with increasing delays → RETRY_EXHAUSTED status → admin sees it → clicks Re-queue after provider recovers → payment completes. This is a production-grade failure recovery flow.
 6. **"Why insurance?"** — Insurance payments are uniquely demanding: premiums must reach the right provider to trigger policy coverage, claim payouts must be fast and traceable to avoid regulatory penalties, and failed payments have real consequences (policy lapse). This makes payment orchestration — not just payment processing — essential in insurance. The same routing engine that minimizes fees for a merchant minimizes delays for a claims payout.
+7. **"What happens downstream after a payment succeeds?"** — A `PaymentSucceededEvent` is published to a durable RabbitMQ notification queue. A consumer picks it up and activates the linked insurance policy (or marks the claim as disbursed) by writing to `transaction_events` and updating the `demo_policies` table. You can stop the consumer live, queue up 5 payments, then restart — all 5 process instantly without loss. This proves the system is not tightly coupled: the payment path and the insurance activation path are independent and survivable.
+8. **"Isn't the demo policy table just fake data?"** — Yes, intentionally. In production, these records would be pushed in by a separate Policy Administration System (PAS) via the same API. The demo simulates what the PAS would do, so the examiner sees a realistic insurance back-office flow rather than a blank payment form. The `POST /admin/demo-policies` endpoint is exactly the contract a real PAS integration would call.

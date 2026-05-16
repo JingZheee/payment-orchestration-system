@@ -51,4 +51,16 @@ export const API = {
     STATUS:    (id: string) => `/payments/${id}/status`,
     METHODS:   '/payments/methods',
   },
+
+  DEMO_POLICIES: {
+    LIST:   '/admin/demo-policies',
+    CREATE: '/admin/demo-policies',
+    DELETE: (id: string) => `/admin/demo-policies/${id}`,
+  },
+
+  NOTIFICATION_QUEUE: {
+    STATUS: '/admin/notification-queue/status',
+    START:  '/admin/notification-queue/consumer/start',
+    STOP:   '/admin/notification-queue/consumer/stop',
+  },
 } as const;

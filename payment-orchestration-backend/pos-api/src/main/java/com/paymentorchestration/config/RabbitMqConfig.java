@@ -3,6 +3,7 @@ package com.paymentorchestration.config;
 import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
@@ -14,16 +15,18 @@ import org.springframework.context.annotation.Configuration;
 public class RabbitMqConfig {
 
     // Exchanges
-    @Value("${rabbitmq.exchanges.webhook}") private String webhookExchange;
-    @Value("${rabbitmq.exchanges.retry}")   private String retryExchange;
+    @Value("${rabbitmq.exchanges.webhook}")       private String webhookExchange;
+    @Value("${rabbitmq.exchanges.retry}")         private String retryExchange;
+    @Value("${rabbitmq.exchanges.notification}")  private String notificationExchange;
 
     // Queues
-    @Value("${rabbitmq.queues.webhook}")      private String webhookQueue;
-    @Value("${rabbitmq.queues.webhook-dlq}")  private String webhookDlq;
-    @Value("${rabbitmq.queues.retry-30s}")    private String retry30s;
-    @Value("${rabbitmq.queues.retry-60s}")    private String retry60s;
-    @Value("${rabbitmq.queues.retry-120s}")   private String retry120s;
-    @Value("${rabbitmq.queues.payment-dlq}")  private String paymentDlq;
+    @Value("${rabbitmq.queues.webhook}")        private String webhookQueue;
+    @Value("${rabbitmq.queues.webhook-dlq}")    private String webhookDlq;
+    @Value("${rabbitmq.queues.retry-30s}")      private String retry30s;
+    @Value("${rabbitmq.queues.retry-60s}")      private String retry60s;
+    @Value("${rabbitmq.queues.retry-120s}")     private String retry120s;
+    @Value("${rabbitmq.queues.payment-dlq}")    private String paymentDlq;
+    @Value("${rabbitmq.queues.notification}")   private String notificationQueue;
 
     // --- Exchanges ---
 
@@ -35,6 +38,11 @@ public class RabbitMqConfig {
     @Bean
     public DirectExchange retryExchange() {
         return new DirectExchange(retryExchange, true, false);
+    }
+
+    @Bean
+    public DirectExchange notificationExchange() {
+        return new DirectExchange(notificationExchange, true, false);
     }
 
     // --- Queues ---
@@ -84,6 +92,11 @@ public class RabbitMqConfig {
         return QueueBuilder.durable(paymentDlq).build();
     }
 
+    @Bean
+    public Queue notificationQueue() {
+        return QueueBuilder.durable(notificationQueue).build();
+    }
+
     // --- Message Converter + Template ---
 
     @Bean
@@ -104,6 +117,11 @@ public class RabbitMqConfig {
         factory.setConnectionFactory(connectionFactory);
         factory.setMessageConverter(jackson2JsonMessageConverter());
         return factory;
+    }
+
+    @Bean
+    public RabbitAdmin rabbitAdmin(ConnectionFactory connectionFactory) {
+        return new RabbitAdmin(connectionFactory);
     }
 
     // --- Bindings ---
@@ -136,5 +154,17 @@ public class RabbitMqConfig {
     @Bean
     public Binding paymentDlqBinding() {
         return BindingBuilder.bind(paymentDlq()).to(retryExchange()).with(paymentDlq);
+    }
+
+    // Expired TTL messages land on retry.exchange with routing key = webhookQueue.
+    // Without this binding they are silently dropped — RetryConsumer never fires.
+    @Bean
+    public Binding retryToWebhookBinding() {
+        return BindingBuilder.bind(webhookQueue()).to(retryExchange()).with(webhookQueue);
+    }
+
+    @Bean
+    public Binding notificationQueueBinding() {
+        return BindingBuilder.bind(notificationQueue()).to(notificationExchange()).with(notificationQueue);
     }
 }
