@@ -12,6 +12,7 @@ import Reconciliation from './features/reconciliation/Reconciliation';
 import DeadLetterQueue from './features/dead-letter-queue/DeadLetterQueue';
 import PaymentDemo from './features/payment-demo/PaymentDemo';
 import PaymentMethods from './features/payment-methods/PaymentMethods';
+import PaymentCheckoutPage from './features/payment-demo/PaymentCheckoutPage';
 
 export default function App() {
   return (
@@ -19,6 +20,9 @@ export default function App() {
       <Route path="/login" element={<Login />} />
 
       <Route element={<RequireAuth />}>
+        {/* Full-page checkout — no sidebar */}
+        <Route path="/payment-demo/pay/:policyId" element={<PaymentCheckoutPage />} />
+
         <Route path="/" element={<AppLayout />}>
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard"          element={<Dashboard />} />

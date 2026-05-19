@@ -328,8 +328,8 @@ Weights are configurable in `application.yml` under `routing.scorer.*`.
 | Field | Value |
 |---|---|
 | **Current module** | full-stack — all major features implemented |
-| **Current task** | End-to-end smoke test: login → click Pay on a demo policy row → verify routing decision, event timeline, PREMIUM_ACTIVATED event, policy row turns green; then test notification queue stop/start durability demo |
-| **Last completed** | PRD.md updated to v1.2 — documented notification queue, demo policies, US-13–16, V21 DB migration, new API endpoints, viva defense points 7–8 |
+| **Current task** | End-to-end smoke test: login → click Pay on a demo policy row → verify checkout page loads, routing decision shown, event timeline correct, PREMIUM_ACTIVATED event fires, policy row turns green on return |
+| **Last completed** | PaymentCheckoutPage — full-page gateway UX (dark summary + form); App.tsx route outside AppLayout; PaymentDemo table now navigates to checkout; duplicate payment fully blocked |
 | **Blockers** | None |
 
 ### Admin API Endpoints — Payment Methods

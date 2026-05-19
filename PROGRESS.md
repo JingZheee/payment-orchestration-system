@@ -1,5 +1,5 @@
 # Progress Snapshot
-Last updated: 2026-05-16
+Last updated: 2026-05-19
 
 ## Completed
 - [x] PRD.md v1.2 — notification queue, demo policies, US-13–16, new API endpoints, V21 DB map, viva points 7–8
@@ -21,20 +21,19 @@ Last updated: 2026-05-16
 - [x] NotificationQueueController — GET /status, POST /consumer/start, POST /consumer/stop
 - [x] RabbitMqConfig updated — notification.exchange + payment.notification.queue beans; RabbitAdmin bean
 - [x] application.yml — rabbitmq.exchanges.notification + rabbitmq.queues.notification added
-- [x] PaymentService — publishes PaymentSucceededEvent on direct SUCCESS (Mock path)
-- [x] PaymentService.handleWebhook — publishes with previous != SUCCESS guard
+- [x] PaymentService — publishes PaymentSucceededEvent on direct SUCCESS; handleWebhook guard added
 - [x] RetryConsumer — publishes PaymentSucceededEvent on retry-resolved SUCCESS
-- [x] V21 migration — demo_policies table with 6 seed rows (4 premium MY/ID/PH, 2 claims MY/PH)
-- [x] DemoPolicy entity, DemoPolicyRepository (findByPolicyNumber, findByClaimReference)
-- [x] DemoPolicyController — GET/POST/DELETE /admin/demo-policies
-- [x] Frontend: notificationQueueService, useNotificationQueue hooks
-- [x] NotificationQueuePanel — live queue depth counter + consumer on/off switch (on Providers page)
+- [x] V21 migration — demo_policies table with 6 seed rows
+- [x] DemoPolicy entity, DemoPolicyRepository, DemoPolicyController
+- [x] Frontend: notificationQueueService, useNotificationQueue hooks, NotificationQueuePanel
 - [x] demoPolicyService, useDemoPolicies hooks (refetchInterval: 4000)
-- [x] PaymentDemo.tsx — full rewrite: policy/claim table, Pay button, pre-filled form, gateway redirect, duplicate prevention via submittedIds + optimistic cache update
-- [x] endpoints.ts — DEMO_POLICIES + NOTIFICATION_QUEUE routes added
+- [x] PaymentDemo.tsx — policy/claim table with Pay/Disburse buttons
+- [x] Duplicate payment prevention — backend IdempotencyFilter (24h TTL); form submit button disabled on success
+- [x] PaymentCheckoutPage.tsx — full-page gateway UX (no sidebar); dark summary panel + payment form; success/already-processed states
+- [x] App.tsx — /payment-demo/pay/:policyId route outside AppLayout; PaymentDemo table now navigates there
 
 ## Up next (start here next session)
-- [ ] End-to-end smoke test — login → initiate MY/ID/PH payment via demo policy table → verify routing decision, event timeline, PREMIUM_ACTIVATED event, policy row turns green
+- [ ] End-to-end smoke test — login → click Pay → verify checkout page, routing decision, event timeline, PREMIUM_ACTIVATED, policy row turns green
 - [ ] Notification queue durability demo — stop consumer → initiate 5 payments → watch depth climb → start → drain to 0
 - [ ] Demo data seeding — ensure 100+ realistic transactions across all 3 regions for dashboard KPIs
 - [ ] Viva prep — run through 10-minute demo script end-to-end, note rough edges
@@ -50,7 +49,8 @@ Last updated: 2026-05-16
 - Frontend: React 18 + Vite + antd v5, feature-based structure
 - API paths centralised in lib/endpoints.ts — never hardcode in hooks
 - Session expiry → 401; axios interceptor redirects to /login on 401
-- notification.exchange is durable direct exchange; payment.notification.queue has no TTL/DLX — messages persist
+- notification.exchange is durable direct exchange; payment.notification.queue has no TTL/DLX
+- Payment checkout is a separate full-page route (/payment-demo/pay/:policyId) outside AppLayout
 
 ## Blockers
 - None
