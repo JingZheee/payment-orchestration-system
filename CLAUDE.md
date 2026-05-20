@@ -328,8 +328,8 @@ Weights are configurable in `application.yml` under `routing.scorer.*`.
 | Field | Value |
 |---|---|
 | **Current module** | full-stack — all major features implemented |
-| **Current task** | End-to-end smoke test: login → click Pay on a demo policy row → verify checkout page loads, routing decision shown, event timeline correct, PREMIUM_ACTIVATED event fires, policy row turns green on return |
-| **Last completed** | PaymentCheckoutPage — full-page gateway UX (dark summary + form); App.tsx route outside AppLayout; PaymentDemo table now navigates to checkout; duplicate payment fully blocked |
+| **Current task** | End-to-end smoke test: login → click Pay → verify checkout page loads, routing decision shown, event timeline correct, PREMIUM_ACTIVATED event fires, policy row turns green on return |
+| **Last completed** | RoutingRules page — region tabs (MY/ID/PH/Global) + dnd-kit drag-to-reorder; priority auto-reassigned on drop with parallel PUT saves; priority field removed from modal |
 | **Blockers** | None |
 
 ### Admin API Endpoints — Payment Methods

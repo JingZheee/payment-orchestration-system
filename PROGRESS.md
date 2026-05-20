@@ -1,36 +1,23 @@
 # Progress Snapshot
-Last updated: 2026-05-19
+Last updated: 2026-05-20
 
 ## Completed
 - [x] PRD.md v1.2 — notification queue, demo policies, US-13–16, new API endpoints, V21 DB map, viva points 7–8
-- [x] PRD.md v1.1 — insurance domain, US-10/11/12, frontend pivoted to React, all migrations up to V20
-- [x] CLAUDE.md — full migration table V1–V21, RabbitMQ topology, React frontend stack, active session
-- [x] Maven multi-module backend — all 7 modules, Flyway V1–V21
-- [x] All backend modules — entities, repos, adapters, routing engine, payment service, admin, DLQ/retry consumers
-- [x] Spring Security + JWT (JwtAuthenticationFilter, JwtTokenProvider); CORS, 401/403 fix
-- [x] V17–V20 migrations — policy_number, claim_reference, payment_type, payment_methods table
-- [x] DB-driven payment methods — PaymentMethodEntity, composite PK; PaymentMethod enum deleted everywhere
-- [x] All 4 provider adapters updated — supportedMethods() and calculateFee use plain String
+- [x] Maven multi-module backend — all 7 modules, Flyway V1–V21, all entities/repos/adapters
+- [x] Spring Security + JWT; CORS, 401/403 fix
+- [x] DB-driven payment methods — PaymentMethodEntity, composite PK; enum deleted everywhere
 - [x] AdminPaymentMethodController — GET/POST/PUT/DELETE with 409 guard
 - [x] React + Vite frontend — all 10 pages, service layer, TanStack Query hooks, AppLayout
-- [x] Login, RequireAuth guard, JWT Axios interceptor; Dashboard, Transactions, Routing Rules pages
-- [x] Providers, Fee Rates, Metrics, Reconciliation, Dead Letter Queue pages
-- [x] PaymentMethods admin page — table grouped by region, add/edit modal, active toggle, delete
-- [x] PaymentSucceededEvent DTO + PaymentSucceededPublisher (pos-payment)
-- [x] NotificationConsumer — id="notificationConsumer", writes PREMIUM_ACTIVATED / CLAIM_DISBURSED events, activates demo policies
-- [x] NotificationQueueController — GET /status, POST /consumer/start, POST /consumer/stop
-- [x] RabbitMqConfig updated — notification.exchange + payment.notification.queue beans; RabbitAdmin bean
-- [x] application.yml — rabbitmq.exchanges.notification + rabbitmq.queues.notification added
-- [x] PaymentService — publishes PaymentSucceededEvent on direct SUCCESS; handleWebhook guard added
-- [x] RetryConsumer — publishes PaymentSucceededEvent on retry-resolved SUCCESS
+- [x] Login, RequireAuth, JWT Axios interceptor; Dashboard, Transactions, Routing Rules pages
+- [x] Providers, Fee Rates, Metrics, Reconciliation, Dead Letter Queue, PaymentMethods pages
+- [x] PaymentSucceededEvent + NotificationConsumer (PREMIUM_ACTIVATED / CLAIM_DISBURSED events)
+- [x] NotificationQueueController + NotificationQueuePanel (live depth counter + on/off switch)
 - [x] V21 migration — demo_policies table with 6 seed rows
-- [x] DemoPolicy entity, DemoPolicyRepository, DemoPolicyController
-- [x] Frontend: notificationQueueService, useNotificationQueue hooks, NotificationQueuePanel
-- [x] demoPolicyService, useDemoPolicies hooks (refetchInterval: 4000)
-- [x] PaymentDemo.tsx — policy/claim table with Pay/Disburse buttons
-- [x] Duplicate payment prevention — backend IdempotencyFilter (24h TTL); form submit button disabled on success
-- [x] PaymentCheckoutPage.tsx — full-page gateway UX (no sidebar); dark summary panel + payment form; success/already-processed states
-- [x] App.tsx — /payment-demo/pay/:policyId route outside AppLayout; PaymentDemo table now navigates there
+- [x] DemoPolicy entity, repo, controller; demoPolicyService + useDemoPolicies hooks
+- [x] PaymentDemo — policy/claim queue table with Pay/Disburse buttons
+- [x] PaymentCheckoutPage — full-page gateway UX outside AppLayout (dark summary + form)
+- [x] Duplicate payment fully blocked — checkout page has no resubmit path; backend IdempotencyFilter guards API
+- [x] RoutingRules page — region tabs (MY/ID/PH/Global), dnd-kit drag-to-reorder, priority auto-reassigned, parallel PUT on drop, priority removed from modal
 
 ## Up next (start here next session)
 - [ ] End-to-end smoke test — login → click Pay → verify checkout page, routing decision, event timeline, PREMIUM_ACTIVATED, policy row turns green
@@ -44,13 +31,10 @@ Last updated: 2026-05-19
 - RabbitMQ (not Kafka); webhook failure → return 200 to prevent retry storms
 - No DB mocking in tests — Testcontainers with real PostgreSQL only
 - Payment methods are DB-managed strings (not Java enum); composite PK (code, region)
-- Fee rates region-scoped: unique key (provider, region, payment_method)
-- Routing rules: preferredProvider XOR strategy — not both
 - Frontend: React 18 + Vite + antd v5, feature-based structure
 - API paths centralised in lib/endpoints.ts — never hardcode in hooks
-- Session expiry → 401; axios interceptor redirects to /login on 401
-- notification.exchange is durable direct exchange; payment.notification.queue has no TTL/DLX
-- Payment checkout is a separate full-page route (/payment-demo/pay/:policyId) outside AppLayout
+- Payment checkout is a separate full-page route outside AppLayout
+- Routing rules: drag-to-reorder (dnd-kit); priority is per-region, not global; no priority field in modal
 
 ## Blockers
 - None
