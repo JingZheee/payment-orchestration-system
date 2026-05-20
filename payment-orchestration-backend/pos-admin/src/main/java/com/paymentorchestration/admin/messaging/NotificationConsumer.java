@@ -1,5 +1,6 @@
 package com.paymentorchestration.admin.messaging;
 
+import com.paymentorchestration.admin.service.EmailNotificationService;
 import com.paymentorchestration.common.enums.PaymentType;
 import com.paymentorchestration.domain.entity.DemoPolicy;
 import com.paymentorchestration.domain.entity.TransactionEvent;
@@ -12,6 +13,8 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -19,6 +22,7 @@ public class NotificationConsumer {
 
     private final TransactionEventRepository transactionEventRepository;
     private final DemoPolicyRepository demoPolicyRepository;
+    private final EmailNotificationService emailNotificationService;
 
     @RabbitListener(id = "notificationConsumer", queues = "${rabbitmq.queues.notification}", autoStartup = "true")
     @Transactional
@@ -48,16 +52,17 @@ public class NotificationConsumer {
         txEvent.setDescription(description);
         transactionEventRepository.save(txEvent);
 
-        // Activate / disburse the corresponding demo policy record
-        activateDemoPolicy(event, eventType);
+        // Activate / disburse the corresponding demo policy record, then send email
+        activateDemoPolicy(event, eventType).ifPresent(policy ->
+                emailNotificationService.sendPaymentSuccessEmail(policy, event));
 
         log.info("[notification] {} recorded for transactionId={}", eventType, event.getTransactionId());
     }
 
-    private void activateDemoPolicy(PaymentSucceededEvent event, String eventType) {
+    private Optional<DemoPolicy> activateDemoPolicy(PaymentSucceededEvent event, String eventType) {
         String newStatus = "CLAIM_DISBURSED".equals(eventType) ? "DISBURSED" : "ACTIVATED";
         try {
-            java.util.Optional<DemoPolicy> found = event.getPaymentType() == PaymentType.CLAIMS_DISBURSEMENT
+            Optional<DemoPolicy> found = event.getPaymentType() == PaymentType.CLAIMS_DISBURSEMENT
                     ? demoPolicyRepository.findByClaimReference(event.getClaimReference())
                     : demoPolicyRepository.findByPolicyNumberAndPaymentType(
                             event.getPolicyNumber(), PaymentType.PREMIUM_COLLECTION.name());
@@ -68,8 +73,10 @@ public class NotificationConsumer {
                 demoPolicyRepository.save(policy);
                 log.info("[notification] demo policy id={} marked as {}", policy.getId(), newStatus);
             });
+            return found;
         } catch (Exception e) {
             log.warn("[notification] could not update demo policy status: {}", e.getMessage());
+            return Optional.empty();
         }
     }
 }

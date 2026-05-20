@@ -27,8 +27,9 @@ export const API = {
   },
 
   FEE_RATES: {
-    LIST:   '/admin/fee-rates',
-    BY_ID:  (id: number) => `/admin/fee-rates/${id}`,
+    LIST:    '/admin/fee-rates',
+    CREATE:  '/admin/fee-rates',
+    BY_ID:   (id: number) => `/admin/fee-rates/${id}`,
   },
 
   METRICS: {

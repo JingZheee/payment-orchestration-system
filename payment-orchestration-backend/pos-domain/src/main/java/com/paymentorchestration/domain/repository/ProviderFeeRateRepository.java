@@ -14,4 +14,6 @@ public interface ProviderFeeRateRepository extends JpaRepository<ProviderFeeRate
             Provider provider, Region region, String paymentMethod);
 
     List<ProviderFeeRate> findAllByOrderByProviderAscRegionAscPaymentMethodAsc();
+
+    boolean existsByProviderAndRegionAndPaymentMethod(Provider provider, Region region, String paymentMethod);
 }

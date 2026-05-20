@@ -328,8 +328,8 @@ Weights are configurable in `application.yml` under `routing.scorer.*`.
 | Field | Value |
 |---|---|
 | **Current module** | full-stack — all major features implemented |
-| **Current task** | End-to-end smoke test: login → click Pay → verify checkout page loads, routing decision shown, event timeline correct, PREMIUM_ACTIVATED event fires, policy row turns green on return |
-| **Last completed** | CSS Modules refactor complete — PaymentMethods and Metrics pages; all 8 pages now use CSS Modules + shared components; zero TypeScript errors |
+| **Current task** | Verify email in Mailtrap inbox — trigger a payment in demo, confirm both HTML email templates (premium + claim) arrive correctly |
+| **Last completed** | Email notification on payment success — EmailNotificationService (branded HTML, Mailtrap SMTP, non-fatal), Fee Rates create/delete (backend POST+DELETE + frontend Add Rate modal with DB-driven payment method dropdown) |
 | **Blockers** | None |
 
 ### Admin API Endpoints — Payment Methods

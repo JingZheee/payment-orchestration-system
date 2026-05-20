@@ -19,11 +19,12 @@ Last updated: 2026-05-20
 - [x] Duplicate payment fully blocked — checkout page has no resubmit path; backend IdempotencyFilter guards API
 - [x] RoutingRules page — region tabs (MY/ID/PH/Global), dnd-kit drag-to-reorder, priority auto-reassigned, parallel PUT on drop
 - [x] Frontend CSS refactor — CSS Modules + shared components across all pages
-  - Shared: variables.css, TableCard, PageHeader, InfoBanner, EmptyState, ProviderBadge, format utils, providerStyles constants
-  - Pages refactored: Transactions (filter chips), RoutingRules, Providers, NotificationQueuePanel, FeeRates, PaymentMethods, Metrics
-  - Backend fix: `root.<String>get("merchantOrderId")` for combined filter + search
+- [x] TanStack Query staleTime set to 0 — every tab navigation fires a fresh backend request
+- [x] Fee Rates — backend POST + DELETE endpoints; frontend Add Rate modal (provider auto-locks region, method dropdown filtered from payment_methods DB) + row-level delete with confirm popover
+- [x] Email notification on payment success — EmailNotificationService with branded HTML emails; Mailtrap sandbox SMTP; two distinct email templates (PREMIUM_COLLECTION "Policy Active" + CLAIMS_DISBURSEMENT "Claim Processed"); non-fatal (SMTP failure never affects payment transaction)
 
 ## Up next (start here next session)
+- [ ] Verify email in Mailtrap — trigger a payment in demo, confirm both email templates render correctly in mailtrap.io inbox
 - [ ] End-to-end smoke test — login → click Pay → verify checkout page, routing decision, event timeline, PREMIUM_ACTIVATED, policy row turns green
 - [ ] Notification queue durability demo — stop consumer → initiate 5 payments → watch depth climb → start → drain to 0
 - [ ] Demo data seeding — ensure 100+ realistic transactions across all 3 regions for dashboard KPIs
@@ -41,6 +42,8 @@ Last updated: 2026-05-20
 - Routing rules: drag-to-reorder (dnd-kit); priority is per-region, not global; no priority field in modal
 - CSS Modules for all structural styles; inline only for runtime/data-driven values (with comment)
 - PROVIDER_BADGE_CONFIG in shared/constants/providerStyles.ts is single source of truth for provider colors
+- Email via Mailtrap sandbox SMTP; JavaMailSender injected with required=false so app boots without SMTP config
+- Fee rates are fully runtime-manageable — no migration needed to add/remove rows
 
 ## Blockers
 - None

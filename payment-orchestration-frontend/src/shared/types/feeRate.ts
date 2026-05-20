@@ -13,6 +13,16 @@ export interface FeeRate {
   updatedAt: string;
 }
 
+export interface FeeRateCreateRequest {
+  provider: string;
+  region: string;
+  paymentMethod: string;
+  feeType: string;
+  fixedAmount?: number;
+  percentage?: number;
+  active?: boolean;
+}
+
 export interface FeeRateUpdateRequest {
   fixedAmount?: number;
   percentage?: number;

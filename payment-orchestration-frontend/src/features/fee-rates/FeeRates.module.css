@@ -125,6 +125,17 @@
   background: var(--bg-input);
 }
 
+.actionBtnDanger:hover {
+  color: #991B1B;
+  background: #FEE2E2;
+}
+
+.actionGroup {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 /* ── Modal ────────────────────────────────────────────────── */
 
 .modalTitle {

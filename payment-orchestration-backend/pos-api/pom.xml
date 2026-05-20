@@ -80,6 +80,12 @@
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
         </dependency>
 
+        <!-- Email -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
         <!-- Config processor (for @ConfigurationProperties IDE support) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
