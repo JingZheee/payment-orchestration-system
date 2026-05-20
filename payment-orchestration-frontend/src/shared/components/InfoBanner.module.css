@@ -1,0 +1,43 @@
+.banner {
+  background: var(--color-accent-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid rgba(252, 185, 0, 0.2);
+}
+
+.bannerSubtle {
+  background: var(--bg-input);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+}
+
+.icon {
+  flex-shrink: 0;
+  font-size: 18px;
+  color: var(--color-primary);
+}
+
+.iconSubtle {
+  flex-shrink: 0;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.content {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.contentSubtle {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}

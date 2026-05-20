@@ -1,0 +1,16 @@
+.root {
+  text-align: center;
+  padding: 48px 0;
+}
+
+.icon {
+  font-size: 40px;
+  display: block;
+  margin-bottom: 12px;
+  color: var(--text-disabled);
+}
+
+.message {
+  color: var(--text-tertiary);
+  font-size: 14px;
+}

@@ -1,0 +1,134 @@
+.panel {
+  background: var(--bg-card);
+  border-radius: 20px;
+  padding: 28px;
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--border-subtle);
+  transition: border-color 0.2s;
+}
+
+.panelActive {
+  border-color: rgba(252, 185, 0, 0.2);
+}
+
+/* ── Header ───────────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.iconAndMeta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.iconWrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+
+.panelTitle {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.panelSubtitle {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
+/* ── Stats grid ───────────────────────────────────────────── */
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.statBox {
+  background: var(--bg-input);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+}
+
+.statBoxHighlight {
+  background: var(--color-accent-subtle);
+  border: 1px solid rgba(252, 185, 0, 0.2);
+  transition: background 0.3s, border-color 0.3s;
+}
+
+.statLabelRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.statIcon {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.statIconHighlight {
+  color: var(--color-primary);
+}
+
+.statLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.depthValue {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--text-primary);
+}
+
+.depthValueHighlight {
+  color: var(--color-primary);
+}
+
+.depthUnit {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.consumerRunning {
+  font-size: 13px;
+  font-weight: 700;
+  color: #065F46;
+}
+
+.consumerStopped {
+  font-size: 13px;
+  font-weight: 700;
+  color: #991B1B;
+}
+
+.queueName {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  word-break: break-all;
+}
+
+.demoHint {
+  margin-top: 16px;
+}

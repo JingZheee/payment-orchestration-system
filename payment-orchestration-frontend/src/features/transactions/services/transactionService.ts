@@ -8,6 +8,8 @@ export interface TransactionFilters {
   status?: PaymentStatus;
   provider?: Provider;
   region?: Region;
+  search?: string;
+  sort?: string;
   page?: number;
   size?: number;
 }
@@ -22,11 +24,12 @@ export const transactionService = {
     const params: Record<string, unknown> = {
       page: filters.page ?? 0,
       size: filters.size ?? 20,
-      sort: 'createdAt,desc',
+      sort: filters.sort ?? 'createdAt,desc',
     };
     if (filters.status)   params.status   = filters.status;
     if (filters.provider) params.provider = filters.provider;
     if (filters.region)   params.region   = filters.region;
+    if (filters.search?.trim()) params.search = filters.search.trim();
 
     const { data } = await api.get<ApiResponse<Page<Transaction>>>(API.TRANSACTIONS.LIST, { params });
     return data.data;

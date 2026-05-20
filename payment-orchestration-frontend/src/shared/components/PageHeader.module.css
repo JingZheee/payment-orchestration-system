@@ -1,0 +1,26 @@
+.root {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.subtitle {
+  color: var(--text-tertiary);
+  font-size: 14px;
+  margin-top: 4px;
+  margin-bottom: 0;
+}
+
+.actions {
+  display: flex;
+  gap: var(--gap-sm);
+  align-items: center;
+}

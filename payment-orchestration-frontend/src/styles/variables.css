@@ -1,0 +1,40 @@
+:root {
+  /* Brand */
+  --color-primary: #7B5800;
+  --color-accent: #FCB900;
+  --color-accent-hover: #FFD154;
+  --color-accent-subtle: rgba(252, 185, 0, 0.08);
+  --color-accent-muted: rgba(252, 185, 0, 0.15);
+
+  /* Backgrounds */
+  --bg-page: #FCF8FB;
+  --bg-card: #FFFFFF;
+  --bg-input: #F6F3F5;
+  --bg-sider: #FFFBEA;
+
+  /* Text */
+  --text-primary: #1C1C1E;
+  --text-secondary: #504532;
+  --text-tertiary: #6B7280;
+  --text-muted: #9CA3AF;
+  --text-disabled: #D1D5DB;
+
+  /* Borders */
+  --border-primary: #D4C4AB;
+  --border-subtle: #F6F3F5;
+
+  /* Shadows */
+  --shadow-card: 0 4px 40px -12px rgba(80, 69, 50, 0.08);
+  --shadow-light: 0 1px 12px rgba(80, 69, 50, 0.06);
+
+  /* Radii */
+  --radius-card: 16px;
+  --radius-md: 12px;
+  --radius-sm: 10px;
+  --radius-pill: 999px;
+
+  /* Gaps */
+  --gap-page: 24px;
+  --gap-md: 16px;
+  --gap-sm: 8px;
+}

@@ -1,132 +1,96 @@
 import { useState } from 'react';
-import { Table, Select, Button, Drawer, Tag, Spin, Tooltip } from 'antd';
+import { Table, Select, Button, Tag, Popover, Input } from 'antd';
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table';
+import type { SorterResult, FilterValue } from 'antd/es/table/interface';
+import { FilterOutlined } from '@ant-design/icons';
 import { useTransactions } from './hooks/useTransactions';
-import { useTransactionDetail } from './hooks/useTransactionDetail';
 import { PaymentStatus, Provider, Region, PaymentType } from '../../shared/types/enums';
 import type { Transaction } from '../../shared/types/transaction';
+import PageHeader from '../../shared/components/PageHeader';
+import TableCard from '../../shared/components/TableCard';
+import StatusBadge from '../../shared/components/StatusBadge';
+import ProviderBadge from '../../shared/components/ProviderBadge';
+import TransactionDetailDrawer from './components/TransactionDetailDrawer';
+import { formatAmount, formatDate } from './utils';
+import styles from './Transactions.module.css';
 
-const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
-  SUCCESS:         { bg: '#DCFCE7', color: '#166534' },
-  FAILED:          { bg: '#FEE2E2', color: '#991B1B' },
-  PROCESSING:      { bg: '#FEF3C7', color: '#92400E' },
-  PENDING:         { bg: '#DBEAFE', color: '#1E40AF' },
-  RETRY_EXHAUSTED: { bg: '#FEE2E2', color: '#7F1D1D' },
-};
+type FilterKey = 'status' | 'provider' | 'region';
 
-const PROVIDER_STYLE: Record<string, { bg: string; color: string }> = {
-  BILLPLZ:  { bg: 'rgba(252,185,0,0.15)',  color: '#7B5800' },
-  MIDTRANS: { bg: 'rgba(123,88,0,0.1)',    color: '#504532' },
-  PAYMONGO: { bg: 'rgba(147,51,234,0.1)',  color: '#6B21A8' },
-  MOCK:     { bg: '#F3F4F6',               color: '#6B7280' },
-};
-
-function StatusTag({ status }: { status: string }) {
-  const s = STATUS_STYLE[status] ?? { bg: '#F3F4F6', color: '#6B7280' };
-  return (
-    <span style={{
-      display: 'inline-block', padding: '2px 10px', borderRadius: 999,
-      fontSize: 12, fontWeight: 600, background: s.bg, color: s.color,
-    }}>
-      {status.replace('_', ' ')}
-    </span>
-  );
+interface ActiveChip {
+  key: FilterKey;
+  label: string;
+  value: string;
 }
-
-function ProviderTag({ provider }: { provider: string }) {
-  const s = PROVIDER_STYLE[provider] ?? { bg: '#F3F4F6', color: '#6B7280' };
-  return (
-    <span style={{
-      display: 'inline-block', padding: '2px 10px', borderRadius: 999,
-      fontSize: 12, fontWeight: 600, background: s.bg, color: s.color,
-    }}>
-      {provider}
-    </span>
-  );
-}
-
-function formatAmount(amount: number, currency: string) {
-  const prefix: Record<string, string> = { MYR: 'RM', IDR: 'Rp', PHP: '₱' };
-  return `${prefix[currency] ?? ''}${Number(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleString('en-GB', {
-    day: '2-digit', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  });
-}
-
-const EVENT_ICON: Record<string, string> = {
-  INITIATED:   'play_circle',
-  PROCESSING:  'autorenew',
-  SUCCESS:     'check_circle',
-  FAILED:      'cancel',
-  RETRY:       'refresh',
-  WEBHOOK:     'webhook',
-  REFUND:      'undo',
-};
 
 export default function Transactions() {
   const [filters, setFilters] = useState<{
     status?: PaymentStatus;
     provider?: Provider;
     region?: Region;
+    search?: string;
+    sort?: string;
     page: number;
     size: number;
   }>({ page: 0, size: 20 });
 
+  const [filterOpen, setFilterOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const { data: page, isFetching } = useTransactions(filters);
-  const { data: detail, isFetching: loadingDetail } = useTransactionDetail(selectedId);
+
+  const activeChips: ActiveChip[] = [
+    filters.status   && { key: 'status'   as const, label: 'Status',   value: filters.status.replace(/_/g, ' ') },
+    filters.provider && { key: 'provider' as const, label: 'Provider', value: filters.provider },
+    filters.region   && { key: 'region'   as const, label: 'Region',   value: filters.region },
+  ].filter(Boolean) as ActiveChip[];
+
+  function clearDropdownFilters() {
+    setFilters((f) => ({ page: 0, size: f.size, search: f.search, sort: f.sort }));
+  }
 
   const columns: ColumnsType<Transaction> = [
     {
       title: 'Order ID',
       dataIndex: 'merchantOrderId',
       width: 160,
-      render: (v: string) => (
-        <span style={{ fontFamily: 'monospace', fontSize: 12, color: '#1C1C1E', fontWeight: 500 }}>{v}</span>
-      ),
+      render: (v: string) => <span className={styles.cellMonospace}>{v}</span>,
     },
     {
       title: 'Amount',
       dataIndex: 'amount',
       width: 130,
+      sorter: true,
+      sortDirections: ['ascend', 'descend'] as const,
       render: (v: number, row) => (
-        <span style={{ fontWeight: 700, fontSize: 13, color: '#1C1C1E' }}>
-          {formatAmount(v, row.currency)}
-        </span>
+        <span className={styles.cellAmount}>{formatAmount(v, row.currency)}</span>
       ),
     },
     {
       title: 'Status',
       dataIndex: 'status',
       width: 140,
-      render: (v: string) => <StatusTag status={v} />,
+      render: (v: PaymentStatus) => <StatusBadge status={v} />,
     },
     {
       title: 'Provider',
       dataIndex: 'provider',
       width: 120,
-      render: (v: string) => <ProviderTag provider={v} />,
+      render: (v: Provider) => <ProviderBadge provider={v} />,
     },
     {
       title: 'Region',
       dataIndex: 'region',
       width: 80,
-      render: (v: string) => (
-        <Tag style={{ borderRadius: 6, fontSize: 11, fontWeight: 600 }}>{v}</Tag>
-      ),
+      render: (v: string) => <Tag className={styles.regionTag}>{v}</Tag>,
     },
     {
       title: 'Type',
       dataIndex: 'paymentType',
       width: 160,
-      render: (v: string | null) => {
-        if (!v) return <span style={{ color: '#D1D5DB', fontSize: 12 }}>—</span>;
+      render: (v: PaymentType | null) => {
+        if (!v) return <span className={styles.cellMuted}>—</span>;
         const isPremium = v === PaymentType.PREMIUM_COLLECTION;
+        // inline justified: color is data-driven (isPremium determines amber vs purple)
         return (
           <span style={{
             display: 'inline-block', padding: '2px 10px', borderRadius: 999,
@@ -144,22 +108,27 @@ export default function Transactions() {
       dataIndex: 'routingStrategy',
       width: 140,
       render: (v: string | null) => v
-        ? <span style={{ fontSize: 12, color: '#6B7280' }}>{v.replace('_', ' ')}</span>
-        : <span style={{ color: '#D1D5DB' }}>—</span>,
+        ? <span className={styles.cellRouting}>{v.replace(/_/g, ' ')}</span>
+        : <span className={styles.cellMuted}>—</span>,
     },
     {
       title: 'Fee',
       dataIndex: 'fee',
       width: 90,
+      sorter: true,
+      sortDirections: ['ascend', 'descend'] as const,
       render: (v: number | null, row) => v != null
-        ? <span style={{ fontSize: 12, color: '#504532' }}>{formatAmount(v, row.currency)}</span>
-        : <span style={{ color: '#D1D5DB' }}>—</span>,
+        ? <span className={styles.cellFee}>{formatAmount(v, row.currency)}</span>
+        : <span className={styles.cellMuted}>—</span>,
     },
     {
       title: 'Created',
       dataIndex: 'createdAt',
       width: 150,
-      render: (v: string) => <span style={{ fontSize: 12, color: '#6B7280' }}>{formatDate(v)}</span>,
+      sorter: true,
+      sortDirections: ['ascend', 'descend'] as const,
+      defaultSortOrder: 'descend' as const,
+      render: (v: string) => <span className={styles.cellDate}>{formatDate(v)}</span>,
     },
     {
       title: '',
@@ -167,8 +136,8 @@ export default function Transactions() {
       width: 48,
       render: (_: unknown, row) => (
         <button
+          className={styles.chevronBtn}
           onClick={(e) => { e.stopPropagation(); setSelectedId(row.id); }}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', padding: 4 }}
         >
           <span className="material-symbols-outlined" style={{ fontSize: 18 }}>chevron_right</span>
         </button>
@@ -176,63 +145,131 @@ export default function Transactions() {
     },
   ];
 
-  function handleTableChange(pagination: TablePaginationConfig) {
+  function handleTableChange(
+    pagination: TablePaginationConfig,
+    _tableFilters: Record<string, FilterValue | null>,
+    sorter: SorterResult<Transaction> | SorterResult<Transaction>[],
+  ) {
+    const s = Array.isArray(sorter) ? sorter[0] : sorter;
+    const sortField = s?.order ? String(s.field) : 'createdAt';
+    const sortDir = s?.order === 'ascend' ? 'asc' : 'desc';
     setFilters((f) => ({
       ...f,
       page: (pagination.current ?? 1) - 1,
       size: pagination.pageSize ?? 20,
+      sort: `${sortField},${sortDir}`,
     }));
   }
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-        <div>
-          <h1 style={{ fontSize: 28, fontWeight: 800, color: '#1C1C1E', margin: 0 }}>Transactions</h1>
-          <p style={{ color: '#6B7280', fontSize: 14, marginTop: 4 }}>
-            {page ? `${page.totalElements.toLocaleString()} total` : 'Loading…'}
-          </p>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div style={{
-        background: '#FFFFFF', borderRadius: 16, padding: '16px 24px',
-        boxShadow: '0 4px 40px -12px rgba(80,69,50,0.08)',
-        display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center',
-      }}>
+  const filterPopoverContent = (
+    <div className={styles.popoverContent}>
+      <div>
+        <div className={styles.popoverLabel}>Status</div>
         <Select
           allowClear
-          placeholder="All statuses"
-          style={{ width: 160 }}
+          placeholder="Any status"
+          style={{ width: '100%' }}
+          value={filters.status}
           onChange={(v) => setFilters((f) => ({ ...f, status: v, page: 0 }))}
-          options={Object.values(PaymentStatus).map((s) => ({ value: s, label: s.replace('_', ' ') }))}
+          options={Object.values(PaymentStatus).map((s) => ({ value: s, label: s.replace(/_/g, ' ') }))}
         />
+      </div>
+      <div>
+        <div className={styles.popoverLabel}>Provider</div>
         <Select
           allowClear
-          placeholder="All providers"
-          style={{ width: 150 }}
+          placeholder="Any provider"
+          style={{ width: '100%' }}
+          value={filters.provider}
           onChange={(v) => setFilters((f) => ({ ...f, provider: v, page: 0 }))}
           options={Object.values(Provider).map((p) => ({ value: p, label: p }))}
         />
+      </div>
+      <div>
+        <div className={styles.popoverLabel}>Region</div>
         <Select
           allowClear
-          placeholder="All regions"
-          style={{ width: 130 }}
+          placeholder="Any region"
+          style={{ width: '100%' }}
+          value={filters.region}
           onChange={(v) => setFilters((f) => ({ ...f, region: v, page: 0 }))}
           options={Object.values(Region).map((r) => ({ value: r, label: r }))}
         />
+      </div>
+      {activeChips.length > 0 && (
         <Button
-          onClick={() => setFilters({ page: 0, size: 20 })}
-          style={{ marginLeft: 'auto', color: '#6B7280', borderColor: '#E5E7EB' }}
+          size="small"
+          type="text"
+          onClick={() => { clearDropdownFilters(); setFilterOpen(false); }}
+          style={{ color: 'var(--text-tertiary)', textAlign: 'left', padding: '0 2px' }}
         >
-          Clear
+          Clear all filters
         </Button>
+      )}
+    </div>
+  );
+
+  return (
+    <div className={styles.page}>
+      <PageHeader
+        title="Transactions"
+        subtitle={page ? `${page.totalElements.toLocaleString()} total` : 'Loading…'}
+      />
+
+      {/* Filter bar */}
+      <div className={styles.filterBar}>
+        <div className={styles.filterTopRow}>
+          <Input.Search
+            placeholder="Search order ID…"
+            allowClear
+            className={styles.filterSearch}
+            onSearch={(v) => setFilters((f) => ({ ...f, search: v || undefined, page: 0 }))}
+            onChange={(e) => { if (!e.target.value) setFilters((f) => ({ ...f, search: undefined, page: 0 })); }}
+          />
+          <Popover
+            open={filterOpen}
+            onOpenChange={setFilterOpen}
+            trigger="click"
+            content={filterPopoverContent}
+            placement="bottomLeft"
+            arrow={false}
+          >
+            {/* inline justified: border/bg change based on activeChips.length (runtime data) */}
+            <Button
+              icon={<FilterOutlined />}
+              style={{
+                borderColor: activeChips.length > 0 ? '#FCB900' : undefined,
+                color: activeChips.length > 0 ? '#7B5800' : undefined,
+                background: activeChips.length > 0 ? 'var(--color-accent-subtle)' : undefined,
+                fontWeight: activeChips.length > 0 ? 600 : undefined,
+              }}
+            >
+              Filters{activeChips.length > 0 ? ` · ${activeChips.length}` : ''}
+            </Button>
+          </Popover>
+        </div>
+
+        {activeChips.length > 0 && (
+          <div className={styles.activeChips}>
+            {activeChips.map((chip) => (
+              <Tag
+                key={chip.key}
+                closable
+                className={styles.chip}
+                onClose={() => setFilters((f) => ({ ...f, [chip.key]: undefined, page: 0 }))}
+              >
+                {chip.label}: {chip.value}
+              </Tag>
+            ))}
+            <button className={styles.clearAllBtn} onClick={clearDropdownFilters}>
+              Clear all
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Table */}
-      <div style={{ background: '#FFFFFF', borderRadius: 16, boxShadow: '0 4px 40px -12px rgba(80,69,50,0.08)', overflow: 'hidden' }}>
+      <TableCard>
         <Table<Transaction>
           columns={columns}
           dataSource={page?.content ?? []}
@@ -249,130 +286,13 @@ export default function Transactions() {
           }}
           onChange={handleTableChange}
           scroll={{ x: 1000 }}
-          style={{ borderRadius: 16 }}
         />
-      </div>
+      </TableCard>
 
-      {/* Detail drawer */}
-      <Drawer
-        open={!!selectedId}
+      <TransactionDetailDrawer
+        transactionId={selectedId}
         onClose={() => setSelectedId(null)}
-        width={520}
-        title={null}
-        styles={{ body: { padding: 0 }, header: { display: 'none' } }}
-      >
-        {loadingDetail && (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: 64 }}>
-            <Spin />
-          </div>
-        )}
-
-        {detail && !loadingDetail && (() => {
-          const tx = detail.transaction;
-          return (
-            <div style={{ padding: 32, display: 'flex', flexDirection: 'column', gap: 28 }}>
-              {/* Drawer header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
-                    Transaction Detail
-                  </div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: '#1C1C1E' }}>
-                    {formatAmount(tx.amount, tx.currency)}
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-                    <StatusTag status={tx.status} />
-                    <ProviderTag provider={tx.provider} />
-                    <Tag style={{ borderRadius: 6, fontSize: 11, fontWeight: 600 }}>{tx.region}</Tag>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setSelectedId(null)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', padding: 4 }}
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: 22 }}>close</span>
-                </button>
-              </div>
-
-              {/* Fields */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 24px' }}>
-                {[
-                  { label: 'Order ID',     value: tx.merchantOrderId },
-                  { label: 'Currency',     value: tx.currency },
-                  { label: 'Routing',      value: tx.routingStrategy?.replace('_', ' ') ?? '—' },
-                  { label: 'Fee',          value: tx.fee != null ? formatAmount(tx.fee, tx.currency) : '—' },
-                  { label: 'Method',       value: tx.paymentMethod ?? '—' },
-                  { label: 'Retry count',  value: tx.retryCount },
-                  { label: 'Payment Type', value: tx.paymentType ? (tx.paymentType === PaymentType.PREMIUM_COLLECTION ? 'Premium Collection' : 'Claims Disbursement') : '—' },
-                  { label: 'Policy #',     value: tx.policyNumber ?? '—' },
-                  { label: 'Claim ref',    value: tx.claimReference ?? '—' },
-                  { label: 'Created',      value: formatDate(tx.createdAt), full: true },
-                  { label: 'Customer',     value: tx.customerEmail ?? '—', full: true },
-                  { label: 'Routing reason', value: tx.routingReason ?? '—', full: true },
-                ].map(({ label, value, full }) => (
-                  <div key={label} style={full ? { gridColumn: '1 / -1' } : {}}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>
-                      {label}
-                    </div>
-                    <Tooltip title={String(value)} placement="topLeft">
-                      <div style={{ fontSize: 13, color: '#1C1C1E', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {String(value)}
-                      </div>
-                    </Tooltip>
-                  </div>
-                ))}
-              </div>
-
-              {/* Event timeline */}
-              {detail.events.length > 0 && (
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#504532', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 16 }}>
-                    Event Timeline
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-                    {detail.events.map((ev, i) => {
-                      const isLast = i === detail.events.length - 1;
-                      const icon = EVENT_ICON[ev.eventType] ?? 'circle';
-                      return (
-                        <div key={ev.id} style={{ display: 'flex', gap: 16 }}>
-                          {/* line + dot */}
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 24 }}>
-                            <div style={{
-                              width: 28, height: 28, borderRadius: '50%',
-                              background: 'rgba(252,185,0,0.12)',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              flexShrink: 0,
-                            }}>
-                              <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#7B5800' }}>{icon}</span>
-                            </div>
-                            {!isLast && <div style={{ flex: 1, width: 2, background: '#F0EDEB', margin: '4px 0' }} />}
-                          </div>
-                          {/* content */}
-                          <div style={{ paddingBottom: isLast ? 0 : 20, flex: 1 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: '#1C1C1E' }}>
-                              {ev.eventType.replace(/_/g, ' ')}
-                            </div>
-                            {ev.description && (
-                              <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>{ev.description}</div>
-                            )}
-                            <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 4 }}>{formatDate(ev.createdAt)}</div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {detail.events.length === 0 && (
-                <div style={{ textAlign: 'center', color: '#9CA3AF', fontSize: 13, padding: '12px 0' }}>
-                  No events recorded.
-                </div>
-              )}
-            </div>
-          );
-        })()}
-      </Drawer>
+      />
     </div>
   );
 }

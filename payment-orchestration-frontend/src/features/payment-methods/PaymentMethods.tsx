@@ -8,11 +8,14 @@ import {
   useDeletePaymentMethod,
 } from './hooks/usePaymentMethods';
 import type { PaymentMethodConfig } from '../../shared/types/paymentMethod';
+import PageHeader from '../../shared/components/PageHeader';
+import TableCard from '../../shared/components/TableCard';
+import styles from './PaymentMethods.module.css';
 
 const REGION_COLOR: Record<string, { color: string; bg: string }> = {
-  MY: { color: '#7B5800', bg: 'rgba(252,185,0,0.12)' },
-  ID: { color: '#065F46', bg: 'rgba(6,95,70,0.08)' },
-  PH: { color: '#6B21A8', bg: 'rgba(107,33,168,0.08)' },
+  MY: { color: '#7B5800', bg: 'rgba(252, 185, 0, 0.12)' },
+  ID: { color: '#065F46', bg: 'rgba(6, 95, 70, 0.08)' },
+  PH: { color: '#6B21A8', bg: 'rgba(107, 33, 168, 0.08)' },
 };
 
 const REGIONS = ['MY', 'ID', 'PH'];
@@ -28,7 +31,6 @@ export default function PaymentMethods() {
   const updateMutation = useUpdatePaymentMethod();
   const deleteMutation = useDeletePaymentMethod();
 
-  // Group by region for summary chips
   const grouped = methods.reduce<Record<string, PaymentMethodConfig[]>>((acc, m) => {
     (acc[m.region] ??= []).push(m);
     return acc;
@@ -46,7 +48,6 @@ export default function PaymentMethods() {
 
   async function handleSave() {
     const values = await form.validateFields();
-
     if (modal?.mode === 'create') {
       await createMutation.mutateAsync({
         code: (values.code as string).toUpperCase(),
@@ -81,6 +82,7 @@ export default function PaymentMethods() {
       width: 90,
       render: (v: string) => {
         const s = REGION_COLOR[v] ?? { color: '#6B7280', bg: '#F3F4F6' };
+        /* bg/color are region-driven — inline justified */
         return (
           <Tag style={{ borderRadius: 6, fontWeight: 700, fontSize: 11, background: s.bg, color: s.color, border: 'none' }}>
             {v}
@@ -92,25 +94,19 @@ export default function PaymentMethods() {
       title: 'Code',
       dataIndex: 'code',
       width: 160,
-      render: (v: string) => (
-        <span style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 600, color: '#1C1C1E' }}>{v}</span>
-      ),
+      render: (v: string) => <span className={styles.cellCode}>{v}</span>,
     },
     {
       title: 'Display Name',
       dataIndex: 'name',
-      render: (v: string) => <span style={{ fontSize: 13, color: '#504532' }}>{v}</span>,
+      render: (v: string) => <span className={styles.cellName}>{v}</span>,
     },
     {
       title: 'Status',
       dataIndex: 'active',
       width: 90,
       render: (v: boolean) => (
-        <span style={{
-          display: 'inline-block', padding: '2px 10px', borderRadius: 999, fontSize: 11, fontWeight: 600,
-          background: v ? '#DCFCE7' : '#F3F4F6',
-          color: v ? '#166534' : '#6B7280',
-        }}>
+        <span className={`${styles.statusBadge} ${v ? styles.statusActive : styles.statusOff}`}>
           {v ? 'Active' : 'Off'}
         </span>
       ),
@@ -120,11 +116,8 @@ export default function PaymentMethods() {
       key: 'actions',
       width: 100,
       render: (_: unknown, row: PaymentMethodConfig) => (
-        <div style={{ display: 'flex', gap: 4 }}>
-          <button
-            onClick={() => openEdit(row)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', padding: 6, borderRadius: 6 }}
-          >
+        <div className={styles.actionBtns}>
+          <button className={styles.actionBtn} onClick={() => openEdit(row)}>
             <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
           </button>
           <Popconfirm
@@ -135,9 +128,7 @@ export default function PaymentMethods() {
             cancelText="Cancel"
             okButtonProps={{ danger: true }}
           >
-            <button
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', padding: 6, borderRadius: 6 }}
-            >
+            <button className={`${styles.actionBtn} ${styles.deleteBtn}`}>
               <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
             </button>
           </Popconfirm>
@@ -149,54 +140,35 @@ export default function PaymentMethods() {
   const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <h1 style={{ fontSize: 28, fontWeight: 800, color: '#1C1C1E', margin: 0 }}>Payment Methods</h1>
-          <p style={{ color: '#6B7280', fontSize: 14, marginTop: 4 }}>
-            Manage available payment methods per region. Disable a method to remove it from routing without deleting it.
-          </p>
-        </div>
-        <button
-          onClick={openCreate}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            background: 'linear-gradient(180deg, #FCB900 0%, #e0a400 100%)',
-            color: '#261900', fontWeight: 600, border: 'none',
-            borderRadius: 10, padding: '10px 20px', cursor: 'pointer',
-            fontSize: 14, boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
-          }}
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>add</span>
-          Add Method
-        </button>
-      </div>
+    <div className={styles.page}>
+      <PageHeader
+        title="Payment Methods"
+        subtitle="Manage available payment methods per region. Disable a method to remove it from routing without deleting it."
+        actions={
+          <button className={styles.addBtn} onClick={openCreate}>
+            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>add</span>
+            Add Method
+          </button>
+        }
+      />
 
-      {/* Region summary chips */}
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+      <div className={styles.summaryRow}>
         {REGIONS.map(region => {
           const rows = grouped[region] ?? [];
           const active = rows.filter(r => r.active).length;
           const s = REGION_COLOR[region] ?? { color: '#6B7280', bg: '#F3F4F6' };
           return (
-            <div key={region} style={{
-              background: '#FFFFFF', borderRadius: 12, padding: '12px 20px',
-              boxShadow: '0 2px 16px -4px rgba(80,69,50,0.08)',
-              display: 'flex', alignItems: 'center', gap: 12,
-            }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#1C1C1E' }}>{region}</span>
-              <span style={{ fontSize: 12, color: '#9CA3AF' }}>
-                {active}/{rows.length} active
-              </span>
+            <div key={region} className={styles.summaryChip}>
+              {/* dot color is region-driven — inline justified */}
+              <div className={styles.summaryDot} style={{ background: s.color }} />
+              <span className={styles.summaryName}>{region}</span>
+              <span className={styles.summaryCount}>{active}/{rows.length} active</span>
             </div>
           );
         })}
       </div>
 
-      {/* Table */}
-      <div style={{ background: '#FFFFFF', borderRadius: 16, boxShadow: '0 4px 40px -12px rgba(80,69,50,0.08)', overflow: 'hidden' }}>
+      <TableCard>
         <Table<PaymentMethodConfig>
           columns={columns}
           dataSource={methods}
@@ -205,9 +177,8 @@ export default function PaymentMethods() {
           pagination={false}
           scroll={{ x: 600 }}
         />
-      </div>
+      </TableCard>
 
-      {/* Create / Edit Modal */}
       <Modal
         open={!!modal}
         onCancel={() => setModal(null)}
@@ -216,11 +187,11 @@ export default function PaymentMethods() {
         okText={modal?.mode === 'create' ? 'Create' : 'Save'}
         title={
           <div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#1C1C1E' }}>
+            <div className={styles.modalTitle}>
               {modal?.mode === 'create' ? 'Add Payment Method' : 'Edit Payment Method'}
             </div>
             {modal?.mode === 'edit' && modal.row && (
-              <div style={{ fontSize: 12, color: '#6B7280', fontWeight: 400, marginTop: 2 }}>
+              <div className={styles.modalSubtitle}>
                 {modal.row.code} · {modal.row.region}
               </div>
             )}
@@ -234,7 +205,7 @@ export default function PaymentMethods() {
         }}
         destroyOnHidden
       >
-        <Form form={form} layout="vertical" requiredMark={false} style={{ marginTop: 16 }}>
+        <Form form={form} layout="vertical" requiredMark={false} className={styles.modalForm}>
           {modal?.mode === 'create' && (
             <>
               <Form.Item

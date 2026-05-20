@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  Button, Form, InputNumber, Modal, Popconfirm, Select, Switch, Tabs, Typography, message,
+  Button, Form, InputNumber, Modal, Popconfirm, Select, Switch, Tabs, message,
 } from 'antd';
 import { HolderOutlined, PlusOutlined } from '@ant-design/icons';
 import {
@@ -18,18 +18,18 @@ import {
   useRoutingRules, useCreateRoutingRule, useUpdateRoutingRule, useDeleteRoutingRule,
 } from './hooks/useRoutingRules';
 import { routingRuleService } from './services/routingRuleService';
-
-const { Text } = Typography;
+import PageHeader from '../../shared/components/PageHeader';
+import TableCard from '../../shared/components/TableCard';
+import InfoBanner from '../../shared/components/InfoBanner';
+import EmptyState from '../../shared/components/EmptyState';
+import { PROVIDER_TEXT_COLOR } from '../../shared/constants/providerStyles';
+import styles from './RoutingRules.module.css';
 
 const STRATEGY_LABELS: Record<RoutingStrategy, string> = {
   [RoutingStrategy.REGION_BASED]:    'Region-Based',
   [RoutingStrategy.LOWEST_FEE]:      'Lowest Fee',
   [RoutingStrategy.SUCCESS_RATE]:    'Success Rate',
   [RoutingStrategy.COMPOSITE_SCORE]: 'Composite Score',
-};
-
-const PROVIDER_COLOR: Record<string, string> = {
-  BILLPLZ: '#7B5800', MIDTRANS: '#504532', PAYMONGO: '#6B21A8', MOCK: '#6B7280',
 };
 
 type RuleMode = 'provider' | 'strategy';
@@ -87,109 +87,72 @@ function SortableRuleCard({
     id: rule.id,
   });
 
-  const style: React.CSSProperties = {
+  // transform + transition are runtime DnD values — must stay inline
+  const dndStyle: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     position: 'relative',
     zIndex: isDragging ? 10 : undefined,
   };
 
-  return (
-    <div ref={setNodeRef} style={style}>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 16,
-        padding: '14px 20px',
-        background: isDragging ? '#FFFBEA' : 'white',
-        borderRadius: 10,
-        border: `1px solid ${isDragging ? 'rgba(252,185,0,0.5)' : '#F3F4F6'}`,
-        marginBottom: 8,
-        boxShadow: isDragging ? '0 6px 20px rgba(0,0,0,0.12)' : 'none',
-        transition: 'border-color 0.15s, box-shadow 0.15s',
-        opacity: isDragging ? 0.9 : 1,
-      }}>
+  const providerColor = rule.preferredProvider
+    ? (PROVIDER_TEXT_COLOR[rule.preferredProvider] ?? '#6B7280')
+    : undefined;
 
-        {/* Drag handle */}
-        <div
-          {...attributes}
-          {...listeners}
-          style={{
-            cursor: isDragging ? 'grabbing' : 'grab',
-            color: '#D1D5DB',
-            touchAction: 'none',
-            flexShrink: 0,
-            display: 'flex',
-            alignItems: 'center',
-            padding: '4px 2px',
-          }}
-        >
+  return (
+    <div ref={setNodeRef} style={dndStyle}>
+      <div className={`${styles.ruleCard} ${isDragging ? styles.ruleCardDragging : ''}`}>
+
+        <div {...attributes} {...listeners} className={styles.dragHandle}>
           <HolderOutlined style={{ fontSize: 16 }} />
         </div>
 
-        {/* Priority badge */}
-        <div style={{
-          width: 28, height: 28, borderRadius: '50%',
-          background: 'rgba(252,185,0,0.12)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontWeight: 800, fontSize: 12, color: '#7B5800', flexShrink: 0,
-        }}>
-          {index + 1}
-        </div>
+        <div className={styles.priorityBadge}>{index + 1}</div>
 
-        {/* Rule fields */}
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 28, flexWrap: 'wrap' }}>
-
-          <div style={{ minWidth: 56 }}>
-            <div style={{ fontSize: 10, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Currency</div>
+        <div className={styles.ruleFields}>
+          <div className={styles.fieldGroupCurrency}>
+            <div className={styles.fieldLabel}>Currency</div>
             {rule.currency
-              ? <span style={{ fontSize: 13, fontWeight: 600, color: '#504532' }}>{rule.currency}</span>
-              : <span style={{ fontSize: 12, color: '#D1D5DB' }}>Any</span>}
+              ? <span className={styles.fieldValue}>{rule.currency}</span>
+              : <span className={styles.fieldMuted}>Any</span>}
           </div>
 
-          <div style={{ minWidth: 120 }}>
-            <div style={{ fontSize: 10, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Amount Range</div>
+          <div className={styles.fieldGroupRange}>
+            <div className={styles.fieldLabel}>Amount Range</div>
             {rule.minAmount != null || rule.maxAmount != null
-              ? <span style={{ fontSize: 12, color: '#374151' }}>
+              ? <span className={styles.fieldRange}>
                   {rule.minAmount != null ? Number(rule.minAmount).toLocaleString() : '0'}
                   {' – '}
                   {rule.maxAmount != null ? Number(rule.maxAmount).toLocaleString() : '∞'}
                 </span>
-              : <span style={{ fontSize: 12, color: '#D1D5DB' }}>Any</span>}
+              : <span className={styles.fieldMuted}>Any</span>}
           </div>
 
-          <div style={{ minWidth: 170 }}>
-            <div style={{ fontSize: 10, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Route To</div>
-            {rule.preferredProvider
-              ? <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 13, color: PROVIDER_COLOR[rule.preferredProvider] ?? '#6B7280' }}>account_balance</span>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: PROVIDER_COLOR[rule.preferredProvider] ?? '#6B7280' }}>{rule.preferredProvider}</span>
-                </div>
-              : rule.strategy
-              ? <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#1D4ED8' }}>auto_awesome</span>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#1D4ED8' }}>{STRATEGY_LABELS[rule.strategy]}</span>
-                </div>
-              : <span style={{ fontSize: 12, color: '#D1D5DB' }}>—</span>}
+          <div className={styles.fieldGroupRouteTo}>
+            <div className={styles.fieldLabel}>Route To</div>
+            {rule.preferredProvider ? (
+              // color is data-driven per provider — inline justified
+              <div className={styles.routeTo}>
+                <span className="material-symbols-outlined" style={{ fontSize: 13, color: providerColor }}>account_balance</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: providerColor }}>{rule.preferredProvider}</span>
+              </div>
+            ) : rule.strategy ? (
+              <div className={styles.routeTo}>
+                <span className={`material-symbols-outlined ${styles.strategyIcon}`}>auto_awesome</span>
+                <span className={styles.strategyText}>{STRATEGY_LABELS[rule.strategy]}</span>
+              </div>
+            ) : (
+              <span className={styles.fieldMuted}>—</span>
+            )}
           </div>
         </div>
 
-        {/* Enabled badge */}
-        <span style={{
-          display: 'inline-block', padding: '3px 12px', borderRadius: 999,
-          fontSize: 12, fontWeight: 600, flexShrink: 0,
-          background: rule.enabled ? '#DCFCE7' : '#F3F4F6',
-          color: rule.enabled ? '#166534' : '#6B7280',
-        }}>
+        <span className={`${styles.statusBadge} ${rule.enabled ? styles.statusActive : styles.statusOff}`}>
           {rule.enabled ? 'Active' : 'Off'}
         </span>
 
-        {/* Actions */}
-        <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
-          <button
-            onClick={() => onEdit(rule)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', padding: 6, borderRadius: 6 }}
-          >
+        <div className={styles.actions}>
+          <button className={styles.actionBtn} onClick={() => onEdit(rule)}>
             <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
           </button>
           <Popconfirm
@@ -199,10 +162,7 @@ function SortableRuleCard({
             okButtonProps={{ danger: true }}
             onConfirm={() => onDelete(rule.id)}
           >
-            <button
-              disabled={isDeleting}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#FCA5A5', padding: 6, borderRadius: 6 }}
-            >
+            <button className={styles.deleteBtn} disabled={isDeleting}>
               <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
             </button>
           </Popconfirm>
@@ -234,12 +194,7 @@ function RegionTabContent({
   }
 
   if (rules.length === 0) {
-    return (
-      <div style={{ textAlign: 'center', padding: '48px 0' }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 40, display: 'block', marginBottom: 12, color: '#E5E7EB' }}>rule</span>
-        <Text type="secondary">No rules for this region — click Add Rule to create one.</Text>
-      </div>
-    );
+    return <EmptyState icon="rule" message="No rules for this region — click Add Rule to create one." />;
   }
 
   return (
@@ -263,10 +218,10 @@ function RegionTabContent({
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 const TABS: { key: GroupKey; label: string; region: Region | null }[] = [
-  { key: 'MY',     label: '🇲🇾 Malaysia',   region: Region.MY },
-  { key: 'ID',     label: '🇮🇩 Indonesia',  region: Region.ID },
+  { key: 'MY',     label: '🇲🇾 Malaysia',    region: Region.MY },
+  { key: 'ID',     label: '🇮🇩 Indonesia',   region: Region.ID },
   { key: 'PH',     label: '🇵🇭 Philippines', region: Region.PH },
-  { key: 'GLOBAL', label: '🌐 Global',       region: null },
+  { key: 'GLOBAL', label: '🌐 Global',        region: null },
 ];
 
 export default function RoutingRules() {
@@ -326,7 +281,7 @@ export default function RoutingRules() {
       }
       setModalOpen(false);
     } catch {
-      // validation errors shown inline
+      // validation errors shown inline by antd Form
     }
   }
 
@@ -336,14 +291,12 @@ export default function RoutingRules() {
   }
 
   function handleReorder(region: Region | null, newOrder: RoutingRule[]) {
-    // Optimistic update
     qc.setQueryData<RoutingRule[]>(['routing-rules'], (old = []) => {
       const others = old.filter(r => r.region !== region);
       const reordered = newOrder.map((rule, i) => ({ ...rule, priority: i + 1 }));
       return [...others, ...reordered];
     });
 
-    // Fire parallel PUTs for rules whose priority changed
     const updates = newOrder
       .map((rule, i) => ({ rule, newPriority: i + 1 }))
       .filter(({ rule, newPriority }) => rule.priority !== newPriority);
@@ -361,66 +314,47 @@ export default function RoutingRules() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div className={styles.page}>
+      <PageHeader
+        title="Routing Rules"
+        subtitle="Drag rows to set priority within each region. First matching enabled rule wins."
+        actions={
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={openCreate}
+            loading={isFetching}
+            style={{
+              background: 'linear-gradient(180deg, #FCB900 0%, #e0a400 100%)',
+              border: 'none', color: '#261900', fontWeight: 600,
+            }}
+          >
+            Add Rule
+          </Button>
+        }
+      />
 
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-        <div>
-          <h1 style={{ fontSize: 28, fontWeight: 800, color: '#1C1C1E', margin: 0 }}>Routing Rules</h1>
-          <p style={{ color: '#6B7280', fontSize: 14, marginTop: 4 }}>
-            Drag rows to set priority within each region. First matching enabled rule wins.
-          </p>
-        </div>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={openCreate}
-          loading={isFetching}
-          style={{
-            background: 'linear-gradient(180deg, #FCB900 0%, #e0a400 100%)',
-            border: 'none', color: '#261900', fontWeight: 600, borderRadius: 10,
-          }}
-        >
-          Add Rule
-        </Button>
-      </div>
+      <InfoBanner>
+        Rules are evaluated top-to-bottom. Drag the <HolderOutlined style={{ fontSize: 12 }} /> handle
+        to reorder. Route to a <strong>Provider</strong> for a hard override,
+        or a <strong>Strategy</strong> to let the engine decide.
+      </InfoBanner>
 
-      {/* Info banner */}
-      <div style={{
-        background: 'rgba(252,185,0,0.08)', borderRadius: 12, padding: '12px 20px',
-        display: 'flex', alignItems: 'center', gap: 12,
-        border: '1px solid rgba(252,185,0,0.2)',
-      }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#7B5800' }}>info</span>
-        <span style={{ fontSize: 13, color: '#504532' }}>
-          Rules are evaluated top-to-bottom. Drag the{' '}
-          <HolderOutlined style={{ fontSize: 12 }} />{' '}
-          handle to reorder. Route to a <strong>Provider</strong> for a hard override,
-          or a <strong>Strategy</strong> to let the engine decide.
-        </span>
-      </div>
-
-      {/* Region tabs */}
-      <div style={{ background: '#FFFFFF', borderRadius: 16, boxShadow: '0 4px 40px -12px rgba(80,69,50,0.08)', overflow: 'hidden' }}>
+      <TableCard>
         <Tabs
           activeKey={activeTab}
           onChange={(k) => setActiveTab(k as GroupKey)}
-          style={{ padding: '0 24px' }}
+          className={styles.tabsInner}
           items={TABS.map(tab => ({
             key: tab.key,
             label: (
-              <span style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className={styles.tabLabel}>
                 {tab.label}
-                <span style={{
-                  background: 'rgba(252,185,0,0.15)', color: '#7B5800',
-                  borderRadius: 999, padding: '0 8px', fontSize: 11, fontWeight: 700,
-                }}>
-                  {grouped[tab.key].length}
-                </span>
+                <span className={styles.tabCount}>{grouped[tab.key].length}</span>
               </span>
             ),
             children: (
-              <div style={{ padding: '8px 0 24px' }}>
+              <div className={styles.tabPanel}>
                 <RegionTabContent
                   rules={grouped[tab.key]}
                   onEdit={openEdit}
@@ -432,20 +366,15 @@ export default function RoutingRules() {
             ),
           }))}
         />
-      </div>
+      </TableCard>
 
-      {/* Create / Edit Modal */}
       <Modal
         open={modalOpen}
         onCancel={() => setModalOpen(false)}
         onOk={handleSave}
         confirmLoading={isSaving}
         okText={editing ? 'Save changes' : 'Create rule'}
-        title={
-          <span style={{ fontSize: 16, fontWeight: 700, color: '#1C1C1E' }}>
-            {editing ? 'Edit Routing Rule' : 'New Routing Rule'}
-          </span>
-        }
+        title={<span className={styles.modalTitle}>{editing ? 'Edit Routing Rule' : 'New Routing Rule'}</span>}
         okButtonProps={{
           style: {
             background: 'linear-gradient(180deg, #FCB900 0%, #e0a400 100%)',
@@ -456,7 +385,7 @@ export default function RoutingRules() {
         destroyOnHidden
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }} requiredMark={false}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+          <div className={styles.formGrid}>
             <Form.Item name="region" label="Region">
               <Select allowClear placeholder="Any region (Global)"
                 options={Object.values(Region).map(r => ({ value: r, label: r }))} />

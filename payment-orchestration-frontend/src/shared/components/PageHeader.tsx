@@ -1,17 +1,20 @@
+import type { ReactNode } from 'react';
+import styles from './PageHeader.module.css';
+
 interface PageHeaderProps {
   title: string;
   subtitle?: string;
-  actions?: React.ReactNode;
+  actions?: ReactNode;
 }
 
 export default function PageHeader({ title, subtitle, actions }: PageHeaderProps) {
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 32 }}>
+    <div className={styles.root}>
       <div>
-        <h1 style={{ fontSize: 28, fontWeight: 800, color: '#1C1C1E', margin: 0, lineHeight: 1.2 }}>{title}</h1>
-        {subtitle && <p style={{ color: '#6B7280', fontSize: 14, marginTop: 4 }}>{subtitle}</p>}
+        <h1 className={styles.title}>{title}</h1>
+        {subtitle && <p className={styles.subtitle}>{subtitle}</p>}
       </div>
-      {actions && <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>{actions}</div>}
+      {actions && <div className={styles.actions}>{actions}</div>}
     </div>
   );
 }

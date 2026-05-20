@@ -1,19 +1,13 @@
 import { Tag } from 'antd';
 import type { Provider } from '../types';
-
-const PROVIDER_CONFIG: Record<Provider, { color: string; bg: string }> = {
-  BILLPLZ:  { color: '#1e40af', bg: '#DBEAFE' },
-  MIDTRANS: { color: '#065f46', bg: '#D1FAE5' },
-  PAYMONGO: { color: '#6b21a8', bg: '#F3E8FF' },
-  MOCK:     { color: '#374151', bg: '#F3F4F6' },
-};
+import { PROVIDER_BADGE_CONFIG } from '../constants/providerStyles';
 
 interface ProviderBadgeProps {
   provider: Provider;
 }
 
 export default function ProviderBadge({ provider }: ProviderBadgeProps) {
-  const cfg = PROVIDER_CONFIG[provider] ?? { color: '#374151', bg: '#F3F4F6' };
+  const cfg = PROVIDER_BADGE_CONFIG[provider] ?? { color: '#374151', bg: 'rgba(55,65,81,0.06)' };
   return (
     <Tag
       style={{

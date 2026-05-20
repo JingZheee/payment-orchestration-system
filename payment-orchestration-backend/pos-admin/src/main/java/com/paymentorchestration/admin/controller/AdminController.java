@@ -20,6 +20,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -87,20 +89,22 @@ public class AdminController {
             @RequestParam(required = false) PaymentStatus status,
             @RequestParam(required = false) Provider provider,
             @RequestParam(required = false) Region region,
-            @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
+            @RequestParam(required = false) String search,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
 
-        Page<Transaction> page;
-        if (status != null) {
-            page = transactionRepository.findByStatus(status, pageable);
-        } else if (provider != null) {
-            page = transactionRepository.findByProvider(provider, pageable);
-        } else if (region != null) {
-            page = transactionRepository.findByRegion(region, pageable);
-        } else {
-            page = transactionRepository.findAll(pageable);
+        Specification<Transaction> spec = Specification.where(null);
+        if (status != null)
+            spec = spec.and((root, q, cb) -> cb.equal(root.get("status"), status));
+        if (provider != null)
+            spec = spec.and((root, q, cb) -> cb.equal(root.get("provider"), provider));
+        if (region != null)
+            spec = spec.and((root, q, cb) -> cb.equal(root.get("region"), region));
+        if (search != null && !search.isBlank()) {
+            String pattern = "%" + search.trim().toLowerCase() + "%";
+            spec = spec.and((root, q, cb) -> cb.like(cb.lower(root.<String>get("merchantOrderId")), pattern));
         }
 
-        return ResponseEntity.ok(ApiResponse.ok(page));
+        return ResponseEntity.ok(ApiResponse.ok(transactionRepository.findAll(spec, pageable)));
     }
 
     @GetMapping("/transactions/{id}")

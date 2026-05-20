@@ -329,7 +329,7 @@ Weights are configurable in `application.yml` under `routing.scorer.*`.
 |---|---|
 | **Current module** | full-stack — all major features implemented |
 | **Current task** | End-to-end smoke test: login → click Pay → verify checkout page loads, routing decision shown, event timeline correct, PREMIUM_ACTIVATED event fires, policy row turns green on return |
-| **Last completed** | RoutingRules page — region tabs (MY/ID/PH/Global) + dnd-kit drag-to-reorder; priority auto-reassigned on drop with parallel PUT saves; priority field removed from modal |
+| **Last completed** | CSS Modules refactor complete — PaymentMethods and Metrics pages; all 8 pages now use CSS Modules + shared components; zero TypeScript errors |
 | **Blockers** | None |
 
 ### Admin API Endpoints — Payment Methods

@@ -1,0 +1,246 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-page);
+}
+
+/* ── Header actions ───────────────────────────────────────── */
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.refreshing {
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── Summary cards ────────────────────────────────────────── */
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.summaryCard {
+  background: var(--bg-card);
+  border-radius: var(--radius-card);
+  padding: 20px;
+  box-shadow: var(--shadow-card);
+}
+
+.summaryCardLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 12px;
+}
+
+.summaryCardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.metricLabel {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.statsRow {
+  display: flex;
+  gap: 12px;
+}
+
+.statItem {
+  flex: 1;
+}
+
+.statLabel {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+
+.statValue {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* ── Mini bar (inline progress) ───────────────────────────── */
+
+.miniBarRoot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.miniBarTrack {
+  flex: 1;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: #F0EDEB;
+  overflow: hidden;
+}
+
+.miniBarFill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+}
+
+.miniBarLabel {
+  font-size: 12px;
+  font-weight: 700;
+  min-width: 38px;
+  text-align: right;
+}
+
+/* ── Charts row ───────────────────────────────────────────── */
+
+.chartsRow {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 20px;
+}
+
+.chartCard {
+  background: var(--bg-card);
+  border-radius: var(--radius-card);
+  padding: 28px;
+  box-shadow: var(--shadow-card);
+}
+
+.chartTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 20px;
+}
+
+.chartTitleCompact {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 8px;
+}
+
+.chartArea {
+  height: 220px;
+}
+
+.chartLegend {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  justify-content: center;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.legendDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Detail table ─────────────────────────────────────────── */
+
+.detailCard {
+  background: var(--bg-card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.detailHeader {
+  padding: 20px 24px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.detailTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 16px;
+}
+
+.detailTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.detailHeadRow {
+  background: var(--bg-input);
+}
+
+.detailTh {
+  padding: 12px 20px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.detailTd {
+  padding: 14px 20px;
+}
+
+.detailTdWide {
+  padding: 14px 20px;
+  min-width: 160px;
+}
+
+.detailRow {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.cellProvider {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cellLatency {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.cellTxCount {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.cellWindow {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.emptyCell {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
