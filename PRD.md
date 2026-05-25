@@ -338,7 +338,7 @@ payment-orchestration-frontend/src/
 - **Composite Scoring** — `ProviderScorer` assigns weighted scores: success rate (50%) + fee (30%) + latency (20%)
 - **Idempotency Filter** — servlet filter intercepts requests with `Idempotency-Key` header before hitting service layer
 - **Immutable Event Log** — `transaction_events` table is append-only; no updates, only inserts
-- **Scheduled Metrics** — `MetricsAggregator` runs every 15 minutes to compute rolling success rates per provider per region
+- **Scheduled Metrics** — `MetricsAggregator` runs every 15 minutes to compute rolling success rates per provider per region over a 60-minute window. Window and tick are intentionally wide for the demo context: with low transaction volume (tens of transactions, not thousands), a 5-minute window would almost always be empty and produce meaningless scores. Production systems (e.g. Razorpay) use a 5-minute primary window with a 1-minute tick, which only makes sense at scale where each provider sees hundreds of transactions per minute.
 - **Message Queue (Async)** — RabbitMQ decouples webhook receipt from processing, and drives the retry pipeline via TTL + DLQ
 
 ### RabbitMQ Topology
@@ -620,8 +620,8 @@ routing:
     fee-weight: 0.30
     latency-weight: 0.20
   metrics:
-    window-minutes: 60
-    refresh-interval-minutes: 15
+    window-minutes: 60          # 60-min window suits demo-scale volume; production would use 5 min
+    refresh-interval-minutes: 15 # aggregation tick; production would run every 1 min at scale
 
 notification:
   email:

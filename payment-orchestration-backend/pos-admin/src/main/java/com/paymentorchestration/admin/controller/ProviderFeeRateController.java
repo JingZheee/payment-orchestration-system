@@ -59,16 +59,17 @@ public class ProviderFeeRateController {
 
         if (request.fixedAmount() != null) rate.setFixedAmount(request.fixedAmount());
         if (request.percentage() != null)  rate.setPercentage(request.percentage());
+        if (request.active() != null)      rate.setActive(request.active());
 
         return ResponseEntity.ok(ApiResponse.ok(feeRateRepository.save(rate)));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable("id") Long id) {
-        if (!feeRateRepository.existsById(id)) {
-            throw new PosException("Fee rate not found: " + id, HttpStatus.NOT_FOUND);
-        }
-        feeRateRepository.deleteById(id);
+        ProviderFeeRate rate = feeRateRepository.findById(id)
+                .orElseThrow(() -> new PosException("Fee rate not found: " + id, HttpStatus.NOT_FOUND));
+        rate.setActive(false);
+        feeRateRepository.save(rate);
         return ResponseEntity.ok(ApiResponse.ok(null));
     }
 
@@ -90,5 +91,5 @@ public class ProviderFeeRateController {
         Boolean active
     ) {}
 
-    record FeeRateUpdateRequest(BigDecimal fixedAmount, BigDecimal percentage) {}
+    record FeeRateUpdateRequest(BigDecimal fixedAmount, BigDecimal percentage, Boolean active) {}
 }

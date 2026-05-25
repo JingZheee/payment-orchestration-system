@@ -26,4 +26,5 @@ export interface FeeRateCreateRequest {
 export interface FeeRateUpdateRequest {
   fixedAmount?: number;
   percentage?: number;
+  active?: boolean;
 }

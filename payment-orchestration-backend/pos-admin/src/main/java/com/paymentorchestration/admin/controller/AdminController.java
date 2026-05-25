@@ -2,6 +2,7 @@ package com.paymentorchestration.admin.controller;
 
 import com.paymentorchestration.admin.dto.ProviderSummaryDto;
 import com.paymentorchestration.admin.dto.RoutingRuleRequest;
+import com.paymentorchestration.routing.strategy.ProviderRegionSupport;
 import com.paymentorchestration.admin.service.RoutingRuleService;
 import com.paymentorchestration.common.dto.ApiResponse;
 import com.paymentorchestration.common.enums.PaymentStatus;
@@ -36,6 +37,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @RestController
@@ -50,14 +52,14 @@ public class AdminController {
     private final ProviderConfigRepository providerConfigRepository;
     private final ProviderFeeRateRepository providerFeeRateRepository;
 
-    private record ProviderMeta(String label, String webhookType, List<String> regions) {}
+    private record ProviderMeta(String label, String webhookType) {}
 
     private static final Map<Provider, ProviderMeta> PROVIDER_META = Map.of(
-            Provider.BILLPLZ,  new ProviderMeta("Billplz",       "HMAC-SHA256",   List.of("MY")),
-            Provider.MIDTRANS, new ProviderMeta("Midtrans",       "HMAC-SHA256",   List.of("ID")),
-            Provider.PAYMONGO, new ProviderMeta("PayMongo",       "RSA Signature", List.of("PH")),
-            Provider.XENDIT,   new ProviderMeta("Xendit",         "HMAC-SHA256",   List.of("PH")),
-            Provider.MOCK,     new ProviderMeta("Mock Provider",  "Always passes", List.of("MY", "ID", "PH"))
+            Provider.BILLPLZ,  new ProviderMeta("Billplz",       "HMAC-SHA256"),
+            Provider.MIDTRANS, new ProviderMeta("Midtrans",       "HMAC-SHA256"),
+            Provider.PAYMONGO, new ProviderMeta("PayMongo",       "RSA Signature"),
+            Provider.XENDIT,   new ProviderMeta("Xendit",         "HMAC-SHA256"),
+            Provider.MOCK,     new ProviderMeta("Mock Provider",  "Always passes")
     );
 
     // ── Metrics ────────────────────────────────────────────────────────────────
@@ -148,7 +150,11 @@ public class AdminController {
                 .map(cfg -> {
                     Provider p = cfg.getProvider();
                     ProviderMeta meta = PROVIDER_META.getOrDefault(p,
-                            new ProviderMeta(p.name(), "Unknown", List.of()));
+                            new ProviderMeta(p.name(), "Unknown"));
+
+                    List<String> regions = ProviderRegionSupport.PROVIDER_REGIONS
+                            .getOrDefault(p, Set.of())
+                            .stream().map(Region::name).sorted().toList();
 
                     List<Transaction> txns = transactionRepository.findAllByProvider(p);
                     int total = txns.size();
@@ -167,7 +173,7 @@ public class AdminController {
                     List<String> methods = providerFeeRateRepository.findActiveMethodsByProvider(p);
 
                     return new ProviderSummaryDto(
-                            p.name(), meta.label(), meta.regions(), meta.webhookType(),
+                            p.name(), meta.label(), regions, meta.webhookType(),
                             cfg.isEnabled(), cfg.getUpdatedAt(),
                             successRate, avgLatencyMs, total == 0 ? null : total, methods);
                 })

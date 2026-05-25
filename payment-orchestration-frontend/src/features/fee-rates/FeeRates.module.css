@@ -4,39 +4,25 @@
   gap: var(--gap-page);
 }
 
-/* ── Summary chips ────────────────────────────────────────── */
+/* ── Provider tabs ────────────────────────────────────────── */
 
-.summaryRow {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.summaryChip {
-  background: var(--bg-card);
-  border-radius: var(--radius-md);
-  padding: 12px 20px;
-  box-shadow: 0 2px 16px -4px rgba(80, 69, 50, 0.08);
+.tabLabel {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
-.summaryDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.summaryName {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.summaryCount {
-  font-size: 12px;
+.tabCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--bg-input);
   color: var(--text-muted);
 }
 

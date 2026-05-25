@@ -1,29 +1,20 @@
-import { useState } from 'react';
-import { Table, Modal, Form, InputNumber, Select, Checkbox, Tag, message, Popconfirm, Button } from 'antd';
+import { useState, useEffect } from 'react';
+import { Table, Modal, Form, InputNumber, Select, Checkbox, Switch, Tag, message, Popconfirm, Button, Tabs } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useFeeRates, useCreateFeeRate, useUpdateFeeRate, useDeleteFeeRate } from './hooks/useFeeRates';
 import { usePaymentMethods } from '../payment-methods/hooks/usePaymentMethods';
+import { useProviderSummaries } from '../providers/hooks/useProviders';
 import type { FeeRate, FeeRateCreateRequest, FeeRateUpdateRequest } from '../../shared/types/feeRate';
 import { FeeType, Provider, Region } from '../../shared/types/enums';
-import type { Provider as ProviderType } from '../../shared/types/enums';
 import PageHeader from '../../shared/components/PageHeader';
 import TableCard from '../../shared/components/TableCard';
-import ProviderBadge from '../../shared/components/ProviderBadge';
 import InfoBanner from '../../shared/components/InfoBanner';
-import { PROVIDER_BADGE_CONFIG } from '../../shared/constants/providerStyles';
 import styles from './FeeRates.module.css';
 
 const FEE_TYPE_LABEL: Record<FeeType, string> = {
   [FeeType.FIXED]:                 'Fixed',
   [FeeType.PERCENTAGE]:            'Percentage',
   [FeeType.FIXED_PLUS_PERCENTAGE]: 'Fixed + %',
-};
-
-// Providers that are locked to a single region
-const PROVIDER_REGION: Partial<Record<Provider, Region>> = {
-  [Provider.BILLPLZ]:  Region.MY,
-  [Provider.MIDTRANS]: Region.ID,
-  [Provider.PAYMONGO]: Region.PH,
 };
 
 function formatFee(rate: FeeRate): string {
@@ -35,26 +26,59 @@ function formatFee(rate: FeeRate): string {
   return parts.length ? parts.join(' + ') : '—';
 }
 
+const okButtonStyle = {
+  background: 'linear-gradient(180deg, #FCB900 0%, #e0a400 100%)',
+  border: 'none', color: '#261900', fontWeight: 600,
+};
+
 export default function FeeRates() {
   const [editForm] = Form.useForm<FeeRateUpdateRequest>();
   const [createForm] = Form.useForm<FeeRateCreateRequest>();
-  const [editing, setEditing] = useState<FeeRate | null>(null);
+  const [editing, setEditing]   = useState<FeeRate | null>(null);
   const [creating, setCreating] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('');
 
-  // Watched create-form values for conditional rendering
   const selectedProvider = Form.useWatch('provider', createForm) as Provider | undefined;
   const selectedRegion   = Form.useWatch('region',   createForm) as Region   | undefined;
   const selectedFeeType  = Form.useWatch('feeType',  createForm) as FeeType  | undefined;
 
   const { data: rates = [], isFetching } = useFeeRates();
   const { data: allMethods = [] }        = usePaymentMethods();
+  const { data: providerSummaries = [] } = useProviderSummaries();
+
+  // Default to first provider tab once summaries load
+  useEffect(() => {
+    if (providerSummaries.length > 0 && !activeTab) {
+      setActiveTab(providerSummaries[0].provider);
+    }
+  }, [providerSummaries, activeTab]);
+
+  // Provider → supported regions (ProviderRegionSupport is the single source of truth via the summary API)
+  const providerRegions = Object.fromEntries(
+    providerSummaries.map(s => [s.provider, s.regions as Region[]])
+  ) as Partial<Record<Provider, Region[]>>;
+
   const createMutation = useCreateFeeRate();
   const updateMutation = useUpdateFeeRate();
   const deleteMutation = useDeleteFeeRate();
 
-  // Payment methods filtered to the selected region in the create form
+  const regionOptions = (selectedProvider && providerRegions[selectedProvider]
+    ? providerRegions[selectedProvider]!
+    : Object.values(Region)
+  ).map(r => ({ value: r, label: r }));
+
+  const lockedRegion = selectedProvider && providerRegions[selectedProvider]?.length === 1
+    ? providerRegions[selectedProvider]![0]
+    : undefined;
+
+  const usedMethods = new Set(
+    rates
+      .filter(r => r.provider === selectedProvider && r.region === selectedRegion)
+      .map(r => r.paymentMethod),
+  );
   const methodOptions = allMethods
     .filter(m => !selectedRegion || m.region === selectedRegion)
+    .filter(m => !usedMethods.has(m.code))
     .map(m => ({ value: m.code, label: `${m.code} — ${m.name}` }));
 
   function openEdit(rate: FeeRate) {
@@ -62,21 +86,23 @@ export default function FeeRates() {
     editForm.setFieldsValue({
       fixedAmount: rate.fixedAmount != null ? Number(rate.fixedAmount) : undefined,
       percentage:  rate.percentage  != null ? Number(rate.percentage) * 100 : undefined,
+      active:      rate.active,
     });
   }
 
   function openCreate() {
     createForm.resetFields();
+    if (activeTab) {
+      const provider = activeTab as Provider;
+      createForm.setFieldValue('provider', provider);
+      handleProviderChange(provider);
+    }
     setCreating(true);
   }
 
   function handleProviderChange(provider: Provider) {
-    const lockedRegion = PROVIDER_REGION[provider];
-    if (lockedRegion) {
-      createForm.setFieldValue('region', lockedRegion);
-    } else {
-      createForm.setFieldValue('region', undefined);
-    }
+    const supportedRegions = providerRegions[provider];
+    createForm.setFieldValue('region', supportedRegions?.length === 1 ? supportedRegions[0] : undefined);
     createForm.setFieldValue('paymentMethod', undefined);
   }
 
@@ -87,18 +113,21 @@ export default function FeeRates() {
   async function handleEditSave() {
     if (!editing) return;
     const values = await editForm.validateFields();
-    const req: FeeRateUpdateRequest = {
-      fixedAmount: values.fixedAmount,
-      percentage:  values.percentage != null ? values.percentage / 100 : undefined,
-    };
-    await updateMutation.mutateAsync({ id: editing.id, req });
+    await updateMutation.mutateAsync({
+      id: editing.id,
+      req: {
+        fixedAmount: values.fixedAmount,
+        percentage:  values.percentage != null ? values.percentage / 100 : undefined,
+        active:      values.active,
+      },
+    });
     message.success('Fee rate updated');
     setEditing(null);
   }
 
   async function handleCreateSave() {
     const values = await createForm.validateFields();
-    const req: FeeRateCreateRequest = {
+    await createMutation.mutateAsync({
       provider:      values.provider,
       region:        values.region,
       paymentMethod: values.paymentMethod,
@@ -106,8 +135,7 @@ export default function FeeRates() {
       fixedAmount:   values.fixedAmount,
       percentage:    values.percentage != null ? values.percentage / 100 : undefined,
       active:        values.active ?? true,
-    };
-    await createMutation.mutateAsync(req);
+    });
     message.success('Fee rate created');
     setCreating(false);
   }
@@ -117,28 +145,18 @@ export default function FeeRates() {
     message.success('Fee rate deleted');
   }
 
-  const grouped = rates.reduce<Record<string, FeeRate[]>>((acc, r) => {
-    (acc[r.provider] ??= []).push(r);
-    return acc;
-  }, {});
-
+  // Provider column omitted — redundant inside a per-provider tab
   const columns: ColumnsType<FeeRate> = [
-    {
-      title: 'Provider',
-      dataIndex: 'provider',
-      width: 140,
-      render: (v: ProviderType) => <ProviderBadge provider={v} />,
-    },
     {
       title: 'Region',
       dataIndex: 'region',
-      width: 90,
+      width: 80,
       render: (v: string) => <Tag className={styles.regionTag}>{v}</Tag>,
     },
     {
       title: 'Payment Method',
       dataIndex: 'paymentMethod',
-      width: 160,
+      width: 180,
       render: (v: string) => <span className={styles.cellMethod}>{v.replace(/_/g, ' ')}</span>,
     },
     {
@@ -154,7 +172,7 @@ export default function FeeRates() {
     {
       title: 'Fixed Amount',
       dataIndex: 'fixedAmount',
-      width: 130,
+      width: 140,
       render: (v: number | null, row) => v != null && Number(v) > 0
         ? <span className={styles.cellAmount}>{row.currency} {Number(v).toFixed(2)}</span>
         : <span className={styles.cellMuted}>—</span>,
@@ -194,14 +212,14 @@ export default function FeeRates() {
             <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
           </button>
           <Popconfirm
-            title="Delete this fee rate?"
-            description="This cannot be undone."
-            okText="Delete"
+            title="Deactivate this fee rate?"
+            description="The rate will be disabled. You can re-enable it by editing."
+            okText="Deactivate"
             okButtonProps={{ danger: true }}
             onConfirm={() => handleDelete(row.id)}
           >
-            <button className={`${styles.actionBtn} ${styles.actionBtnDanger}`}>
-              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
+            <button className={`${styles.actionBtn} ${styles.actionBtnDanger}`} title="Deactivate">
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>do_not_disturb_on</span>
             </button>
           </Popconfirm>
         </div>
@@ -209,47 +227,50 @@ export default function FeeRates() {
     },
   ];
 
-  const okButtonStyle = {
-    background: 'linear-gradient(180deg, #FCB900 0%, #e0a400 100%)',
-    border: 'none', color: '#261900', fontWeight: 600,
-  };
+  const tabItems = providerSummaries.map(s => {
+    const providerRates = rates.filter(r => r.provider === s.provider);
+    return {
+      key: s.provider,
+      label: (
+        <span className={styles.tabLabel}>
+          {s.label}
+          <span className={styles.tabCount}>{providerRates.length}</span>
+        </span>
+      ),
+      children: (
+        <TableCard>
+          <Table<FeeRate>
+            columns={columns}
+            dataSource={providerRates}
+            rowKey="id"
+            loading={isFetching}
+            pagination={false}
+            scroll={{ x: 900 }}
+          />
+        </TableCard>
+      ),
+    };
+  });
 
   return (
     <div className={styles.page}>
       <PageHeader
         title="Fee Rates"
         subtitle="Configure interchange fees per provider, region, and payment method."
-        actions={
-          <Button onClick={openCreate} type="primary" style={okButtonStyle}>
-            Add Rate
-          </Button>
-        }
       />
 
-      {/* Summary chips */}
-      <div className={styles.summaryRow}>
-        {Object.entries(grouped).map(([provider, rows]) => {
-          const dotColor = PROVIDER_BADGE_CONFIG[provider]?.color ?? '#6B7280';
-          return (
-            <div key={provider} className={styles.summaryChip}>
-              <div className={styles.summaryDot} style={{ background: dotColor }} />
-              <span className={styles.summaryName}>{provider}</span>
-              <span className={styles.summaryCount}>{rows.length} rate{rows.length !== 1 ? 's' : ''}</span>
-            </div>
-          );
-        })}
-      </div>
-
-      <TableCard>
-        <Table<FeeRate>
-          columns={columns}
-          dataSource={rates}
-          rowKey="id"
-          loading={isFetching}
-          pagination={false}
-          scroll={{ x: 1000 }}
-        />
-      </TableCard>
+      <Tabs
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        items={tabItems}
+        tabBarExtraContent={{
+          right: (
+            <Button onClick={openCreate} type="primary" style={okButtonStyle}>
+              Add Rate
+            </Button>
+          ),
+        }}
+      />
 
       {/* ── Edit modal ── */}
       <Modal
@@ -289,6 +310,9 @@ export default function FeeRates() {
                   <InputNumber min={0} max={100} step={0.001} precision={3} style={{ width: '100%' }} placeholder="e.g. 1.500" />
                 </Form.Item>
               )}
+              <Form.Item name="active" label="Status" valuePropName="checked">
+                <Switch checkedChildren="Active" unCheckedChildren="Off" />
+              </Form.Item>
             </Form>
           </div>
         )}
@@ -311,16 +335,16 @@ export default function FeeRates() {
             <Select
               placeholder="Select provider"
               onChange={handleProviderChange}
-              options={Object.values(Provider).map(p => ({ value: p, label: p }))}
+              options={providerSummaries.map(s => ({ value: s.provider, label: s.label }))}
             />
           </Form.Item>
 
           <Form.Item name="region" label="Region" rules={[{ required: true }]}>
             <Select
-              placeholder="Select region"
-              disabled={!!selectedProvider && !!PROVIDER_REGION[selectedProvider]}
+              placeholder={selectedProvider ? 'Select region' : 'Select provider first'}
+              disabled={!selectedProvider || !!lockedRegion}
               onChange={handleRegionChange}
-              options={Object.values(Region).map(r => ({ value: r, label: r }))}
+              options={regionOptions}
             />
           </Form.Item>
 

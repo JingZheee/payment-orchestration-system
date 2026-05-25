@@ -7,7 +7,6 @@ import com.paymentorchestration.domain.entity.PaymentMethodId;
 import com.paymentorchestration.domain.repository.PaymentMethodRepository;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -71,19 +70,14 @@ public class AdminPaymentMethodController {
             @PathVariable String code) {
 
         PaymentMethodId id = new PaymentMethodId(code.toUpperCase(), region.toUpperCase());
-        paymentMethodRepository.findById(id)
+        PaymentMethodEntity entity = paymentMethodRepository.findById(id)
                 .orElseThrow(() -> new PosException(
                         "Payment method " + code + " not found for region " + region,
                         HttpStatus.NOT_FOUND));
 
-        try {
-            paymentMethodRepository.deleteById(id);
-            return ResponseEntity.ok(ApiResponse.ok(null));
-        } catch (DataIntegrityViolationException e) {
-            throw new PosException(
-                    "Cannot delete " + code + "/" + region + " — referenced by existing transactions or fee rates",
-                    HttpStatus.CONFLICT);
-        }
+        entity.setActive(false);
+        paymentMethodRepository.save(entity);
+        return ResponseEntity.ok(ApiResponse.ok(null));
     }
 
     record CreateRequest(@NotBlank String code, @NotBlank String region, @NotBlank String name) {}

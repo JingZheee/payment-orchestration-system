@@ -328,8 +328,8 @@ Weights are configurable in `application.yml` under `routing.scorer.*`.
 | Field | Value |
 |---|---|
 | **Current module** | full-stack — all major features implemented |
-| **Current task** | Add Xendit sandbox keys to application-dev.yml (secret-key + webhook-token from dashboard.xendit.co), then smoke test PH payments end-to-end |
-| **Last completed** | Xendit adapter (Invoice API + Disbursements API), V22 migration, backend duplicate payment 409 guard (DuplicatePaymentException), paymentType on PaymentRequest, ProviderRegionSupport XENDIT fix, PRD v1.4 |
+| **Current task** | Add Xendit sandbox keys to application-dev.yml, then smoke test PH payments end-to-end (Invoice redirect + claim disbursement) |
+| **Last completed** | Providers page redesign (live tx stats, DB-driven methods), Fee Rates per-provider tabs + soft delete + active toggle in edit, Payment Methods per-region tabs + soft delete, PRD 60-min window rationale |
 | **Blockers** | None |
 
 ### Admin API Endpoints — Payment Methods

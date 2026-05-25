@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Table, Modal, Form, Input, Switch, Select, Tag, Popconfirm, message } from 'antd';
+import { Table, Modal, Form, Input, Switch, Select, Popconfirm, message, Tabs } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
   usePaymentMethods,
@@ -8,6 +8,7 @@ import {
   useDeletePaymentMethod,
 } from './hooks/usePaymentMethods';
 import type { PaymentMethodConfig } from '../../shared/types/paymentMethod';
+import { Region } from '../../shared/types/enums';
 import PageHeader from '../../shared/components/PageHeader';
 import TableCard from '../../shared/components/TableCard';
 import styles from './PaymentMethods.module.css';
@@ -18,13 +19,25 @@ const REGION_COLOR: Record<string, { color: string; bg: string }> = {
   PH: { color: '#6B21A8', bg: 'rgba(107, 33, 168, 0.08)' },
 };
 
-const REGIONS = ['MY', 'ID', 'PH'];
+const REGIONS = Object.values(Region);
+
+const REGION_LABEL: Record<Region, string> = {
+  [Region.MY]: 'Malaysia (MY)',
+  [Region.ID]: 'Indonesia (ID)',
+  [Region.PH]: 'Philippines (PH)',
+};
 
 type ModalMode = 'create' | 'edit';
+
+const okButtonStyle = {
+  background: 'linear-gradient(180deg, #FCB900 0%, #e0a400 100%)',
+  border: 'none', color: '#261900', fontWeight: 600,
+};
 
 export default function PaymentMethods() {
   const [form] = Form.useForm();
   const [modal, setModal] = useState<{ mode: ModalMode; row?: PaymentMethodConfig } | null>(null);
+  const [activeTab, setActiveTab] = useState<string>(Region.MY);
 
   const { data: methods = [], isFetching } = usePaymentMethods();
   const createMutation = useCreatePaymentMethod();
@@ -38,6 +51,7 @@ export default function PaymentMethods() {
 
   function openCreate() {
     form.resetFields();
+    form.setFieldValue('region', activeTab);
     setModal({ mode: 'create' });
   }
 
@@ -50,16 +64,16 @@ export default function PaymentMethods() {
     const values = await form.validateFields();
     if (modal?.mode === 'create') {
       await createMutation.mutateAsync({
-        code: (values.code as string).toUpperCase(),
+        code:   (values.code as string).toUpperCase(),
         region: values.region as string,
-        name: values.name as string,
+        name:   values.name as string,
       });
       message.success('Payment method created');
     } else if (modal?.mode === 'edit' && modal.row) {
       await updateMutation.mutateAsync({
         region: modal.row.region,
-        code: modal.row.code,
-        req: { name: values.name, active: values.active },
+        code:   modal.row.code,
+        req:    { name: values.name, active: values.active },
       });
       message.success('Payment method updated');
     }
@@ -67,33 +81,16 @@ export default function PaymentMethods() {
   }
 
   async function handleDelete(row: PaymentMethodConfig) {
-    try {
-      await deleteMutation.mutateAsync({ region: row.region, code: row.code });
-      message.success(`${row.code} (${row.region}) deleted`);
-    } catch {
-      message.error('Cannot delete — referenced by existing transactions or fee rates');
-    }
+    await deleteMutation.mutateAsync({ region: row.region, code: row.code });
+    message.success(`${row.code} deactivated`);
   }
 
+  // Region column omitted — redundant inside a per-region tab
   const columns: ColumnsType<PaymentMethodConfig> = [
-    {
-      title: 'Region',
-      dataIndex: 'region',
-      width: 90,
-      render: (v: string) => {
-        const s = REGION_COLOR[v] ?? { color: '#6B7280', bg: '#F3F4F6' };
-        /* bg/color are region-driven — inline justified */
-        return (
-          <Tag style={{ borderRadius: 6, fontWeight: 700, fontSize: 11, background: s.bg, color: s.color, border: 'none' }}>
-            {v}
-          </Tag>
-        );
-      },
-    },
     {
       title: 'Code',
       dataIndex: 'code',
-      width: 160,
+      width: 180,
       render: (v: string) => <span className={styles.cellCode}>{v}</span>,
     },
     {
@@ -121,21 +118,50 @@ export default function PaymentMethods() {
             <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
           </button>
           <Popconfirm
-            title={`Delete ${row.code} (${row.region})?`}
-            description="This will fail if any transactions or fee rates reference this method."
+            title={`Deactivate ${row.code}?`}
+            description="The method will be disabled. You can re-enable it by editing."
             onConfirm={() => handleDelete(row)}
-            okText="Delete"
+            okText="Deactivate"
             cancelText="Cancel"
             okButtonProps={{ danger: true }}
           >
-            <button className={`${styles.actionBtn} ${styles.deleteBtn}`}>
-              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
+            <button className={`${styles.actionBtn} ${styles.deleteBtn}`} title="Deactivate">
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>do_not_disturb_on</span>
             </button>
           </Popconfirm>
         </div>
       ),
     },
   ];
+
+  const tabItems = REGIONS.map(region => {
+    const rows  = grouped[region] ?? [];
+    const active = rows.filter(r => r.active).length;
+    const s = REGION_COLOR[region] ?? { color: '#6B7280', bg: '#F3F4F6' };
+    return {
+      key: region,
+      label: (
+        <span className={styles.tabLabel}>
+          {REGION_LABEL[region as Region]}
+          <span className={styles.tabCount} style={{ background: s.bg, color: s.color }}>
+            {active}/{rows.length}
+          </span>
+        </span>
+      ),
+      children: (
+        <TableCard>
+          <Table<PaymentMethodConfig>
+            columns={columns}
+            dataSource={rows}
+            rowKey={r => `${r.region}-${r.code}`}
+            loading={isFetching}
+            pagination={false}
+            scroll={{ x: 500 }}
+          />
+        </TableCard>
+      ),
+    };
+  });
 
   const isPending = createMutation.isPending || updateMutation.isPending;
 
@@ -144,40 +170,21 @@ export default function PaymentMethods() {
       <PageHeader
         title="Payment Methods"
         subtitle="Manage available payment methods per region. Disable a method to remove it from routing without deleting it."
-        actions={
-          <button className={styles.addBtn} onClick={openCreate}>
-            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>add</span>
-            Add Method
-          </button>
-        }
       />
 
-      <div className={styles.summaryRow}>
-        {REGIONS.map(region => {
-          const rows = grouped[region] ?? [];
-          const active = rows.filter(r => r.active).length;
-          const s = REGION_COLOR[region] ?? { color: '#6B7280', bg: '#F3F4F6' };
-          return (
-            <div key={region} className={styles.summaryChip}>
-              {/* dot color is region-driven — inline justified */}
-              <div className={styles.summaryDot} style={{ background: s.color }} />
-              <span className={styles.summaryName}>{region}</span>
-              <span className={styles.summaryCount}>{active}/{rows.length} active</span>
-            </div>
-          );
-        })}
-      </div>
-
-      <TableCard>
-        <Table<PaymentMethodConfig>
-          columns={columns}
-          dataSource={methods}
-          rowKey={r => `${r.region}-${r.code}`}
-          loading={isFetching}
-          pagination={false}
-          scroll={{ x: 600 }}
-        />
-      </TableCard>
+      <Tabs
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        items={tabItems}
+        tabBarExtraContent={{
+          right: (
+            <button className={styles.addBtn} onClick={openCreate}>
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>add</span>
+              Add Method
+            </button>
+          ),
+        }}
+      />
 
       <Modal
         open={!!modal}
@@ -197,12 +204,7 @@ export default function PaymentMethods() {
             )}
           </div>
         }
-        okButtonProps={{
-          style: {
-            background: 'linear-gradient(180deg, #FCB900 0%, #e0a400 100%)',
-            border: 'none', color: '#261900', fontWeight: 600,
-          },
-        }}
+        okButtonProps={{ style: okButtonStyle }}
         destroyOnHidden
       >
         <Form form={form} layout="vertical" requiredMark={false} className={styles.modalForm}>
@@ -221,9 +223,10 @@ export default function PaymentMethods() {
                 label="Region"
                 rules={[{ required: true, message: 'Required' }]}
               >
-                <Select placeholder="Select region">
-                  {REGIONS.map(r => <Select.Option key={r} value={r}>{r}</Select.Option>)}
-                </Select>
+                <Select
+                  placeholder="Select region"
+                  options={REGIONS.map(r => ({ value: r, label: REGION_LABEL[r] }))}
+                />
               </Form.Item>
             </>
           )}
