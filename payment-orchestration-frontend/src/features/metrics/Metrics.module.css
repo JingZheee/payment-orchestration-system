@@ -244,3 +244,134 @@
   color: var(--text-muted);
   font-size: 13px;
 }
+
+/* ── Fallback banner ──────────────────────────────────────── */
+
+.fallbackBanner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(252, 185, 0, 0.10);
+  border: 1px solid rgba(252, 185, 0, 0.35);
+  border-radius: var(--radius-card);
+  font-size: 13px;
+  color: #92400E;
+}
+
+.fallbackAge {
+  display: inline-block;
+  margin-left: 6px;
+  font-weight: 700;
+  background: rgba(252, 185, 0, 0.22);
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+}
+
+/* ── Provider Capability Matrix ───────────────────────────── */
+
+.matrixCard {
+  background: var(--bg-card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.matrixHeader {
+  padding: 20px 24px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.matrixTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 4px;
+}
+
+.matrixSubtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0 0 16px;
+}
+
+.matrixTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.matrixProviderCell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.matrixProviderLabel {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.statusActive {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #166534;
+  background: #DCFCE7;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+}
+
+.statusActive::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  background: #16a34a;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.statusInactive {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #991B1B;
+  background: #FEE2E2;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+}
+
+.statusInactive::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  background: #dc2626;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.tagList {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.methodTagList {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  max-width: 280px;
+}
+
+.methodTag {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #F3F4F6;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}

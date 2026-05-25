@@ -6,6 +6,7 @@ import {
   Tooltip, CartesianGrid, Cell,
 } from 'recharts';
 import { useMetrics } from './hooks/useMetrics';
+import { useProviderSummaries } from '../providers/hooks/useProviders';
 import type { ProviderMetrics } from '../../shared/types/metrics';
 import PageHeader from '../../shared/components/PageHeader';
 import { PROVIDER_BADGE_CONFIG } from '../../shared/constants/providerStyles';
@@ -57,13 +58,33 @@ function getLatest(rows: ProviderMetrics[]): ProviderMetrics[] {
   );
 }
 
+function timeAgo(date: Date): string {
+  const diffMs = Date.now() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 60) return `${diffMins} min ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  return `${Math.floor(diffHours / 24)}d ago`;
+}
+
 export default function Metrics() {
   const [windowMins, setWindowMins] = useState(60);
   const { data: rows = [], isFetching } = useMetrics(windowMins);
+  const { data: fallbackRows = [] } = useMetrics(10080);
+  const { data: summaries = [] } = useProviderSummaries();
 
   const latest = getLatest(rows);
+  const fallbackLatest = getLatest(fallbackRows);
+  const isFallback = latest.length === 0 && fallbackLatest.length > 0;
+  const displayRows = isFallback ? fallbackLatest : latest;
 
-  const byProvider = latest.reduce<Record<string, ProviderMetrics[]>>((acc, r) => {
+  const lastRecordedAt = isFallback && fallbackLatest.length > 0
+    ? new Date(Math.max(...fallbackLatest.map(r => new Date(r.windowEnd).getTime())))
+    : null;
+
+  const currentWindowLabel = WINDOW_OPTIONS.find(o => o.value === windowMins)?.label ?? '';
+
+  const byProvider = displayRows.reduce<Record<string, ProviderMetrics[]>>((acc, r) => {
     (acc[r.provider] ??= []).push(r);
     return acc;
   }, {});
@@ -114,6 +135,17 @@ export default function Metrics() {
         }
       />
 
+      {/* Fallback banner */}
+      {isFallback && lastRecordedAt && (
+        <div className={styles.fallbackBanner}>
+          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>history</span>
+          <span>
+            No transactions in the <strong>{currentWindowLabel.toLowerCase()}</strong> — showing last recorded snapshot
+            <span className={styles.fallbackAge}>{timeAgo(lastRecordedAt)}</span>
+          </span>
+        </div>
+      )}
+
       {/* Summary cards */}
       <div className={styles.summaryGrid}>
         {barData.map((p) => {
@@ -151,7 +183,7 @@ export default function Metrics() {
           <h3 className={styles.chartTitle}>Success Rate by Provider &amp; Region</h3>
           <div className={styles.chartArea}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={latest} barCategoryGap="30%">
+              <BarChart data={displayRows} barCategoryGap="30%">
                 <CartesianGrid strokeDasharray="3 3" stroke="#F0EDEB" vertical={false} />
                 <XAxis
                   dataKey={(r: ProviderMetrics) => `${r.provider}\n${r.region}`}
@@ -168,7 +200,7 @@ export default function Metrics() {
                   contentStyle={{ borderRadius: 10, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
                 />
                 <Bar dataKey="successRate" radius={[6, 6, 0, 0]}>
-                  {latest.map((r) => (
+                  {displayRows.map((r) => (
                     /* fill is provider-driven — inline justified */
                     <Cell key={`${r.provider}-${r.region}`} fill={PROVIDER_BADGE_CONFIG[r.provider]?.color ?? '#FCB900'} />
                   ))}
@@ -222,7 +254,7 @@ export default function Metrics() {
       <div className={styles.detailCard}>
         <div className={styles.detailHeader}>
           <h3 className={styles.detailTitle}>
-            Detailed Metrics — {WINDOW_OPTIONS.find(o => o.value === windowMins)?.label}
+            Detailed Metrics — {isFallback ? 'Last Recorded Snapshot' : currentWindowLabel}
           </h3>
         </div>
         <table className={styles.detailTable}>
@@ -234,14 +266,14 @@ export default function Metrics() {
             </tr>
           </thead>
           <tbody>
-            {latest.length === 0 && (
+            {displayRows.length === 0 && (
               <tr>
                 <td colSpan={7} className={styles.emptyCell}>
                   No metrics in this window. The aggregator runs every 15 minutes.
                 </td>
               </tr>
             )}
-            {latest.map((r) => {
+            {displayRows.map((r) => {
               const cfg = PROVIDER_BADGE_CONFIG[r.provider];
               /* bg/color are provider-driven — inline justified */
               const providerColor = cfg?.color ?? '#6B7280';
@@ -276,6 +308,73 @@ export default function Metrics() {
                       {new Date(r.windowStart).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
                       {' – '}
                       {new Date(r.windowEnd).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Provider Capability Matrix */}
+      <div className={styles.matrixCard}>
+        <div className={styles.matrixHeader}>
+          <h3 className={styles.matrixTitle}>Provider Capability Matrix</h3>
+          <p className={styles.matrixSubtitle}>Region coverage and supported methods — always available regardless of transaction volume</p>
+        </div>
+        <table className={styles.matrixTable}>
+          <thead>
+            <tr className={styles.detailHeadRow}>
+              {['Provider', 'Status', 'Region Coverage', 'Payment Methods', 'All-time Success', 'Total Tx'].map((h) => (
+                <th key={h} className={styles.detailTh}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {summaries.filter(s => s.provider !== 'MOCK').map((s) => {
+              const cfg = PROVIDER_BADGE_CONFIG[s.provider];
+              const providerColor = cfg?.color ?? '#6B7280';
+              const providerBg = cfg ? `${cfg.color}20` : '#F3F4F6';
+              return (
+                <tr key={s.provider} className={styles.detailRow}>
+                  <td className={styles.detailTd}>
+                    <div className={styles.matrixProviderCell}>
+                      {/* bg/color are provider-driven — inline justified */}
+                      <span className={styles.cellProvider} style={{ background: providerBg, color: providerColor }}>
+                        {s.provider}
+                      </span>
+                      <span className={styles.matrixProviderLabel}>{s.label}</span>
+                    </div>
+                  </td>
+                  <td className={styles.detailTd}>
+                    <span className={s.enabled ? styles.statusActive : styles.statusInactive}>
+                      {s.enabled ? 'Active' : 'Disabled'}
+                    </span>
+                  </td>
+                  <td className={styles.detailTd}>
+                    <div className={styles.tagList}>
+                      {s.regions.map((r) => (
+                        <Tag key={r} style={{ borderRadius: 6, fontWeight: 600, fontSize: 11 }}>{r}</Tag>
+                      ))}
+                    </div>
+                  </td>
+                  <td className={styles.detailTd}>
+                    <div className={styles.methodTagList}>
+                      {s.supportedMethods.map((m) => (
+                        <span key={m} className={styles.methodTag}>{m}</span>
+                      ))}
+                    </div>
+                  </td>
+                  <td className={styles.detailTdWide}>
+                    {s.successRate != null
+                      ? <MiniBar value={s.successRate} color={rateColor(s.successRate)} />
+                      : <span className={styles.cellWindow}>No data yet</span>
+                    }
+                  </td>
+                  <td className={styles.detailTd}>
+                    <span className={styles.cellTxCount}>
+                      {s.transactionCount != null ? s.transactionCount.toLocaleString() : '—'}
                     </span>
                   </td>
                 </tr>

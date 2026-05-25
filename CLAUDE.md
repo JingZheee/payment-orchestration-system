@@ -329,7 +329,7 @@ Weights are configurable in `application.yml` under `routing.scorer.*`.
 |---|---|
 | **Current module** | full-stack — all major features implemented |
 | **Current task** | Add Xendit sandbox keys to application-dev.yml, then smoke test PH payments end-to-end (Invoice redirect + claim disbursement) |
-| **Last completed** | Providers page redesign (live tx stats, DB-driven methods), Fee Rates per-provider tabs + soft delete + active toggle in edit, Payment Methods per-region tabs + soft delete, PRD 60-min window rationale |
+| **Last completed** | Metrics page: 7-day fallback with amber banner when window is empty + Provider Capability Matrix always-visible section |
 | **Blockers** | None |
 
 ### Admin API Endpoints — Payment Methods
