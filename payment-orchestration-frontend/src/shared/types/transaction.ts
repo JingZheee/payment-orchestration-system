@@ -39,6 +39,7 @@ export interface TransactionDetail {
 }
 
 export interface InitiatePaymentRequest {
+  policyId?: string;
   merchantOrderId: string;
   policyNumber?: string;
   claimReference?: string;

@@ -380,6 +380,7 @@ export default function PaymentCheckoutPage() {
   function onFinish(values: { paymentMethod: string; customerEmail: string; description?: string }) {
     if (!policy) return;
     const request: InitiatePaymentRequest = {
+      policyId: policy.id,
       merchantOrderId: `INS-${policy.id.slice(0, 8).toUpperCase()}-${Date.now()}`,
       amount: policy.amount,
       currency: currency as Currency,

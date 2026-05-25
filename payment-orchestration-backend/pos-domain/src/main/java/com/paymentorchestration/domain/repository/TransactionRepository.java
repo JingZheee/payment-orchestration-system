@@ -25,6 +25,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID>,
 
     Page<Transaction> findByProvider(Provider provider, Pageable pageable);
 
+    List<Transaction> findAllByProvider(Provider provider);
+
     Page<Transaction> findByRegion(Region region, Pageable pageable);
 
     @Query("SELECT t.status, COUNT(t) FROM Transaction t GROUP BY t.status")

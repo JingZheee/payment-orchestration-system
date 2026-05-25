@@ -23,6 +23,7 @@ public final class ProviderRegionSupport {
             Provider.BILLPLZ,  Set.of(Region.MY),
             Provider.MIDTRANS, Set.of(Region.ID),
             Provider.PAYMONGO, Set.of(Region.PH),
+            Provider.XENDIT,   Set.of(Region.PH),
             Provider.MOCK,     Set.of(Region.MY, Region.ID, Region.PH)
     );
 

@@ -22,8 +22,9 @@ export const API = {
   },
 
   PROVIDERS: {
-    LIST:   '/admin/providers',
-    TOGGLE: (provider: string) => `/admin/providers/${provider}/toggle`,
+    LIST:    '/admin/providers',
+    SUMMARY: '/admin/providers/summary',
+    TOGGLE:  (provider: string) => `/admin/providers/${provider}/toggle`,
   },
 
   FEE_RATES: {

@@ -2,6 +2,7 @@ export enum Provider {
   BILLPLZ = 'BILLPLZ',
   MIDTRANS = 'MIDTRANS',
   PAYMONGO = 'PAYMONGO',
+  XENDIT = 'XENDIT',
   MOCK = 'MOCK',
 }
 

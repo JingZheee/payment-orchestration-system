@@ -3,11 +3,14 @@ package com.paymentorchestration.payment.service;
 import com.paymentorchestration.common.enums.PaymentStatus;
 import com.paymentorchestration.common.enums.PaymentType;
 import com.paymentorchestration.common.enums.Provider;
+import com.paymentorchestration.common.exception.DuplicatePaymentException;
 import com.paymentorchestration.common.exception.PaymentNotFoundException;
 import com.paymentorchestration.common.exception.ProviderException;
+import com.paymentorchestration.domain.entity.DemoPolicy;
 import com.paymentorchestration.domain.entity.Transaction;
 import com.paymentorchestration.domain.entity.TransactionEvent;
 import com.paymentorchestration.domain.entity.WebhookLog;
+import com.paymentorchestration.domain.repository.DemoPolicyRepository;
 import com.paymentorchestration.domain.repository.TransactionEventRepository;
 import com.paymentorchestration.domain.repository.TransactionRepository;
 import com.paymentorchestration.domain.repository.WebhookLogRepository;
@@ -44,6 +47,7 @@ public class PaymentService {
     private final TransactionRepository transactionRepository;
     private final TransactionEventRepository eventRepository;
     private final WebhookLogRepository webhookLogRepository;
+    private final DemoPolicyRepository demoPolicyRepository;
     private final RetryPublisher retryPublisher;
     private final PaymentSucceededPublisher paymentSucceededPublisher;
     private final List<PaymentProviderPort> allProviders;
@@ -67,6 +71,15 @@ public class PaymentService {
     @Transactional
     public InitiatePaymentResponse initiatePayment(InitiatePaymentRequest request,
                                                     String idempotencyKey) {
+        // 0. Duplicate-payment guard — reject if the linked policy is already paid
+        DemoPolicy demoPolicy = null;
+        if (request.getPolicyId() != null) {
+            demoPolicy = demoPolicyRepository.findById(request.getPolicyId()).orElse(null);
+            if (demoPolicy != null && !"PENDING".equals(demoPolicy.getStatus())) {
+                throw new DuplicatePaymentException(request.getPolicyId().toString());
+            }
+        }
+
         // 1. Route
         PaymentType paymentType = request.getPaymentType() != null
                 ? request.getPaymentType()
@@ -121,6 +134,7 @@ public class PaymentService {
                     .currency(request.getCurrency())
                     .region(request.getRegion())
                     .paymentMethod(request.getPaymentMethod())
+                    .paymentType(paymentType)
                     .customerEmail(request.getCustomerEmail())
                     .description(request.getDescription())
                     .redirectUrl(request.getRedirectUrl())
@@ -146,6 +160,11 @@ public class PaymentService {
 
         if (result.getStatus() == PaymentStatus.SUCCESS) {
             paymentSucceededPublisher.publish(transaction);
+            if (demoPolicy != null) {
+                demoPolicy.setTransactionId(transaction.getId());
+                demoPolicy.setStatus(paymentType == PaymentType.PREMIUM_COLLECTION ? "ACTIVATED" : "DISBURSED");
+                demoPolicyRepository.save(demoPolicy);
+            }
         }
 
         // 5. Schedule retry if payment is still pending a webhook

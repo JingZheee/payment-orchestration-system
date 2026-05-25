@@ -1,9 +1,9 @@
 # Progress Snapshot
-Last updated: 2026-05-20
+Last updated: 2026-05-25
 
 ## Completed
-- [x] PRD.md v1.2 — notification queue, demo policies, US-13–16, new API endpoints, V21 DB map, viva points 7–8
-- [x] Maven multi-module backend — all 7 modules, Flyway V1–V21, all entities/repos/adapters
+- [x] PRD.md v1.4 — Xendit integration, duplicate payment defence, V22 DB map, viva points updated
+- [x] Maven multi-module backend — all 7 modules, Flyway V1–V22, all entities/repos/adapters
 - [x] Spring Security + JWT; CORS, 401/403 fix
 - [x] DB-driven payment methods — PaymentMethodEntity, composite PK; enum deleted everywhere
 - [x] AdminPaymentMethodController — GET/POST/PUT/DELETE with 409 guard
@@ -16,19 +16,24 @@ Last updated: 2026-05-20
 - [x] DemoPolicy entity, repo, controller; demoPolicyService + useDemoPolicies hooks
 - [x] PaymentDemo — policy/claim queue table with Pay/Disburse buttons
 - [x] PaymentCheckoutPage — full-page gateway UX outside AppLayout (dark summary + form)
-- [x] Duplicate payment fully blocked — checkout page has no resubmit path; backend IdempotencyFilter guards API
-- [x] RoutingRules page — region tabs (MY/ID/PH/Global), dnd-kit drag-to-reorder, priority auto-reassigned, parallel PUT on drop
+- [x] RoutingRules page — region tabs, dnd-kit drag-to-reorder, priority auto-reassigned
 - [x] Frontend CSS refactor — CSS Modules + shared components across all pages
-- [x] TanStack Query staleTime set to 0 — every tab navigation fires a fresh backend request
-- [x] Fee Rates — backend POST + DELETE endpoints; frontend Add Rate modal (provider auto-locks region, method dropdown filtered from payment_methods DB) + row-level delete with confirm popover
-- [x] Email notification on payment success — EmailNotificationService with branded HTML emails; Mailtrap sandbox SMTP; two distinct email templates (PREMIUM_COLLECTION "Policy Active" + CLAIMS_DISBURSEMENT "Claim Processed"); non-fatal (SMTP failure never affects payment transaction)
+- [x] Fee Rates — backend POST+DELETE; Add Rate modal + row-level delete
+- [x] Email notification on payment success — branded HTML, Mailtrap SMTP, non-fatal
+- [x] Duplicate payment prevention — backend 409 guard (DuplicatePaymentException) checks demo_policies.status before initiating; policy status+transactionId updated atomically on SUCCESS; RETRY_EXHAUSTED leaves policy PENDING for retry
+- [x] paymentType added to PaymentRequest DTO — flows to all provider adapters
+- [x] Xendit adapter — Invoice API (GCash/Maya/GrabPay/Card collection) + Disbursements API (claim payouts); x-callback-token webhook verification
+- [x] V22 migration — XENDIT in provider_configs + 5 PH fee rate rows; PAYMONGO disabled
+- [x] ProviderRegionSupport — XENDIT mapped to Region.PH (bug fix: was causing 422 for all PH payments)
+- [x] Frontend: XENDIT added to Provider enum + providerStyles badge (blue #0052CC)
 
 ## Up next (start here next session)
-- [ ] Verify email in Mailtrap — trigger a payment in demo, confirm both email templates render correctly in mailtrap.io inbox
-- [ ] End-to-end smoke test — login → click Pay → verify checkout page, routing decision, event timeline, PREMIUM_ACTIVATED, policy row turns green
-- [ ] Notification queue durability demo — stop consumer → initiate 5 payments → watch depth climb → start → drain to 0
-- [ ] Demo data seeding — ensure 100+ realistic transactions across all 3 regions for dashboard KPIs
-- [ ] Viva prep — run through 10-minute demo script end-to-end, note rough edges
+- [ ] Add Xendit sandbox keys to application-dev.yml (secret-key + webhook-token from dashboard.xendit.co)
+- [ ] End-to-end smoke test with Xendit — PH premium collection (Invoice redirect) + PH claim disbursement
+- [ ] Verify email in Mailtrap — trigger premium + claim payments, confirm both HTML templates arrive
+- [ ] Notification queue durability demo — stop consumer → 5 payments → watch depth → drain
+- [ ] Demo data seeding — 100+ realistic transactions across all 3 regions for dashboard KPIs
+- [ ] Viva prep — run 10-minute demo script end-to-end, note rough edges
 
 ## Decisions locked in
 - Maven multi-module; spring-boot-maven-plugin only in pos-api
@@ -37,13 +42,10 @@ Last updated: 2026-05-20
 - No DB mocking in tests — Testcontainers with real PostgreSQL only
 - Payment methods are DB-managed strings (not Java enum); composite PK (code, region)
 - Frontend: React 18 + Vite + antd v5, feature-based structure
-- API paths centralised in lib/endpoints.ts — never hardcode in hooks
-- Payment checkout is a separate full-page route outside AppLayout
-- Routing rules: drag-to-reorder (dnd-kit); priority is per-region, not global; no priority field in modal
-- CSS Modules for all structural styles; inline only for runtime/data-driven values (with comment)
-- PROVIDER_BADGE_CONFIG in shared/constants/providerStyles.ts is single source of truth for provider colors
-- Email via Mailtrap sandbox SMTP; JavaMailSender injected with required=false so app boots without SMTP config
-- Fee rates are fully runtime-manageable — no migration needed to add/remove rows
+- PayMongo replaced by Xendit for PH — sandbox geo-restricted; adapter kept but disabled in DB
+- Xendit: Invoice API for collection (redirect), Disbursements API for claims (direct payout)
+- Duplicate payment guard is backend-enforced (409) — frontend button state is UX only, not security
+- RETRY_EXHAUSTED leaves demo_policies.status as PENDING — policy is retryable after payment failure
 
 ## Blockers
-- None
+- None (Xendit sandbox keys must be added by user before PH payments can be tested)

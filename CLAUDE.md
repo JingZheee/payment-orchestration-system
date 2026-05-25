@@ -328,8 +328,8 @@ Weights are configurable in `application.yml` under `routing.scorer.*`.
 | Field | Value |
 |---|---|
 | **Current module** | full-stack — all major features implemented |
-| **Current task** | Verify email in Mailtrap inbox — trigger a payment in demo, confirm both HTML email templates (premium + claim) arrive correctly |
-| **Last completed** | Email notification on payment success — EmailNotificationService (branded HTML, Mailtrap SMTP, non-fatal), Fee Rates create/delete (backend POST+DELETE + frontend Add Rate modal with DB-driven payment method dropdown) |
+| **Current task** | Add Xendit sandbox keys to application-dev.yml (secret-key + webhook-token from dashboard.xendit.co), then smoke test PH payments end-to-end |
+| **Last completed** | Xendit adapter (Invoice API + Disbursements API), V22 migration, backend duplicate payment 409 guard (DuplicatePaymentException), paymentType on PaymentRequest, ProviderRegionSupport XENDIT fix, PRD v1.4 |
 | **Blockers** | None |
 
 ### Admin API Endpoints — Payment Methods

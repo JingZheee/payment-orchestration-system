@@ -1,5 +1,6 @@
 package com.paymentorchestration.admin.controller;
 
+import com.paymentorchestration.admin.dto.ProviderSummaryDto;
 import com.paymentorchestration.admin.dto.RoutingRuleRequest;
 import com.paymentorchestration.admin.service.RoutingRuleService;
 import com.paymentorchestration.common.dto.ApiResponse;
@@ -13,6 +14,7 @@ import com.paymentorchestration.domain.entity.RoutingRule;
 import com.paymentorchestration.domain.entity.Transaction;
 import com.paymentorchestration.domain.entity.TransactionEvent;
 import com.paymentorchestration.domain.repository.ProviderConfigRepository;
+import com.paymentorchestration.domain.repository.ProviderFeeRateRepository;
 import com.paymentorchestration.domain.repository.ProviderMetricsRepository;
 import com.paymentorchestration.domain.repository.TransactionEventRepository;
 import com.paymentorchestration.domain.repository.TransactionRepository;
@@ -27,6 +29,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
@@ -44,6 +48,17 @@ public class AdminController {
     private final TransactionRepository transactionRepository;
     private final TransactionEventRepository transactionEventRepository;
     private final ProviderConfigRepository providerConfigRepository;
+    private final ProviderFeeRateRepository providerFeeRateRepository;
+
+    private record ProviderMeta(String label, String webhookType, List<String> regions) {}
+
+    private static final Map<Provider, ProviderMeta> PROVIDER_META = Map.of(
+            Provider.BILLPLZ,  new ProviderMeta("Billplz",       "HMAC-SHA256",   List.of("MY")),
+            Provider.MIDTRANS, new ProviderMeta("Midtrans",       "HMAC-SHA256",   List.of("ID")),
+            Provider.PAYMONGO, new ProviderMeta("PayMongo",       "RSA Signature", List.of("PH")),
+            Provider.XENDIT,   new ProviderMeta("Xendit",         "HMAC-SHA256",   List.of("PH")),
+            Provider.MOCK,     new ProviderMeta("Mock Provider",  "Always passes", List.of("MY", "ID", "PH"))
+    );
 
     // ── Metrics ────────────────────────────────────────────────────────────────
 
@@ -125,6 +140,40 @@ public class AdminController {
     @GetMapping("/providers")
     public ResponseEntity<ApiResponse<List<ProviderConfig>>> getProviders() {
         return ResponseEntity.ok(ApiResponse.ok(providerConfigRepository.findAll()));
+    }
+
+    @GetMapping("/providers/summary")
+    public ResponseEntity<ApiResponse<List<ProviderSummaryDto>>> getProviderSummaries() {
+        List<ProviderSummaryDto> summaries = providerConfigRepository.findAll().stream()
+                .map(cfg -> {
+                    Provider p = cfg.getProvider();
+                    ProviderMeta meta = PROVIDER_META.getOrDefault(p,
+                            new ProviderMeta(p.name(), "Unknown", List.of()));
+
+                    List<Transaction> txns = transactionRepository.findAllByProvider(p);
+                    int total = txns.size();
+
+                    BigDecimal successRate = total == 0 ? null
+                            : BigDecimal.valueOf(txns.stream().filter(t -> t.getStatus() == PaymentStatus.SUCCESS).count())
+                                    .divide(BigDecimal.valueOf(total), 4, RoundingMode.HALF_UP);
+
+                    Long avgLatencyMs = total == 0 ? null
+                            : (long) txns.stream()
+                                    .filter(t -> t.getCreatedAt() != null && t.getUpdatedAt() != null)
+                                    .mapToLong(t -> java.time.Duration.between(t.getCreatedAt(), t.getUpdatedAt()).toMillis())
+                                    .filter(ms -> ms >= 0)
+                                    .average().orElse(0);
+
+                    List<String> methods = providerFeeRateRepository.findActiveMethodsByProvider(p);
+
+                    return new ProviderSummaryDto(
+                            p.name(), meta.label(), meta.regions(), meta.webhookType(),
+                            cfg.isEnabled(), cfg.getUpdatedAt(),
+                            successRate, avgLatencyMs, total == 0 ? null : total, methods);
+                })
+                .toList();
+
+        return ResponseEntity.ok(ApiResponse.ok(summaries));
     }
 
     @PostMapping("/providers/{provider}/toggle")

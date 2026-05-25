@@ -1,7 +1,7 @@
 # Product Requirements Document
 # Payment Orchestration System (POS)
-**Version:** 1.2
-**Date:** 2026-05-16
+**Version:** 1.4
+**Date:** 2026-05-25
 **Type:** Final Year Project (FYP)
 
 ---
@@ -12,7 +12,7 @@ The Payment Orchestration System (POS) is a backend-driven platform that intelli
 
 The primary use case is **insurance** — premium collection from policyholders and claims payouts to beneficiaries, where routing reliability directly affects policyholder trust and regulatory compliance. The core value proposition is **resilience and cost optimization**: when a provider is degraded or expensive, the system automatically reroutes to the best available alternative — without the insurance operator changing anything. This mirrors how large-scale platforms like Grab, Gojek, and Shopee manage payments internally, but packaged as a demonstrable, configurable system with a visual admin dashboard.
 
-The MVP goal is a fully functional routing engine integrated with real sandbox providers (Billplz for Malaysia, Midtrans for Indonesia, PayMongo for the Philippines), with a Mock provider for controlled testing, and an Angular admin dashboard that makes the routing intelligence *visible* — showing live decisions, failover events, cost comparisons, and provider health in real time.
+The MVP goal is a fully functional routing engine integrated with real sandbox providers (Billplz for Malaysia, Midtrans for Indonesia, Xendit for the Philippines), with a Mock provider for controlled testing, and a React admin dashboard that makes the routing intelligence *visible* — showing live decisions, failover events, cost comparisons, and provider health in real time.
 
 ---
 
@@ -84,13 +84,16 @@ The MVP goal is a fully functional routing engine integrated with real sandbox p
 - ✅ Insurance Payment Demo — admin-managed `demo_policies` table with seed records; a Pay button per row pre-fills the payment form and locks after submission to prevent duplicates
 - ✅ Policy status lifecycle — PENDING → ACTIVATED (premium) / DISBURSED (claim) driven by the notification consumer; optimistic UI update flips status instantly on payment success
 - ✅ Payment gateway redirect — successful initiation auto-opens the provider's hosted payment page in a new tab (non-localhost URLs only); a manual "Open Payment Page" button persists in the result card
-- ✅ Duplicate payment prevention — `submittedIds` set locks the Pay button the moment the form is submitted; only released on error so the user can retry; optimistic cache update prevents re-submit after success
+- ✅ Duplicate payment prevention — layered defence: (1) backend guard in `PaymentService` checks `demo_policies.status` before initiating — throws `DuplicatePaymentException` (HTTP 409) if already ACTIVATED/DISBURSED; (2) policy status and `transaction_id` updated atomically on SUCCESS so the guard is durable across restarts; (3) frontend Pay button disabled when `status !== PENDING`; RETRY_EXHAUSTED transactions leave policy as PENDING so the policyholder can retry with a different method
+- ✅ Fee rates are fully runtime-manageable — admins can create and delete rows via `POST`/`DELETE /admin/fee-rates` without any DB migration; provider auto-locks region (BILLPLZ→MY, MIDTRANS→ID, XENDIT→PH); payment method dropdown populated from the live `payment_methods` table
+- ✅ Customer email notification on payment success — branded HTML email dispatched to the policy holder's email address (`demo_policies.holder_email`) after every successful `PREMIUM_COLLECTION` ("Your Policy is Now Active") and `CLAIMS_DISBURSEMENT` ("Claim Disbursement Processed") payment; email failure is non-fatal and never affects the payment transaction
 
 ### Providers
 - ✅ Billplz sandbox (Malaysia — FPX bank transfer)
 - ✅ Midtrans sandbox (Indonesia — Virtual Account, QRIS)
-- ✅ PayMongo sandbox (Philippines — Maya, cards)
+- ✅ Xendit sandbox (Philippines — GCash, Maya, GrabPay, cards via Invoice API; claim disbursements via Disbursements API)
 - ✅ Mock provider (controllable success/failure, simulates any region/method)
+- ❌ PayMongo (Philippines — sandbox geo-restricted to PH; replaced by Xendit; adapter retained, disabled in DB)
 - ❌ Direct FPX PayNet API (requires business registration)
 - ❌ TNG eWallet direct API (no public sandbox)
 - ❌ GCash direct API (no sandbox exists)
@@ -268,6 +271,19 @@ The MVP goal is a fully functional routing engine integrated with real sandbox p
 **so that** I cannot accidentally create duplicate charges for the same policy by double-clicking or re-navigating.
 
 *Example:* Click Pay → button becomes disabled immediately → payment pending → success → policy status flips to ACTIVATED → button remains disabled. Navigating away and back still shows the locked state until the page reloads (or policy status refreshes from the DB).
+
+---
+
+### US-17: Customer Email Notification on Payment Success
+**As a** policyholder or claimant,
+**I want** to receive an email confirmation when my payment is successfully processed,
+**so that** I have a record of my premium activation or claim disbursement without logging into any portal.
+
+*Example (Premium):* Ahmad pays his life insurance premium → payment succeeds → email arrives at `ahmad.razif@mymail.com` with subject "Payment Successful — Life Policy POL-2026-MY-001 is Now Active" → body shows amount, policy number, provider used, and date.
+
+*Example (Claim):* Elena's claim disbursement completes → email arrives at `elena.villanueva@ph.com` with subject "Claim Disbursement Processed — Reference CLM-2026-PH-002" → body shows disbursed amount, claim reference, provider, and date.
+
+**Implementation:** `EmailNotificationService` is called by `NotificationConsumer` after the demo policy record is updated. Uses `JavaMailSender` (Spring Mail) with Mailtrap sandbox SMTP in dev. Email is non-fatal — SMTP failure logs a warning and does not roll back the database transaction.
 
 ---
 
@@ -466,12 +482,40 @@ After every successful payment, `PaymentService` publishes a `PaymentSucceededEv
 The `NotificationConsumer` processes each event and:
 - Writes a `PREMIUM_ACTIVATED` or `CLAIM_DISBURSED` entry to `transaction_events`
 - Locates the linked `demo_policy` record by `policy_number` (premium) or `claim_reference` (disbursement) and updates its status to `ACTIVATED` / `DISBURSED`
+- Calls `EmailNotificationService.sendPaymentSuccessEmail()` with the updated policy — sends a branded HTML email to `demo_policies.holder_email` (see Feature 10)
 
 The consumer is declared with `id = "notificationConsumer"` and `autoStartup = "true"`. At runtime, admin can call `POST /admin/notification-queue/consumer/stop` and `start` to toggle it. `GET /admin/notification-queue/status` returns `{ consumerActive, queueDepth }` polled every 3 seconds by the frontend Notification Queue Panel.
 
 **Queue characteristics:** Durable, no TTL, no DLX. Messages survive broker restarts and consumer outages — they simply accumulate until the consumer comes back online.
 
 **Demo moment:** Stop consumer → initiate 4–5 successful payments → watch queue depth climb in the panel → start consumer → depth drains to 0 in seconds → all policy rows turn green simultaneously.
+
+### Feature 10: Customer Email Notifications
+
+After `NotificationConsumer` activates or disburses a policy, it calls `EmailNotificationService` to send a branded HTML email directly to the policy holder.
+
+**Two distinct email templates:**
+
+| Payment Type | Subject | Key Content |
+|---|---|---|
+| `PREMIUM_COLLECTION` | `Payment Successful — [insuranceType] Policy [policyNumber] is Now Active` | holderName, amount, currency, policyNumber, insuranceType, provider, date |
+| `CLAIMS_DISBURSEMENT` | `Claim Disbursement Processed — Reference [claimReference]` | holderName, amount, currency, claimReference, provider, date |
+
+**Design:**
+- Amber (#FCB900) header bar matching the admin dashboard brand
+- Inline CSS only — compatible with all major email clients
+- No Thymeleaf dependency — HTML built in Java string templates
+
+**Resilience:**
+- `JavaMailSender` injected with `@Autowired(required = false)` — app starts normally if SMTP is not configured; email is silently skipped with a `WARN` log
+- `send()` call wrapped in try-catch — SMTP failure never throws out of `NotificationConsumer`, never causes a DB transaction rollback
+- Payment success is already committed before email is attempted
+
+**Dev SMTP:** Mailtrap sandbox (`sandbox.smtp.mailtrap.io:2525`) — all emails are caught in a web inbox, never reach real recipients. Credentials live in `application-dev.yml` (gitignored).
+
+**Demo moment:** Trigger a payment in the Payment Demo page → open Mailtrap inbox → see the branded HTML email arrive within seconds with policy details.
+
+---
 
 ### Feature 9: Insurance Payment Demo
 The `/payment-demo` page is a simulated insurance back-office system, not just a raw payment form.
@@ -514,6 +558,7 @@ The `/payment-demo` page is a simulated insurance back-office system, not just a
 | JJWT | 0.12+ | JWT creation/validation |
 | Springdoc OpenAPI | 2.x | Swagger UI |
 | Testcontainers | 1.19+ | Integration tests with real PostgreSQL |
+| Spring Mail | (via Spring Boot starter) | Transactional HTML email via SMTP (Mailtrap in dev) |
 
 ### Frontend
 | Technology | Version | Purpose |
@@ -532,7 +577,7 @@ The `/payment-demo` page is a simulated insurance back-office system, not just a
 |---|---|---|---|
 | Billplz | Malaysia | FPX bank transfer | Free, no registration required |
 | Midtrans | Indonesia | Virtual Account, QRIS, GoPay | Free sandbox at midtrans.com |
-| PayMongo | Philippines | Maya, cards, e-wallets | Free, immediate at paymongo.com |
+| Xendit | Philippines | GCash, Maya, GrabPay, Card (Invoice API); Bank disbursement (Disbursements API) | Free, globally accessible at dashboard.xendit.co |
 | Mock | All | Configurable | Built-in, no external account |
 
 ### Dev Tools
@@ -561,9 +606,10 @@ The `/payment-demo` page is a simulated insurance back-office system, not just a
 
 ### Webhook Security
 - Each provider has a `webhook_secret` stored in `provider_configs`
-- Verification is HMAC-SHA256 for Billplz and Midtrans, RSA for PayMongo
+- Verification is HMAC-SHA256 for Billplz and Midtrans; static `x-callback-token` header comparison for Xendit (configured in Xendit dashboard → Settings → Callbacks)
 - Mock provider always passes verification
 - All inbound webhooks logged to `webhook_logs` with `signature_valid` flag — even failed verifications are logged
+- Xendit webhook endpoint: `POST /api/v1/webhooks/XENDIT` — handled by the same generic `WebhookController` that routes by provider path variable
 
 ### Environment Configuration
 ```yaml
@@ -577,14 +623,29 @@ routing:
     window-minutes: 60
     refresh-interval-minutes: 15
 
+notification:
+  email:
+    from: noreply@paymentorchestration.com
+
 # application-dev.yml (dev secrets — gitignored)
 spring.datasource.url: jdbc:postgresql://localhost:5432/pos_dev
 jwt.secret: <dev-secret>
 providers:
   billplz.api-key: <sandbox-key>
   midtrans.server-key: <sandbox-key>
-  paymongo.secret-key: <sandbox-key>
+  xendit:
+    secret-key: xnd_development_XXXXXXXXXXXXXXXXXXXXXXXX   # dashboard.xendit.co → Settings → API Keys
+    webhook-token: <any-string-you-set-in-xendit-dashboard> # Settings → Configuration → Callback Token
   mock.default-mode: ALWAYS_SUCCESS
+
+# Mailtrap sandbox SMTP (from mailtrap.io → Email Testing → SMTP Settings)
+spring.mail:
+  host: sandbox.smtp.mailtrap.io
+  port: 2525
+  username: <mailtrap-username>
+  password: <mailtrap-password>
+  properties.mail.smtp.auth: true
+  properties.mail.smtp.starttls.enable: true
 ```
 
 ### Security Scope
@@ -621,6 +682,7 @@ Base URL: `/api/v1`
 **Initiate Payment Request:**
 ```json
 {
+  "policyId": "uuid-of-demo-policy",
   "merchantOrderId": "ORDER-001",
   "policyNumber": "POL-2026-MY-00123",
   "claimReference": null,
@@ -657,13 +719,13 @@ Base URL: `/api/v1`
 
 Request mirrors `/payments/initiate` with `claimReference` (required) and `policyNumber` (optional). `paymentType` is automatically set to `CLAIM_PAYOUT`.
 
-### Webhooks (No JWT — HMAC verified)
-| Method | Path |
-|---|---|
-| POST | `/webhooks/billplz` |
-| POST | `/webhooks/midtrans` |
-| POST | `/webhooks/paymongo` |
-| POST | `/webhooks/mock` |
+### Webhooks (No JWT — signature verified per provider)
+| Method | Path | Verification |
+|---|---|---|
+| POST | `/webhooks/BILLPLZ` | HMAC-SHA256 |
+| POST | `/webhooks/MIDTRANS` | HMAC-SHA256 |
+| POST | `/webhooks/XENDIT` | `x-callback-token` header |
+| POST | `/webhooks/MOCK` | Always passes |
 
 ### Admin — Transactions
 | Method | Path | Description |
@@ -717,6 +779,27 @@ Request mirrors `/payments/initiate` with `claimReference` (required) and `polic
 | GET | `/admin/dashboard/provider-breakdown` |
 | GET | `/admin/dashboard/region-breakdown` |
 | GET | `/admin/dashboard/recent-failures` |
+
+### Admin — Fee Rates
+| Method | Path | Description |
+|---|---|---|
+| GET | `/admin/fee-rates` | List all rows ordered by provider → region → payment method |
+| POST | `/admin/fee-rates` | Create a new fee rate row. Currency auto-derived from region (MY→MYR, ID→IDR, PH→PHP). Returns 409 if provider/region/method combination already exists. |
+| PUT | `/admin/fee-rates/{id}` | Update fixed amount and/or percentage on an existing row |
+| DELETE | `/admin/fee-rates/{id}` | Delete a fee rate row. Returns 404 if not found. |
+
+**Create Fee Rate Request:**
+```json
+{
+  "provider": "BILLPLZ",
+  "region": "MY",
+  "paymentMethod": "FPX",
+  "feeType": "FIXED_PLUS_PERCENTAGE",
+  "fixedAmount": 0.50,
+  "percentage": 0.008,
+  "active": true
+}
+```
 
 ### Admin — Demo Policies
 | Method | Path | Description |
@@ -787,6 +870,8 @@ The system is considered MVP-complete when an examiner can watch a 10-minute dem
 - ✅ Demo policy table shows PENDING → ACTIVATED / DISBURSED transition driven by the notification consumer
 - ✅ Pay button locks immediately on submission and cannot be re-clicked for the same policy
 - ✅ Successful non-localhost payments auto-open the provider's hosted payment page in a new tab
+- ✅ Branded HTML email sent to `holder_email` within seconds of PREMIUM_COLLECTION or CLAIMS_DISBURSEMENT payment success; SMTP failure never affects the payment transaction
+- ✅ Fee rates are fully CRUD-manageable at runtime — create and delete rows via API/UI without migrations
 
 ### Demo Quality Goals
 - ✅ Failover demo is reproducible on demand (Mock provider toggle)
@@ -858,7 +943,7 @@ The system is considered MVP-complete when an examiner can watch a 10-minute dem
 - ✅ Transaction list: filterable, paginated, status badges
 - ✅ Routing rules: CRUD table + create/edit modal + simulate panel
 - ✅ Providers: health status, toggle, fee config edit
-- ✅ Fee Rates: inline-editable table per provider/region
+- ✅ Fee Rates: inline-editable table per provider/region; Add Rate modal (provider auto-locks region, method dropdown from DB) + row-level delete with confirm popover; full CRUD without migrations
 - ✅ Payment Methods: CRUD per region, active toggle (DB-driven)
 - ✅ Metrics: success rate + latency charts
 - ✅ Reconciliation: recon statement table + anomaly filter
@@ -959,6 +1044,7 @@ where:
 | V19 | seed data | insurance-specific routing rules seeded |
 | V20 | `payment_methods` (new) | Composite PK (code, region), name VARCHAR(100), is_active BOOLEAN; 13 seed rows; composite FK from transactions, provider_fee_rates, recon_statements |
 | V21 | `demo_policies` (new) | id UUID PK, holder_name, holder_email, insurance_type, policy_number, claim_reference, amount DECIMAL(19,4), currency, region, payment_method, payment_type, status VARCHAR(20) DEFAULT 'PENDING', transaction_id UUID, created_at, updated_at; 6 seed rows (4 premium + 2 claims across MY/ID/PH) |
+| V22 | `provider_configs` + `provider_fee_rates` (alter) | Inserts XENDIT into provider_configs (enabled, 2.5% fee); sets PAYMONGO is_enabled=false; inserts 5 Xendit PH fee rate rows (GCASH 2.5%, MAYA 2.2%, GRABPAY 2.5%, CARD PHP15+3.5%, EWALLET 2.5%) |
 
 ### RabbitMQ Queue Topology (Implementation Reference)
 ```yaml
@@ -992,7 +1078,7 @@ rabbitmq:
 ```
 
 ### What Makes This Defensible in a Viva
-1. **"Why not just use Xendit?"** — Xendit is one of our providers. We route *to* Xendit (or its equivalent). The orchestration layer is what selects *which* provider, when to fail over, and how to optimize cost. Xendit doesn't solve that problem — it is one variable in the solution.
+1. **"Why not just use Xendit?"** — Xendit *is* one of our providers (Philippines region — GCash, Maya, GrabPay, cards, and disbursements). We route *to* Xendit alongside Billplz (Malaysia) and Midtrans (Indonesia). The orchestration layer is what selects *which* provider, when to fail over, and how to optimize cost across all three. Xendit doesn't solve that problem — it is one variable in the solution.
 2. **"Is this a real problem?"** — Yes. Grab, Gojek, Shopee, and Lazada all operate internal payment orchestration layers for exactly this reason. This project is a demonstrable, smaller-scale implementation of the same pattern.
 3. **"What's novel about your routing algorithm?"** — The composite scorer with tunable weights, region-aware rule engine, and real-time success rate feedback loop. Show the simulate endpoint's breakdown table.
 4. **"Why RabbitMQ and not Kafka?"** — RabbitMQ is purpose-built for task queues with routing, TTL, and dead letter patterns. Kafka is a distributed log designed for event streaming at millions of events/second — using it here would be like using a freight train to deliver a letter. RabbitMQ's dead letter exchange gives us native exponential backoff with zero custom scheduling code.

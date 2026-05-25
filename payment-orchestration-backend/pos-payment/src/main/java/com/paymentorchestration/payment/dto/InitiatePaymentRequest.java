@@ -10,12 +10,16 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 @Getter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class InitiatePaymentRequest {
+
+    /** Links this payment to a demo_policies row for duplicate-payment prevention. */
+    private UUID policyId;
 
     @NotBlank
     private String merchantOrderId;
