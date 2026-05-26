@@ -2,19 +2,21 @@ import api from '../../../lib/axios';
 import { API } from '../../../lib/endpoints';
 import type { ApiResponse } from '../../../shared/types';
 import type { TransactionSummary, ScoreDetail, StrategyComparison } from '../../../shared/types/dashboard';
-import type { Region, Currency } from '../../../shared/types/enums';
+import type { Region, Currency, PaymentType } from '../../../shared/types/enums';
 
 export interface ScoreParams {
   region: Region;
   amount: number;
   currency: Currency;
   paymentMethod?: string;
+  paymentType?: PaymentType;
 }
 
 export interface CompareParams {
   region: Region;
   amount: number;
   currency: Currency;
+  paymentType?: PaymentType;
 }
 
 export const dashboardService = {

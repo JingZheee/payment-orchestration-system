@@ -1,11 +1,12 @@
 import { Spin, Alert } from 'antd';
+import { useNavigate } from 'react-router-dom';
 import { useDashboardSummary } from './hooks/useDashboardSummary';
 import KpiCard from './components/KpiCard';
 import StatusBreakdownChart from './components/StatusBreakdownChart';
 import VolumeByProviderChart from './components/VolumeByProviderChart';
-import RoutingIntelligencePanel from './components/RoutingIntelligencePanel';
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const { data: summary, isLoading, isError } = useDashboardSummary();
 
   const successRate = summary && summary.total > 0
@@ -70,8 +71,40 @@ export default function Dashboard() {
         </>
       )}
 
-      {/* Routing intelligence — always shown */}
-      <RoutingIntelligencePanel />
+      {/* Routing Engine shortcut */}
+      <div
+        onClick={() => navigate('/routing')}
+        style={{
+          background: 'linear-gradient(135deg, #FFFBEA 0%, #FFF3CD 100%)',
+          borderRadius: 16,
+          border: '1px solid rgba(252,185,0,0.3)',
+          padding: '24px 28px',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          transition: 'box-shadow 0.15s',
+        }}
+        onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 20px rgba(252,185,0,0.15)')}
+        onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: 12,
+            background: 'rgba(252,185,0,0.2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 24, color: '#7B5800' }}>hub</span>
+          </div>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#1C1C1E' }}>Routing Engine</div>
+            <div style={{ fontSize: 13, color: '#6B7280', marginTop: 2 }}>
+              Simulate routing decisions, inspect composite scores, and compare strategies
+            </div>
+          </div>
+        </div>
+        <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#FCB900' }}>arrow_forward</span>
+      </div>
     </div>
   );
 }

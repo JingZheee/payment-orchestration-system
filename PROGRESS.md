@@ -1,5 +1,5 @@
 # Progress Snapshot
-Last updated: 2026-05-25
+Last updated: 2026-05-26
 
 ## Completed
 - [x] PRD.md v1.4 — Xendit integration, duplicate payment defence, V22 DB map, viva points updated
@@ -7,7 +7,7 @@ Last updated: 2026-05-25
 - [x] Spring Security + JWT; CORS, 401/403 fix
 - [x] DB-driven payment methods — PaymentMethodEntity, composite PK; enum deleted everywhere
 - [x] AdminPaymentMethodController — GET/POST/PUT/DELETE with soft-delete
-- [x] React + Vite frontend — all 10 pages, service layer, TanStack Query hooks, AppLayout
+- [x] React + Vite frontend — all 11 pages, service layer, TanStack Query hooks, AppLayout
 - [x] Login, RequireAuth, JWT Axios interceptor; Dashboard, Transactions, Routing Rules pages
 - [x] Providers, Fee Rates, Metrics, Reconciliation, Dead Letter Queue, PaymentMethods pages
 - [x] PaymentSucceededEvent + NotificationConsumer (PREMIUM_ACTIVATED / CLAIM_DISBURSED events)
@@ -26,8 +26,12 @@ Last updated: 2026-05-25
 - [x] Providers page — redesigned with live stats, DB-driven method pills, new summary endpoint
 - [x] Fee Rates page — per-provider tabs, soft delete, active toggle in edit modal
 - [x] Payment Methods page — per-region tabs, soft delete
-- [x] PRD — documented 60-min window / 15-min tick rationale
-- [x] Metrics page — fallback to last known snapshot when window is empty (amber banner); always-visible Provider Capability Matrix section
+- [x] Metrics page — fallback to last known snapshot (amber banner); always-visible Provider Capability Matrix
+- [x] supportedPaymentTypes() on PaymentProviderPort — Billplz/Midtrans PREMIUM_COLLECTION only; Xendit/Mock both
+- [x] RoutingEngine + DashboardController filter eligible providers by paymentType
+- [x] Routing Engine page (/routing) — composite score formula cards, live simulator with payment type selector, per-provider sub-score breakdown, excluded providers panel, strategy comparison table
+- [x] Dashboard — RoutingIntelligencePanel replaced with "Routing Engine →" shortcut card
+- [x] PRD — Feature 11 (Routing Engine page) + provider disbursement capability matrix documented
 
 ## Up next (start here next session)
 - [ ] Add Xendit sandbox keys to application-dev.yml (secret-key + webhook-token from dashboard.xendit.co)
@@ -46,13 +50,12 @@ Last updated: 2026-05-25
 - Frontend: React 18 + Vite + antd v5, feature-based structure
 - PayMongo replaced by Xendit for PH — adapter kept but disabled in DB
 - Xendit: Invoice API for collection (redirect), Disbursements API for claims (direct payout)
+- Billplz + Midtrans are PREMIUM_COLLECTION only; MY/ID claims route to Mock
 - Duplicate payment guard is backend-enforced (409) — frontend button state is UX only
-- RETRY_EXHAUSTED leaves demo_policies.status as PENDING — retryable after failure
 - ProviderRegionSupport.java is the single source of truth for provider→region mapping
-- Providers page stats come from transactions table directly (not provider_metrics)
 - Fee rates and payment methods use soft delete (active=false) — no hard deletes anywhere
 - MetricsAggregator: 60-min window + 15-min tick intentionally wide for demo-scale volume
-- Metrics page fallback uses 7-day window query; MOCK provider excluded from Capability Matrix
+- Metrics page fallback uses 7-day window query; MOCK excluded from Capability Matrix
 
 ## Blockers
 - None (Xendit sandbox keys must be added by user before PH payments can be tested)

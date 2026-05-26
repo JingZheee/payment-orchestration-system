@@ -329,7 +329,8 @@ payment-orchestration-frontend/src/
     ├── metrics/           (/metrics — success rate + latency charts)
     ├── reconciliation/    (/reconciliation — recon statements + anomaly filter)
     ├── dead-letter-queue/ (/dead-letter-queue — RETRY_EXHAUSTED transactions)
-    └── payment-demo/      (/payment-demo — trigger test payments, show routing decision)
+    ├── payment-demo/      (/payment-demo — trigger test payments, show routing decision)
+    └── routing/           (/routing — Routing Engine page: composite score formula, live simulator, strategy comparison)
 ```
 
 ### Key Design Patterns
@@ -396,10 +397,24 @@ verifyWebhookSignature(body, headers)            → boolean
 parseWebhookPayload(body)                        → normalized WebhookParseResult
 calculateFee(amount, currency, paymentMethod)    → BigDecimal (paymentMethod is String)
 supportedMethods()                               → List<String> (e.g. ["FPX","CARD","EWALLET"])
+supportedPaymentTypes()                          → List<PaymentType> (PREMIUM_COLLECTION and/or CLAIMS_DISBURSEMENT)
 isAvailable()                                    → boolean (circuit breaker backed)
 ```
 
 Payment methods are DB-managed strings, not a Java enum. The `payment_methods` table (V20) stores available codes per region with an `is_active` flag that admins can toggle at runtime.
+
+#### Provider Payment Type Capabilities
+
+Not all providers support outbound claim disbursements — only Xendit exposes a real Disbursements API. The routing engine filters out ineligible providers in `eligibleProviders()` before scoring or applying rules, so a claim disbursement can never accidentally be routed to a collection-only provider.
+
+| Provider | PREMIUM_COLLECTION | CLAIMS_DISBURSEMENT | Notes |
+|---|---|---|---|
+| Billplz (MY) | ✅ | ❌ | `/bills` endpoint is collection-only; no payout API in sandbox |
+| Midtrans (ID) | ✅ | ❌ | `/charge` endpoint is collection-only; Iris Disbursement API requires separate approval |
+| Xendit (PH) | ✅ | ✅ | `initiatePayment` routes to `/v2/invoices` (collection) or `/disbursements` (claims) based on `paymentType` |
+| Mock | ✅ | ✅ | Handles all payment types for all regions; used as fallback for MY/ID claim disbursements |
+
+**Routing consequence:** MY and ID claim disbursements are automatically routed to the Mock provider (the only eligible provider for those regions that declares disbursement support). PH claim disbursements route to Xendit via the real Disbursements API.
 
 ### Feature 3: Mock Provider
 Configurable behavior via admin dashboard or `application.yml`:
@@ -431,12 +446,11 @@ POST /webhooks/{provider}
 
 ### Feature 5: Admin Dashboard
 Key screens:
-- **Dashboard Home** — total transactions, overall success rate, total volume by currency, active providers count, recent failures list
-- **Volume Chart** — transaction count over time (hour/day/week granularity)
-- **Provider Breakdown** — per-provider success rate, transaction count, total fees, average latency (last 24h)
-- **Transaction List** — filterable by status/provider/region/currency/date range, CSV export
-- **Transaction Detail** — full event timeline, routing decision explanation, provider response
-- **Routing Rules** — priority-ordered list, create/edit modal, enable/disable toggle, drag-to-reorder, **simulate panel**
+- **Dashboard Home** — total transactions, overall success rate, active providers count, regions covered, status breakdown chart, volume by provider chart. A clickable "Routing Engine →" card links to the dedicated routing simulator page.
+- **Transaction List** — filterable by status/provider/region/currency/date range
+- **Transaction Detail** — full event timeline, routing decision explanation (`routingStrategy`, `routingReason`), provider response
+- **Routing Rules** — priority-ordered list, create/edit modal, enable/disable toggle, drag-to-reorder
+- **Routing Engine** — dedicated simulator page; see Feature 11
 - **Provider Config** — enable/disable, edit fee structure, view live health status; **Notification Queue Panel** at the bottom shows live queue depth and consumer on/off toggle
 - **Dead Letter Queue Panel** — list of transactions that exhausted all retries, with error history and "Re-queue" / "Mark Failed" actions
 - **Payment Demo** — DB-backed policy/claim table with Pay button per row; clicking Pay pre-fills the form; routing decision result shown after initiation including provider redirect link
@@ -517,6 +531,67 @@ After `NotificationConsumer` activates or disburses a policy, it calls `EmailNot
 
 ---
 
+### Feature 11: Routing Engine Page
+
+A dedicated admin page (`/routing`) that makes the scoring algorithm fully transparent — both as a static reference and as a live simulator. Moved out of the Dashboard so it gets the full page width it deserves and is discoverable via the sidebar.
+
+**Section 1 — Composite Score Formula (always visible, no interaction needed)**
+
+Four weight cards showing exactly how the composite score is assembled:
+
+| Factor | Weight | What it measures |
+|---|---|---|
+| Success Rate | 40% | Historical payment approval rate for this provider in the selected region. Defaults to 50% when no recent `provider_metrics` rows exist. |
+| Fee Score | 25% | Inverse of the normalized fee relative to other eligible providers. Lower fee = higher score. |
+| Latency | 15% | Inverse of the normalized average response time. Faster = higher score. |
+| Fee Accuracy | 20% | Match between quoted fees and actual fees from `recon_statements`. High accuracy = provider is predictable. |
+
+A monospace formula bar shows the equation:
+```
+score = (successRate × 0.40) + ((1 − normFee) × 0.25) + ((1 − normLatency) × 0.15) + (feeAccuracy × 0.20)
+```
+A note clarifies that weights are configurable in `application.yml → routing.scorer.*`.
+
+**Section 2 — Simulation Form**
+
+Input fields:
+- Region (MY / ID / PH)
+- Payment Type (`PREMIUM_COLLECTION` / `CLAIMS_DISBURSEMENT`) — selecting Claims Disbursement will filter out Billplz and Midtrans to demonstrate the provider capability check
+- Amount (with currency auto-determined per region)
+- Currency (read-only, derived from region)
+
+**Section 3 — Provider Score Breakdown**
+
+After running a simulation, each eligible provider is shown as a card:
+- Total composite score (0–100) with a progress bar; winner highlighted in amber
+- Four sub-score rows, each showing: raw input value → weighted component score → weight multiplier
+  - e.g. `Success Rate  87% → 0.35  ×0.40`
+- Providers excluded by the payment type capability filter are listed below with the reason (e.g. "Billplz — Does not support CLAIMS_DISBURSEMENT (collection-only provider)")
+
+**Section 4 — Strategy Comparison**
+
+A table showing what each of the 4 strategies would select for the same input:
+
+| Strategy | What it does |
+|---|---|
+| Region-Based Override | Follows the highest-priority routing rule with a `preferred_provider` set |
+| Lowest Fee Optimizer | Picks the provider with the lowest calculated fee for this amount/method |
+| Success Rate Focus | Picks the provider with the highest historical approval rate in this region |
+| Smart Composite Score | Applies the weighted formula — the default production strategy |
+
+**Backend endpoints used:**
+
+| Endpoint | Description |
+|---|---|
+| `GET /admin/dashboard/scores?region=MY&amount=500&currency=MYR&paymentType=CLAIMS_DISBURSEMENT` | Returns `ScoreDetail[]` for eligible providers only, sorted best-to-worst |
+| `GET /admin/dashboard/strategy-comparison?...&paymentType=CLAIMS_DISBURSEMENT` | Returns which provider each strategy would select |
+
+Both endpoints filter eligible providers by `paymentType` using the `supportedPaymentTypes()` capability method on each adapter.
+
+**Demo moment:** Select MY + CLAIMS_DISBURSEMENT → Billplz disappears from the eligible list, only Mock appears with full score breakdown. Switch to PH + CLAIMS_DISBURSEMENT → Xendit appears alongside Mock, both with real scores. This shows the examiner that the engine is not just region-aware but payment-type-aware.
+
+---
+
 ### Feature 9: Insurance Payment Demo
 The `/payment-demo` page is a simulated insurance back-office system, not just a raw payment form.
 
@@ -573,12 +648,12 @@ The `/payment-demo` page is a simulated insurance back-office system, not just a
 | Recharts | latest | Charts (volume, provider breakdown) |
 
 ### Provider Sandbox Accounts
-| Provider | Region | Methods | Sandbox |
-|---|---|---|---|
-| Billplz | Malaysia | FPX bank transfer | Free, no registration required |
-| Midtrans | Indonesia | Virtual Account, QRIS, GoPay | Free sandbox at midtrans.com |
-| Xendit | Philippines | GCash, Maya, GrabPay, Card (Invoice API); Bank disbursement (Disbursements API) | Free, globally accessible at dashboard.xendit.co |
-| Mock | All | Configurable | Built-in, no external account |
+| Provider | Region | Methods | Disbursement | Sandbox |
+|---|---|---|---|---|
+| Billplz | Malaysia | FPX bank transfer | ❌ | Free, no registration required |
+| Midtrans | Indonesia | Virtual Account, QRIS, GoPay | ❌ | Free sandbox at midtrans.com |
+| Xendit | Philippines | GCash, Maya, GrabPay, Card (Invoice API); Bank disbursement (Disbursements API) | ✅ | Free, globally accessible at dashboard.xendit.co |
+| Mock | All | Configurable | ✅ | Built-in, no external account |
 
 ### Dev Tools
 - Docker Compose — PostgreSQL + RabbitMQ local instances

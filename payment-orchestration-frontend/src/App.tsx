@@ -13,6 +13,7 @@ import DeadLetterQueue from './features/dead-letter-queue/DeadLetterQueue';
 import PaymentDemo from './features/payment-demo/PaymentDemo';
 import PaymentMethods from './features/payment-methods/PaymentMethods';
 import PaymentCheckoutPage from './features/payment-demo/PaymentCheckoutPage';
+import RoutingEnginePage from './features/routing/RoutingEnginePage';
 
 export default function App() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
           <Route path="dashboard"          element={<Dashboard />} />
           <Route path="transactions"       element={<Transactions />} />
           <Route path="routing-rules"      element={<RoutingRules />} />
+          <Route path="routing"            element={<RoutingEnginePage />} />
           <Route path="providers"          element={<Providers />} />
           <Route path="fee-rates"          element={<FeeRates />} />
           <Route path="payment-methods"    element={<PaymentMethods />} />

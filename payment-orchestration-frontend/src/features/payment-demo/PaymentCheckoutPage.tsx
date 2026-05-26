@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Alert, Button, Divider, Form, Input, Select, Spin, Tag, Typography } from 'antd';
+import { Alert, Button, Divider, Form, Input, Spin, Tag, Typography } from 'antd';
 import { ArrowLeftOutlined, CheckCircleFilled, LockOutlined } from '@ant-design/icons';
-import { Region, Currency, PaymentType, PAYMENT_METHOD_LABELS } from '../../shared/types/enums';
+import { Region, Currency, PaymentType } from '../../shared/types/enums';
 import type { InitiatePaymentRequest, InitiatePaymentResponse } from '../../shared/types/transaction';
 import type { Provider } from '../../shared/types/enums';
 import { paymentDemoService } from './services/paymentDemoService';
@@ -12,6 +12,8 @@ import type { DemoPolicy } from './services/demoPolicyService';
 import ProviderBadge from '../../shared/components/ProviderBadge';
 
 const { Text } = Typography;
+
+// ── Constants ─────────────────────────────────────────────────────────────────
 
 const REGION_CURRENCY: Record<string, string> = { MY: 'MYR', ID: 'IDR', PH: 'PHP' };
 const REGION_METHODS: Record<string, string[]> = {
@@ -26,177 +28,258 @@ const STRATEGY_LABELS: Record<string, string> = {
   SUCCESS_RATE: 'Success Rate', COMPOSITE_SCORE: 'Composite Score',
 };
 
+interface MethodConfig {
+  bg: string;
+  fg: string;
+  label: string;
+  abbr: string;
+  description: string;
+}
+
+const METHOD_CONFIG: Record<string, MethodConfig> = {
+  CARD:            { bg: '#1C1C1E', fg: '#fff',     abbr: '💳',  label: 'Card',           description: 'Visa · Mastercard · Secure hosted card page' },
+  FPX:             { bg: '#1D4ED8', fg: '#fff',     abbr: 'FPX', label: 'Online Banking',  description: 'Internet banking · Select your bank at checkout' },
+  VIRTUAL_ACCOUNT: { bg: '#0F766E', fg: '#fff',     abbr: 'VA',  label: 'Virtual Account', description: 'Bank transfer · Virtual account number issued on confirm' },
+  QRIS:            { bg: '#7C3AED', fg: '#fff',     abbr: 'QR',  label: 'QRIS',            description: 'Scan & pay · Compatible with all major banking apps' },
+  GOPAY:           { bg: '#00838F', fg: '#fff',     abbr: 'GP',  label: 'GoPay',           description: 'Redirected to Gojek app to approve payment' },
+  GCASH:           { bg: '#007DFE', fg: '#fff',     abbr: 'GC',  label: 'GCash',           description: 'Redirected to GCash app to approve payment' },
+  MAYA:            { bg: '#00875A', fg: '#fff',     abbr: 'MA',  label: 'Maya',            description: 'Redirected to Maya app to approve payment' },
+  GRABPAY:         { bg: '#00B14F', fg: '#fff',     abbr: 'GR',  label: 'GrabPay',         description: 'Redirected to Grab app to approve payment' },
+  EWALLET:         { bg: '#D97706', fg: '#fff',     abbr: 'eW',  label: 'e-Wallet',        description: 'Redirected to your e-wallet app to approve payment' },
+};
+
 function fmtAmount(amount: number, currency: string) {
   if (currency === 'IDR') return `IDR ${amount.toLocaleString('id-ID')}`;
   return `${currency} ${Number(amount).toFixed(2)}`;
 }
 
-// ── Order Summary (left dark panel) ──────────────────────────────────────────
+// ── Method row (radio-button style) ──────────────────────────────────────────
+
+function MethodRow({
+  method, selected, onSelect,
+}: {
+  method: string;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const cfg: MethodConfig = METHOD_CONFIG[method] ?? {
+    bg: '#F3F4F6', fg: '#374151', abbr: '?', label: method, description: '',
+  };
+  const isEmoji = cfg.abbr.length <= 2 && /\p{Emoji}/u.test(cfg.abbr);
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      style={{
+        width: '100%',
+        border: selected ? '2px solid #FCB900' : '1.5px solid #E5E7EB',
+        borderLeft: selected ? '4px solid #FCB900' : undefined,
+        borderRadius: 12,
+        padding: '14px 16px',
+        cursor: 'pointer',
+        background: selected ? '#FFFBEB' : 'white',
+        transition: 'border-color 0.15s, background 0.15s',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 14,
+        textAlign: 'left',
+        outline: 'none',
+      }}
+    >
+      {/* Icon */}
+      <div style={{
+        width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+        background: isEmoji ? '#F3F4F6' : cfg.bg,
+        color: isEmoji ? 'inherit' : cfg.fg,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: isEmoji ? 20 : (cfg.abbr.length > 2 ? 10 : 12),
+        fontWeight: 800, letterSpacing: '-0.01em',
+      }}>
+        {cfg.abbr}
+      </div>
+
+      {/* Label + description */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: '#1C1C1E', lineHeight: 1.3 }}>
+          {cfg.label}
+        </div>
+        {selected && cfg.description && (
+          <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2, lineHeight: 1.4 }}>
+            {cfg.description}
+          </div>
+        )}
+      </div>
+
+      {/* Radio indicator */}
+      <div style={{
+        width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
+        border: selected ? '5px solid #FCB900' : '2px solid #D1D5DB',
+        background: 'white',
+        transition: 'border 0.15s',
+      }} />
+    </button>
+  );
+}
+
+// ── Order Summary (left panel) ───────────────────────────────────────────────
+
+function DetailRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div>
+      <div style={{
+        fontSize: 10, fontWeight: 700, color: '#9CA3AF',
+        textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3,
+      }}>
+        {label}
+      </div>
+      <div style={{
+        fontSize: 13, color: '#1C1C1E', fontWeight: 600,
+        fontFamily: mono ? 'monospace' : 'inherit',
+        wordBreak: 'break-all',
+      }}>
+        {value}
+      </div>
+    </div>
+  );
+}
 
 function OrderSummary({ policy, currency }: { policy: DemoPolicy; currency: string }) {
   const isPremium = policy.paymentType === 'PREMIUM_COLLECTION';
-  const reference = policy.claimReference ?? policy.policyNumber ?? '—';
 
   return (
     <div style={{
-      width: 320,
-      background: '#1C1C1E',
-      padding: '44px 36px',
+      width: 290,
+      background: '#F9F8F6',
+      borderRight: '1px solid #ECEAE6',
+      padding: '40px 32px',
       flexShrink: 0,
       display: 'flex',
       flexDirection: 'column',
     }}>
-      <Tag
-        color={isPremium ? 'blue' : 'purple'}
-        style={{ borderRadius: 999, fontSize: 11, padding: '2px 10px', alignSelf: 'flex-start', marginBottom: 28 }}
-      >
-        {isPremium ? 'PREMIUM COLLECTION' : 'CLAIMS DISBURSEMENT'}
-      </Tag>
-
-      <div style={{ fontSize: 22, fontWeight: 800, color: 'white', lineHeight: 1.3, marginBottom: 6 }}>
-        {policy.insuranceType}
+      {/* Heading */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{
+          fontSize: 10, fontWeight: 700, color: '#9CA3AF',
+          textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10,
+        }}>
+          Payment Summary
+        </div>
+        <div style={{ fontSize: 20, fontWeight: 800, color: '#1C1C1E', lineHeight: 1.3, marginBottom: 4 }}>
+          {policy.insuranceType}
+        </div>
+        <div style={{ fontSize: 12, color: '#9CA3AF' }}>
+          {isPremium ? 'Premium Payment' : 'Claim Disbursement'}
+        </div>
       </div>
-      <div style={{ fontSize: 12, color: '#6B7280', fontFamily: 'monospace', marginBottom: 32 }}>
-        {reference}
-      </div>
 
-      <Divider style={{ borderColor: 'rgba(255,255,255,0.08)', margin: '0 0 28px 0' }} />
+      <Divider style={{ borderColor: '#ECEAE6', margin: '0 0 28px 0' }} />
 
+      {/* Details */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, marginBottom: 'auto' }}>
-        <div>
-          <div style={{ fontSize: 10, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
-            Policyholder
-          </div>
-          <div style={{ fontSize: 14, color: 'white', fontWeight: 600 }}>{policy.holderName}</div>
-          <div style={{ fontSize: 12, color: '#9CA3AF' }}>{policy.holderEmail}</div>
-        </div>
-        <div>
-          <div style={{ fontSize: 10, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
-            Region
-          </div>
-          <div style={{ fontSize: 14, color: 'white' }}>
-            {REGION_FLAG[policy.region]} {REGION_NAME[policy.region] ?? policy.region}
-          </div>
-        </div>
-        <div>
-          <div style={{ fontSize: 10, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
-            Payment Method
-          </div>
-          <div style={{ fontSize: 14, color: 'white' }}>
-            {PAYMENT_METHOD_LABELS[policy.paymentMethod] ?? policy.paymentMethod}
-          </div>
-        </div>
+        <DetailRow label="Policyholder" value={policy.holderName} />
+        <DetailRow label="Email" value={policy.holderEmail} />
+        {policy.policyNumber && (
+          <DetailRow label="Policy No." value={policy.policyNumber} mono />
+        )}
+        {policy.claimReference && (
+          <DetailRow label="Claim Ref." value={policy.claimReference} mono />
+        )}
       </div>
 
-      <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: '20px', marginTop: 32 }}>
-        <div style={{ fontSize: 10, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
-          {isPremium ? 'Premium Amount' : 'Claim Amount'}
+      {/* Amount footer */}
+      <div style={{ marginTop: 32 }}>
+        <Divider style={{ borderColor: '#ECEAE6', margin: '0 0 20px 0' }} />
+        <div style={{
+          fontSize: 10, fontWeight: 700, color: '#9CA3AF',
+          textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8,
+        }}>
+          {isPremium ? 'Premium Due' : 'Payout Amount'}
         </div>
         <div style={{ fontSize: 30, fontWeight: 900, color: '#FCB900', lineHeight: 1 }}>
           {fmtAmount(policy.amount, currency)}
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 24 }}>
-        <LockOutlined style={{ color: '#4B5563', fontSize: 12 }} />
-        <Text style={{ fontSize: 11, color: '#4B5563' }}>256-bit SSL encrypted</Text>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 20 }}>
+        <LockOutlined style={{ color: '#C4BFB8', fontSize: 11 }} />
+        <Text style={{ fontSize: 11, color: '#C4BFB8' }}>256-bit SSL encrypted</Text>
       </div>
     </div>
   );
 }
 
-// ── Payment Form (right panel, pre-payment) ───────────────────────────────────
+// ── Payment Form Panel (right panel, pre-payment) ─────────────────────────────
 
 function PaymentFormPanel({
-  policy, currency, form, onFinish, isPending, payError,
+  policy, currency, onSubmit, isPending, payError,
 }: {
   policy: DemoPolicy;
   currency: string;
-  form: ReturnType<typeof Form.useForm>[0];
-  onFinish: (values: { paymentMethod: string; customerEmail: string; description?: string }) => void;
+  onSubmit: (paymentMethod: string, customerEmail: string) => void;
   isPending: boolean;
   payError: string | null;
 }) {
+  const [form] = Form.useForm();
+  const methods = REGION_METHODS[policy.region] ?? [];
+  const [selectedMethod, setSelectedMethod] = useState(policy.paymentMethod || methods[0] || '');
+
   return (
     <div>
-      <div style={{ marginBottom: 32 }}>
-        <div style={{ fontSize: 24, fontWeight: 800, color: '#1C1C1E', marginBottom: 6 }}>
+      {/* Title */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ fontSize: 22, fontWeight: 800, color: '#1C1C1E', marginBottom: 4 }}>
           Complete your payment
         </div>
         <div style={{ fontSize: 13, color: '#6B7280' }}>
-          Confirm the details below and click Pay to proceed.
+          Choose a payment method and confirm to proceed.
         </div>
       </div>
 
+      {/* Method list */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{
+          fontSize: 11, fontWeight: 700, color: '#9CA3AF',
+          textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10,
+        }}>
+          Payment Method
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {methods.map(m => (
+            <MethodRow
+              key={m}
+              method={m}
+              selected={selectedMethod === m}
+              onSelect={() => setSelectedMethod(m)}
+            />
+          ))}
+        </div>
+      </div>
+
+      <Divider style={{ margin: '20px 0', borderColor: '#F3F4F6' }} />
+
+      {/* Email + Pay */}
       <Form
         form={form}
         layout="vertical"
-        onFinish={onFinish}
-        initialValues={{
-          paymentMethod: policy.paymentMethod,
-          customerEmail: policy.holderEmail,
-          description: `${policy.insuranceType} — ${policy.claimReference ?? policy.policyNumber}`,
-        }}
+        onFinish={({ customerEmail }) => onSubmit(selectedMethod, customerEmail)}
+        initialValues={{ customerEmail: policy.holderEmail }}
       >
         <Form.Item
-          name="paymentMethod"
-          label={<span style={{ fontWeight: 600, fontSize: 13 }}>Payment Method</span>}
-          rules={[{ required: true }]}
-          style={{ marginBottom: 20 }}
-        >
-          <Select size="large">
-            {(REGION_METHODS[policy.region] ?? []).map(m => (
-              <Select.Option key={m} value={m}>
-                {PAYMENT_METHOD_LABELS[m] ?? m.replace(/_/g, ' ')}
-              </Select.Option>
-            ))}
-          </Select>
-        </Form.Item>
-
-        <Form.Item
           name="customerEmail"
-          label={<span style={{ fontWeight: 600, fontSize: 13 }}>Customer Email</span>}
-          rules={[{ required: true, type: 'email' }]}
-          style={{ marginBottom: 20 }}
+          label={
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              Email for receipt
+            </span>
+          }
+          rules={[{ required: true, type: 'email', message: 'Enter a valid email' }]}
+          style={{ marginBottom: 24 }}
         >
-          <Input size="large" />
-        </Form.Item>
-
-        <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
-          {policy.policyNumber && (
-            <Form.Item
-              label={<span style={{ fontWeight: 600, fontSize: 13 }}>Policy No.</span>}
-              style={{ flex: 1, marginBottom: 0 }}
-            >
-              <Input
-                size="large"
-                value={policy.policyNumber}
-                readOnly
-                style={{ background: '#F9FAFB', fontFamily: 'monospace', color: '#374151' }}
-              />
-            </Form.Item>
-          )}
-          {policy.claimReference && (
-            <Form.Item
-              label={<span style={{ fontWeight: 600, fontSize: 13 }}>Claim Ref.</span>}
-              style={{ flex: 1, marginBottom: 0 }}
-            >
-              <Input
-                size="large"
-                value={policy.claimReference}
-                readOnly
-                style={{ background: '#F9FAFB', fontFamily: 'monospace', color: '#374151' }}
-              />
-            </Form.Item>
-          )}
-        </div>
-
-        <Form.Item
-          name="description"
-          label={<span style={{ fontWeight: 600, fontSize: 13 }}>Description</span>}
-          style={{ marginBottom: 28 }}
-        >
-          <Input size="large" />
+          <Input
+            size="large"
+            placeholder="you@example.com"
+            style={{ borderRadius: 10, borderColor: '#E5E7EB', fontSize: 14 }}
+          />
         </Form.Item>
 
         {payError && (
@@ -217,16 +300,17 @@ function PaymentFormPanel({
             fontWeight: 800,
             fontSize: 16,
             borderRadius: 12,
+            boxShadow: '0 4px 14px rgba(252,185,0,0.35)',
           }}
         >
           {isPending ? 'Routing payment…' : `Pay ${fmtAmount(policy.amount, currency)}`}
         </Button>
       </Form>
 
-      <div style={{ textAlign: 'center', marginTop: 20 }}>
-        <LockOutlined style={{ color: '#9CA3AF', marginRight: 6, fontSize: 12 }} />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 20 }}>
+        <LockOutlined style={{ color: '#9CA3AF', fontSize: 11 }} />
         <Text style={{ fontSize: 12, color: '#9CA3AF' }}>
-          Your payment is protected by InsureRoute's secure orchestration infrastructure
+          Secured by InsureRoute · 256-bit TLS encryption
         </Text>
       </div>
     </div>
@@ -235,13 +319,18 @@ function PaymentFormPanel({
 
 // ── Already Processed panel ───────────────────────────────────────────────────
 
-function AlreadyProcessedPanel({ policy, navigate }: { policy: DemoPolicy; navigate: ReturnType<typeof useNavigate> }) {
-  const statusLabel = policy.status === 'ACTIVATED' ? 'Activated' : 'Disbursed';
+function AlreadyProcessedPanel({
+  policy, navigate,
+}: {
+  policy: DemoPolicy;
+  navigate: ReturnType<typeof useNavigate>;
+}) {
+  const label = policy.status === 'ACTIVATED' ? 'Activated' : 'Disbursed';
   return (
     <div style={{ textAlign: 'center' }}>
       <CheckCircleFilled style={{ fontSize: 64, color: '#059669', marginBottom: 16 }} />
       <div style={{ fontSize: 22, fontWeight: 800, color: '#1C1C1E', marginBottom: 8 }}>
-        Already {statusLabel}
+        Already {label}
       </div>
       <div style={{ fontSize: 14, color: '#6B7280', marginBottom: 32 }}>
         This {policy.paymentType === 'PREMIUM_COLLECTION' ? 'policy' : 'claim'} has already been processed.
@@ -279,7 +368,7 @@ function SuccessPanel({
 
       <div style={{ background: '#F9FAFB', borderRadius: 12, padding: '20px 24px', marginBottom: 24 }}>
         <div style={{
-          fontSize: 10, fontWeight: 700, color: '#6B7280',
+          fontSize: 10, fontWeight: 700, color: '#9CA3AF',
           textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 16,
         }}>
           Routing Decision
@@ -302,14 +391,14 @@ function SuccessPanel({
           </div>
         </div>
 
-        <Divider style={{ margin: '16px 0' }} />
+        <Divider style={{ margin: '16px 0', borderColor: '#E5E7EB' }} />
 
         <div style={{ background: '#F0FDF4', borderRadius: 8, padding: '10px 14px', marginBottom: 14 }}>
           <Text style={{ fontSize: 12, color: '#166534' }}>{result.routingReason}</Text>
         </div>
 
         <div>
-          <Text type="secondary" style={{ fontSize: 11 }}>Transaction ID</Text>
+          <Text style={{ fontSize: 11, color: '#9CA3AF' }}>Transaction ID</Text>
           <br />
           <Text copyable style={{ fontSize: 11, fontFamily: 'monospace', color: '#374151' }}>
             {result.transactionId}
@@ -332,7 +421,10 @@ function SuccessPanel({
           block
           size="large"
           onClick={() => navigate('/transactions')}
-          style={{ height: 46, borderRadius: 10, fontWeight: 600, background: '#FCB900', borderColor: '#FCB900', color: '#1C1C1E' }}
+          style={{
+            height: 46, borderRadius: 10, fontWeight: 600,
+            background: '#FCB900', borderColor: '#FCB900', color: '#1C1C1E',
+          }}
         >
           View Event Timeline →
         </Button>
@@ -348,11 +440,9 @@ export default function PaymentCheckoutPage() {
   const { state } = useLocation();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const [form] = Form.useForm();
   const [result, setResult] = useState<InitiatePaymentResponse | null>(null);
   const [payError, setPayError] = useState<string | null>(null);
 
-  // Policy comes from router state (fast path) or falls back to API data
   const { data: allPolicies = [], isLoading } = useDemoPolicies();
   const policy: DemoPolicy | undefined =
     (state as { policy?: DemoPolicy })?.policy ?? allPolicies.find(p => p.id === policyId);
@@ -377,7 +467,7 @@ export default function PaymentCheckoutPage() {
     },
   });
 
-  function onFinish(values: { paymentMethod: string; customerEmail: string; description?: string }) {
+  function handleSubmit(paymentMethod: string, customerEmail: string) {
     if (!policy) return;
     const request: InitiatePaymentRequest = {
       policyId: policy.id,
@@ -385,18 +475,15 @@ export default function PaymentCheckoutPage() {
       amount: policy.amount,
       currency: currency as Currency,
       region: policy.region as Region,
-      paymentMethod: values.paymentMethod,
+      paymentMethod,
       paymentType: policy.paymentType as PaymentType,
-      customerEmail: values.customerEmail,
-      description: values.description,
+      customerEmail,
       redirectUrl: window.location.href,
       policyNumber: policy.policyNumber ?? undefined,
       claimReference: policy.claimReference ?? undefined,
     };
     paymentMutation.mutate({ request, key: crypto.randomUUID() });
   }
-
-  // ── Loading / not found ──────────────────────────────────────────────────────
 
   if (isLoading && !policy) {
     return (
@@ -417,8 +504,6 @@ export default function PaymentCheckoutPage() {
     );
   }
 
-  // ── Page ─────────────────────────────────────────────────────────────────────
-
   return (
     <div style={{ minHeight: '100vh', background: '#F3F4F6', display: 'flex', flexDirection: 'column' }}>
 
@@ -436,24 +521,24 @@ export default function PaymentCheckoutPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{
             width: 36, height: 36, borderRadius: 8,
-            background: '#FCB900', display: 'flex',
-            alignItems: 'center', justifyContent: 'center',
+            background: '#FCB900',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: '#1C1C1E', fontWeight: 900, fontSize: 14, flexShrink: 0,
           }}>
             IR
           </div>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 900, color: '#1C1C1E', lineHeight: 1.2 }}>InsureRoute</div>
-            <div style={{ fontSize: 10, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+            <div style={{ fontSize: 15, fontWeight: 900, color: '#1C1C1E', lineHeight: 1.2 }}>InsureRoute</div>
+            <div style={{ fontSize: 10, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
               Secure Payment Gateway
             </div>
           </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <LockOutlined style={{ color: '#9CA3AF', fontSize: 13 }} />
+          <LockOutlined style={{ color: '#9CA3AF', fontSize: 12 }} />
           <Text style={{ fontSize: 12, color: '#9CA3AF' }}>256-bit SSL</Text>
-          <Divider type="vertical" style={{ margin: '0 4px' }} />
+          <Divider type="vertical" style={{ margin: '0 4px', borderColor: '#E5E7EB' }} />
           <Button
             type="link"
             icon={<ArrowLeftOutlined />}
@@ -476,16 +561,22 @@ export default function PaymentCheckoutPage() {
         <div style={{
           background: 'white',
           borderRadius: 20,
-          boxShadow: '0 8px 40px rgba(0,0,0,0.10)',
-          maxWidth: 900,
+          boxShadow: '0 8px 40px rgba(0,0,0,0.09)',
+          maxWidth: 880,
           width: '100%',
           display: 'flex',
           overflow: 'hidden',
-          minHeight: 560,
+          minHeight: 540,
         }}>
           <OrderSummary policy={policy!} currency={currency} />
 
-          <div style={{ flex: 1, padding: '44px 48px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <div style={{
+            flex: 1,
+            padding: '44px 48px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+          }}>
             {result ? (
               <SuccessPanel result={result} currency={currency} navigate={navigate} />
             ) : policy!.status !== 'PENDING' ? (
@@ -494,8 +585,7 @@ export default function PaymentCheckoutPage() {
               <PaymentFormPanel
                 policy={policy!}
                 currency={currency}
-                form={form}
-                onFinish={onFinish}
+                onSubmit={handleSubmit}
                 isPending={paymentMutation.isPending}
                 payError={payError}
               />

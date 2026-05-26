@@ -277,6 +277,11 @@ public class XenditAdapter implements PaymentProviderPort {
     }
 
     @Override
+    public List<PaymentType> supportedPaymentTypes() {
+        return List.of(PaymentType.PREMIUM_COLLECTION, PaymentType.CLAIMS_DISBURSEMENT);
+    }
+
+    @Override
     public BigDecimal calculateFee(BigDecimal amount, Region region, String paymentMethod) {
         if (paymentMethod == null) paymentMethod = "GCASH";
         return providerFeeRateRepository

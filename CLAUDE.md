@@ -329,7 +329,7 @@ Weights are configurable in `application.yml` under `routing.scorer.*`.
 |---|---|
 | **Current module** | full-stack — all major features implemented |
 | **Current task** | Add Xendit sandbox keys to application-dev.yml, then smoke test PH payments end-to-end (Invoice redirect + claim disbursement) |
-| **Last completed** | Metrics page: 7-day fallback with amber banner when window is empty + Provider Capability Matrix always-visible section |
+| **Last completed** | Routing Engine page (/routing) — composite score formula, live simulator with paymentType filter, sub-score breakdown, excluded providers panel; Dashboard shortcut card; PRD Feature 11 documented |
 | **Blockers** | None |
 
 ### Admin API Endpoints — Payment Methods
@@ -346,6 +346,7 @@ DELETE /api/v1/admin/payment-methods/{region}/{code} — delete (returns 409 if 
 | `/dashboard` | Dashboard |
 | `/transactions` | Transactions |
 | `/routing-rules` | RoutingRules |
+| `/routing` | RoutingEnginePage |
 | `/providers` | Providers |
 | `/fee-rates` | FeeRates |
 | `/payment-methods` | PaymentMethods |

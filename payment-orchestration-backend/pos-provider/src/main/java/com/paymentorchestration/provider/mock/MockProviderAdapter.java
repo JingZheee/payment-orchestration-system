@@ -2,6 +2,7 @@ package com.paymentorchestration.provider.mock;
 
 import com.paymentorchestration.common.enums.MockProviderMode;
 import com.paymentorchestration.common.enums.PaymentStatus;
+import com.paymentorchestration.common.enums.PaymentType;
 import com.paymentorchestration.common.enums.Provider;
 import com.paymentorchestration.common.enums.Region;
 import com.paymentorchestration.domain.entity.ProviderConfig;
@@ -127,6 +128,11 @@ public class MockProviderAdapter implements PaymentProviderPort {
     @Override
     public List<String> supportedMethods() {
         return List.of("FPX", "VIRTUAL_ACCOUNT", "QRIS", "GOPAY", "MAYA", "GCASH", "GRABPAY", "CARD", "EWALLET");
+    }
+
+    @Override
+    public List<PaymentType> supportedPaymentTypes() {
+        return List.of(PaymentType.PREMIUM_COLLECTION, PaymentType.CLAIMS_DISBURSEMENT);
     }
 
     @Override

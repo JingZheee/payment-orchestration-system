@@ -1,6 +1,7 @@
 package com.paymentorchestration.provider.billplz;
 
 import com.paymentorchestration.common.enums.PaymentStatus;
+import com.paymentorchestration.common.enums.PaymentType;
 import com.paymentorchestration.common.enums.Provider;
 import com.paymentorchestration.common.enums.Region;
 import com.paymentorchestration.common.exception.ProviderException;
@@ -201,6 +202,11 @@ public class BillplzAdapter implements PaymentProviderPort {
     @Override
     public List<String> supportedMethods() {
         return List.of("FPX", "EWALLET");
+    }
+
+    @Override
+    public List<PaymentType> supportedPaymentTypes() {
+        return List.of(PaymentType.PREMIUM_COLLECTION);
     }
 
     @Override

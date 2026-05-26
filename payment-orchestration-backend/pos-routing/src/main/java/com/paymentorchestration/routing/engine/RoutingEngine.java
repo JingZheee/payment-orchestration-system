@@ -84,6 +84,8 @@ public class RoutingEngine {
         return allProviders.stream()
                 .filter(p -> ProviderRegionSupport.supportsRegion(p.getProvider(), context.getRegion()))
                 .filter(PaymentProviderPort::isAvailable)
+                .filter(p -> context.getPaymentType() == null
+                        || p.supportedPaymentTypes().contains(context.getPaymentType()))
                 .collect(Collectors.toList());
     }
 

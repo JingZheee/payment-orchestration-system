@@ -12,10 +12,16 @@ export interface TransactionSummary {
 export interface ScoreDetail {
   provider: Provider;
   totalScore: number;
-  successRateScore: number;
-  feeScore: number;
-  latencyScore: number;
-  feeAccuracyScore: number;
+  // Raw inputs
+  successRate: number;
+  rawFee: number;
+  latencyMs: number;
+  feeAccuracy: number;
+  // Weighted components (srComponent + feeComponent + latencyComponent + accuracyComponent = totalScore)
+  srComponent: number;
+  feeComponent: number;
+  latencyComponent: number;
+  accuracyComponent: number;
 }
 
 export interface StrategyComparison {

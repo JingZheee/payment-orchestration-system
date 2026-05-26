@@ -3,6 +3,7 @@ package com.paymentorchestration.admin.controller;
 import com.paymentorchestration.common.dto.ApiResponse;
 import com.paymentorchestration.common.enums.Currency;
 import com.paymentorchestration.common.enums.PaymentStatus;
+import com.paymentorchestration.common.enums.PaymentType;
 import com.paymentorchestration.common.enums.Provider;
 import com.paymentorchestration.common.enums.Region;
 import com.paymentorchestration.domain.repository.ProviderMetricsRepository;
@@ -96,15 +97,17 @@ public class DashboardController {
             @RequestParam Region region,
             @RequestParam BigDecimal amount,
             @RequestParam Currency currency,
-            @RequestParam(required = false) String paymentMethod) {
+            @RequestParam(required = false) String paymentMethod,
+            @RequestParam(required = false) PaymentType paymentType) {
 
-        List<PaymentProviderPort> eligible = eligibleProviders(region);
+        List<PaymentProviderPort> eligible = eligibleProviders(region, paymentType);
 
         RoutingContext context = RoutingContext.builder()
                 .amount(amount)
                 .currency(currency)
                 .region(region)
                 .paymentMethod(paymentMethod)
+                .paymentType(paymentType)
                 .availableProviders(eligible)
                 .build();
 
@@ -128,15 +131,17 @@ public class DashboardController {
             @RequestParam Region region,
             @RequestParam BigDecimal amount,
             @RequestParam Currency currency,
-            @RequestParam(required = false) String paymentMethod) {
+            @RequestParam(required = false) String paymentMethod,
+            @RequestParam(required = false) PaymentType paymentType) {
 
-        List<PaymentProviderPort> eligible = eligibleProviders(region);
+        List<PaymentProviderPort> eligible = eligibleProviders(region, paymentType);
 
         RoutingContext context = RoutingContext.builder()
                 .amount(amount)
                 .currency(currency)
                 .region(region)
                 .paymentMethod(paymentMethod)
+                .paymentType(paymentType)
                 .availableProviders(eligible)
                 .build();
 
@@ -171,10 +176,11 @@ public class DashboardController {
 
     // ── helpers ─────────────────────────────────────────────────────────────────
 
-    private List<PaymentProviderPort> eligibleProviders(Region region) {
+    private List<PaymentProviderPort> eligibleProviders(Region region, PaymentType paymentType) {
         return allProviders.stream()
                 .filter(PaymentProviderPort::isAvailable)
                 .filter(p -> ProviderRegionSupport.supportsRegion(p.getProvider(), region))
+                .filter(p -> paymentType == null || p.supportedPaymentTypes().contains(paymentType))
                 .collect(Collectors.toList());
     }
 }

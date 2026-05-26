@@ -2,6 +2,7 @@ package com.paymentorchestration.provider.midtrans;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.paymentorchestration.common.enums.PaymentStatus;
+import com.paymentorchestration.common.enums.PaymentType;
 import com.paymentorchestration.common.enums.Provider;
 import com.paymentorchestration.common.enums.Region;
 import com.paymentorchestration.common.exception.ProviderException;
@@ -245,6 +246,11 @@ public class MidtransAdapter implements PaymentProviderPort {
     @Override
     public List<String> supportedMethods() {
         return List.of("VIRTUAL_ACCOUNT", "QRIS", "CARD", "GOPAY", "EWALLET");
+    }
+
+    @Override
+    public List<PaymentType> supportedPaymentTypes() {
+        return List.of(PaymentType.PREMIUM_COLLECTION);
     }
 
     @Override

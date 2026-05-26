@@ -1,5 +1,6 @@
 package com.paymentorchestration.provider.port;
 
+import com.paymentorchestration.common.enums.PaymentType;
 import com.paymentorchestration.common.enums.Provider;
 import com.paymentorchestration.common.enums.Region;
 import com.paymentorchestration.provider.dto.*;
@@ -87,4 +88,13 @@ public interface PaymentProviderPort {
      * or is known to be degraded. The routing engine skips providers where this is false.
      */
     boolean isAvailable();
+
+    /**
+     * Payment types this provider can process. The routing engine filters out providers
+     * that don't support the requested payment type before scoring or applying rules.
+     * Default covers both types so existing adapters remain fully compatible.
+     */
+    default List<PaymentType> supportedPaymentTypes() {
+        return List.of(PaymentType.PREMIUM_COLLECTION, PaymentType.CLAIMS_DISBURSEMENT);
+    }
 }

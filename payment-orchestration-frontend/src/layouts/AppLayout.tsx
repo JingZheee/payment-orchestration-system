@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { path: '/dashboard',        label: 'Dashboard',        icon: 'dashboard' },
   { path: '/transactions',     label: 'Transactions',     icon: 'payments' },
   { path: '/routing-rules',    label: 'Routing Rules',    icon: 'account_tree' },
+  { path: '/routing',          label: 'Routing Engine',   icon: 'hub' },
   { path: '/providers',        label: 'Providers',        icon: 'account_balance' },
   { path: '/fee-rates',        label: 'Fee Rates',        icon: 'percent' },
   { path: '/payment-methods',  label: 'Payment Methods',  icon: 'credit_card' },
