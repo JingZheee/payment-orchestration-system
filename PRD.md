@@ -539,6 +539,26 @@ Payment initiated → provider returns PENDING or PROCESSING (webhook expected l
 
 **Demo moment:** Set Mock provider to DELAYED mode → initiate payment → watch retry queue drain through 3 attempts on the dashboard → transaction appears in DLQ panel → admin clicks "Re-queue" after switching Mock to SUCCESS mode → transaction completes.
 
+**Architectural rationale — active polling vs webhooks-first:**
+
+In production payment systems (Stripe, Adyen, Xendit), the standard pattern is **webhooks as the primary status signal** and a **scheduled reconciliation job** (hourly or nightly) to backfill any missed events — not an active polling loop. The reconciliation job sweeps all transactions still in `PROCESSING` after a threshold period and queries the provider API in bulk to resolve them.
+
+This system deliberately uses an **active retry polling loop** instead, as a conscious trade-off for the demo environment:
+
+| Concern | Production pattern | This system |
+|---|---|---|
+| Primary status signal | Webhook (push) | Webhook (push) — same |
+| Fallback for missed webhooks | Scheduled reconciliation job (hourly/nightly) | Active retry loop (30s → 60s → 120s) |
+| Why the difference? | At scale, per-transaction polling exhausts provider rate limits | Demo scale is trivially small; rapid resolution is required for a live demo |
+| Demo reliability | Reconciliation runs hourly — useless in a 10-minute demo slot | Payment resolves within 3.5 minutes even if ngrok drops the webhook |
+| Demo surface area | Reconciliation job is invisible during a demo | Retry queue draining and DLQ are visibly demonstrable |
+
+The retry loop **does not replace webhooks** — if a webhook arrives first, `RetryConsumer` detects the transaction is already resolved and skips silently (the `current != PENDING && current != PROCESSING` guard). The loop only acts when no webhook has arrived by the time the TTL fires.
+
+In a production deployment, the active retry queue would be replaced with: (1) webhooks as the sole real-time signal, and (2) a `@Scheduled` reconciliation job querying the provider API once per hour for all unresolved transactions — consuming a single API call per batch rather than one call per transaction per retry tick.
+
+**Disbursement note:** Xendit sandbox resolves disbursements synchronously — `POST /disbursements` returns `"status": "COMPLETED"` immediately. The adapter maps this to `SUCCESS` at initiation time, so no retry or webhook is ever needed for sandbox disbursement flows. This is consistent with real Xendit behaviour on certain fast-settlement rails.
+
 ### Feature 7: Routing Rule Simulate
 A POST endpoint and matching UI panel where you input:
 - Region, amount, currency, payment method
@@ -1266,4 +1286,5 @@ rabbitmq:
 5. **"What happens when a payment gets stuck?"** — Show the DLQ panel. Walk through: provider failure → 3 retry attempts with increasing delays → RETRY_EXHAUSTED status → admin sees it → clicks Re-queue after provider recovers → payment completes. This is a production-grade failure recovery flow.
 6. **"Why insurance?"** — Insurance payments are uniquely demanding: premiums must reach the right provider to trigger policy coverage, claim payouts must be fast and traceable to avoid regulatory penalties, and failed payments have real consequences (policy lapse). This makes payment orchestration — not just payment processing — essential in insurance. The same routing engine that minimizes fees for a merchant minimizes delays for a claims payout.
 7. **"What happens downstream after a payment succeeds?"** — A `PaymentSucceededEvent` is published to a durable RabbitMQ notification queue. A consumer picks it up and activates the linked insurance policy (or marks the claim as disbursed) by writing to `transaction_events` and updating the `demo_policies` table. You can stop the consumer live, queue up 5 payments, then restart — all 5 process instantly without loss. This proves the system is not tightly coupled: the payment path and the insurance activation path are independent and survivable.
-8. **"Isn't the demo policy table just fake data?"** — Yes, intentionally. In production, these records would be pushed in by a separate Policy Administration System (PAS) via the same API. The demo simulates what the PAS would do, so the examiner sees a realistic insurance back-office flow rather than a blank payment form. The `POST /admin/demo-policies` endpoint is exactly the contract a real PAS integration would call.
+8. **"Why do you poll the provider instead of relying purely on webhooks?"** — We don't poll instead of webhooks — we use both, with webhooks as the primary signal. The active retry loop is a deliberate trade-off for the demo environment: a production system would use webhooks as the real-time signal and a scheduled hourly reconciliation job to backfill any missed events. We chose an active retry loop because (a) our demo scale is trivially small so rate limits are irrelevant, (b) ngrok is unreliable in a live demo setting so we can't bet a 10-minute examiner slot on webhook delivery, and (c) the retry queue draining and DLQ panel are visibly demonstrable in real time — a scheduled reconciliation job that runs hourly gives us nothing to show. The retry consumer also skips silently if the webhook already resolved the transaction, so there is no double-processing risk.
+9. **"Isn't the demo policy table just fake data?"** — Yes, intentionally. In production, these records would be pushed in by a separate Policy Administration System (PAS) via the same API. The demo simulates what the PAS would do, so the examiner sees a realistic insurance back-office flow rather than a blank payment form. The `POST /admin/demo-policies` endpoint is exactly the contract a real PAS integration would call.

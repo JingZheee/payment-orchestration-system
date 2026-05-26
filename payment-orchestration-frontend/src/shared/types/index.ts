@@ -8,3 +8,4 @@ export * from './provider';
 export * from './feeRate';
 export * from './metrics';
 export * from './recon';
+export * from './user';

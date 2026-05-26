@@ -5,17 +5,43 @@ import { authService } from '../features/auth/services/authService';
 
 const { Sider, Header, Content } = Layout;
 
-const NAV_ITEMS = [
-  { path: '/dashboard',        label: 'Dashboard',        icon: 'dashboard' },
-  { path: '/transactions',     label: 'Transactions',     icon: 'payments' },
-  { path: '/routing-rules',    label: 'Routing Rules',    icon: 'account_tree' },
-  { path: '/routing',          label: 'Routing Engine',   icon: 'hub' },
-  { path: '/providers',        label: 'Providers',        icon: 'account_balance' },
-  { path: '/fee-rates',        label: 'Fee Rates',        icon: 'percent' },
-  { path: '/payment-methods',  label: 'Payment Methods',  icon: 'credit_card' },
-  { path: '/metrics',          label: 'Metrics',          icon: 'analytics' },
-  { path: '/reconciliation',   label: 'Reconciliation',   icon: 'account_balance_wallet' },
-  { path: '/dead-letter-queue',label: 'Dead Letter Queue',icon: 'error_outline' },
+const NAV_SECTIONS = [
+  {
+    heading: 'Overview',
+    items: [
+      { path: '/dashboard',    label: 'Dashboard',    icon: 'dashboard' },
+      { path: '/transactions', label: 'Transactions', icon: 'payments' },
+    ],
+  },
+  {
+    heading: 'Routing',
+    items: [
+      { path: '/routing-rules', label: 'Routing Rules',  icon: 'account_tree' },
+      { path: '/routing',       label: 'Routing Engine', icon: 'hub' },
+    ],
+  },
+  {
+    heading: 'Configuration',
+    items: [
+      { path: '/providers',       label: 'Providers',        icon: 'account_balance' },
+      { path: '/fee-rates',       label: 'Fee Rates',        icon: 'percent' },
+      { path: '/payment-methods', label: 'Payment Methods',  icon: 'credit_card' },
+      { path: '/users',           label: 'Users',            icon: 'group' },
+    ],
+  },
+  {
+    heading: 'Analytics',
+    items: [
+      { path: '/metrics',        label: 'Metrics',        icon: 'analytics' },
+      { path: '/reconciliation', label: 'Reconciliation', icon: 'account_balance_wallet' },
+    ],
+  },
+  {
+    heading: 'System',
+    items: [
+      { path: '/dead-letter-queue', label: 'Dead Letter Queue', icon: 'error_outline' },
+    ],
+  },
 ];
 
 function MIcon({ name, size = 20, style }: { name: string; size?: number; style?: CSSProperties }) {
@@ -66,31 +92,48 @@ export default function AppLayout() {
         </div>
 
         {/* Navigation */}
-        <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {NAV_ITEMS.map(({ path, label, icon }) => (
-            <NavLink
-              key={path}
-              to={path}
-              className="nav-item"
-              style={({ isActive }): CSSProperties => ({
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-                padding: '10px 12px',
-                borderLeft: `3px solid ${isActive ? '#FCB900' : 'transparent'}`,
-                borderRadius: '0 8px 8px 0',
-                background: isActive ? 'rgba(255,255,255,0.5)' : 'transparent',
-                color: isActive ? '#7B5800' : '#475569',
-                fontWeight: isActive ? 600 : 400,
-                fontSize: 14,
-                textDecoration: 'none',
-                opacity: isActive ? 1 : 0.85,
-                transition: 'all 0.15s',
-              })}
-            >
-              <MIcon name={icon} />
-              <span>{label}</span>
-            </NavLink>
+        <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0 }}>
+          {NAV_SECTIONS.map(({ heading, items }, sectionIdx) => (
+            <div key={heading} style={{ marginTop: sectionIdx === 0 ? 0 : 16 }}>
+              <div style={{
+                fontSize: 10,
+                fontWeight: 700,
+                color: '#9CA3AF',
+                textTransform: 'uppercase',
+                letterSpacing: '0.1em',
+                padding: '0 12px',
+                marginBottom: 4,
+              }}>
+                {heading}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {items.map(({ path, label, icon }) => (
+                  <NavLink
+                    key={path}
+                    to={path}
+                    className="nav-item"
+                    style={({ isActive }): CSSProperties => ({
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      padding: '10px 12px',
+                      borderLeft: `3px solid ${isActive ? '#FCB900' : 'transparent'}`,
+                      borderRadius: '0 8px 8px 0',
+                      background: isActive ? 'rgba(255,255,255,0.5)' : 'transparent',
+                      color: isActive ? '#7B5800' : '#475569',
+                      fontWeight: isActive ? 600 : 400,
+                      fontSize: 14,
+                      textDecoration: 'none',
+                      opacity: isActive ? 1 : 0.85,
+                      transition: 'all 0.15s',
+                    })}
+                  >
+                    <MIcon name={icon} />
+                    <span>{label}</span>
+                  </NavLink>
+                ))}
+              </div>
+            </div>
           ))}
         </nav>
 
@@ -152,23 +195,7 @@ export default function AppLayout() {
             borderBottom: '1px solid #F6F3F5',
           }}
         >
-          {/* Search */}
-          <div style={{ position: 'relative', width: 384 }}>
-            <MIcon
-              name="search"
-              size={18}
-              style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF' }}
-            />
-            <input
-              placeholder="Search transactions, rules, providers..."
-              style={{
-                width: '100%', background: '#F6F3F5', border: 'none',
-                borderRadius: 12, padding: '10px 16px 10px 40px',
-                fontSize: 14, color: '#1C1C1E', outline: 'none',
-                fontFamily: 'inherit',
-              }}
-            />
-          </div>
+          <div />
 
           {/* Right actions */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
@@ -218,9 +245,6 @@ export default function AppLayout() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: '#1C1C1E', lineHeight: 1.3 }}>Admin</div>
-                  <div style={{ fontSize: 10, color: '#7B5800', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    {localStorage.getItem('pos_role') ?? 'ADMIN'}
-                  </div>
                 </div>
                 <div style={{
                   width: 36, height: 36, borderRadius: '50%',

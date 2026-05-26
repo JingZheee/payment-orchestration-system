@@ -61,6 +61,11 @@ export const API = {
     DELETE: (id: string) => `/admin/demo-policies/${id}`,
   },
 
+  USERS: {
+    LIST:   '/admin/users',
+    BY_ID:  (id: string) => `/admin/users/${id}`,
+  },
+
   NOTIFICATION_QUEUE: {
     STATUS: '/admin/notification-queue/status',
     START:  '/admin/notification-queue/consumer/start',

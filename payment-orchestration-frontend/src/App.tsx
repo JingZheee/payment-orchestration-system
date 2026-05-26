@@ -14,6 +14,7 @@ import PaymentDemo from './features/payment-demo/PaymentDemo';
 import PaymentMethods from './features/payment-methods/PaymentMethods';
 import PaymentCheckoutPage from './features/payment-demo/PaymentCheckoutPage';
 import RoutingEnginePage from './features/routing/RoutingEnginePage';
+import Users from './features/users/Users';
 
 export default function App() {
   return (
@@ -36,6 +37,7 @@ export default function App() {
           <Route path="metrics"            element={<Metrics />} />
           <Route path="reconciliation"     element={<Reconciliation />} />
           <Route path="dead-letter-queue"  element={<DeadLetterQueue />} />
+          <Route path="users"              element={<Users />} />
           <Route path="payment-demo"       element={<PaymentDemo />} />
         </Route>
       </Route>
