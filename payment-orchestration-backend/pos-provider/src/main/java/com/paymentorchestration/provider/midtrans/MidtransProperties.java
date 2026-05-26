@@ -13,6 +13,6 @@ public class MidtransProperties {
 
     private String serverKey;
     private String clientKey;
-    private String webhookSecret;
     private String baseUrl = "https://api.sandbox.midtrans.com/v2";
+    private String snapBaseUrl = "https://app.sandbox.midtrans.com/snap/v1";
 }

@@ -327,10 +327,10 @@ Weights are configurable in `application.yml` under `routing.scorer.*`.
 
 | Field | Value |
 |---|---|
-| **Current module** | full-stack — async webhook refactor + Dead Letter Queue page |
-| **Current task** | Start backend, verify RabbitMQ topology in management UI (localhost:15672), then smoke test DLQ page with Mock FAIL mode |
-| **Last completed** | Dead Letter Queue page fully implemented (requeue endpoint + full frontend); async webhook refactor (WebhookConsumer on webhook.queue, RetryConsumer on retry.processing.queue) |
-| **Blockers** | Backend not restarted yet after docker compose reset — queue topology unverified |
+| **Current module** | pos-provider — Midtrans adapter fixes + PRD v1.6 |
+| **Current task** | Restart backend (picks up V23 migration), smoke test CARD via Snap hosted page and VA number display in checkout UI |
+| **Last completed** | Midtrans fixes: CARD→Snap API, vaNumber surfaced, providerTransactionId=merchantOrderId, webhook uses order_id, refund status mapped, V23 migration, PRD v1.6 documented |
+| **Blockers** | Backend not restarted — V23 migration + Midtrans code changes not live; Xendit sandbox keys not yet in application-dev.yml |
 
 ### Admin API Endpoints — Payment Methods
 ```

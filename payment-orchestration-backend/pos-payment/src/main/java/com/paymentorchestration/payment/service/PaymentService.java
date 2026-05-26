@@ -153,6 +153,7 @@ public class PaymentService {
         transaction.setStatus(result.getStatus());
         transaction.setProviderTransactionId(result.getProviderTransactionId());
         transaction.setRedirectUrl(result.getRedirectUrl());
+        transaction.setVaNumber(result.getVaNumber());
         transaction.setFee(result.getFee());
         transactionRepository.save(transaction);
 
@@ -247,6 +248,7 @@ public class PaymentService {
                 .routingReason(t.getRoutingReason())
                 .fee(t.getFee())
                 .redirectUrl(t.getRedirectUrl())
+                .vaNumber(t.getVaNumber())
                 .createdAt(t.getCreatedAt())
                 .paymentType(t.getPaymentType())
                 .policyNumber(t.getPolicyNumber())

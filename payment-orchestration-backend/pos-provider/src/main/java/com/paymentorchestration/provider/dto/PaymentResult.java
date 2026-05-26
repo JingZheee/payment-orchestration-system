@@ -13,6 +13,8 @@ public class PaymentResult {
     private final String providerTransactionId;
     private final PaymentStatus status;
     private final String redirectUrl;
+    /** Virtual account number returned by bank-transfer providers (e.g. Midtrans BCA VA). */
+    private final String vaNumber;
     private final BigDecimal fee;
     /** Raw JSON response from the provider — stored in transaction_events for debugging. */
     private final String rawResponse;

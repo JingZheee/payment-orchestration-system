@@ -22,8 +22,10 @@ public class InitiatePaymentResponse {
     private final RoutingStrategy routingStrategy;
     private final String routingReason;
     private final BigDecimal fee;
-    /** Redirect URL returned by the provider — null for server-side flows. */
+    /** Redirect URL returned by the provider — null for VA flows. */
     private final String redirectUrl;
+    /** Virtual account number — set for Midtrans bank_transfer payments. */
+    private final String vaNumber;
     private final Instant createdAt;
     private final PaymentType paymentType;
     private final String policyNumber;

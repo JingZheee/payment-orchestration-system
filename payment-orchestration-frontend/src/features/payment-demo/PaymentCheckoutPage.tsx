@@ -356,15 +356,41 @@ function SuccessPanel({
   currency: string;
   navigate: ReturnType<typeof useNavigate>;
 }) {
+  const isVa = !!result.vaNumber;
+  const isRedirect = !isVa && !!result.redirectUrl;
+
   return (
     <div>
       <div style={{ textAlign: 'center', marginBottom: 28 }}>
         <CheckCircleFilled style={{ fontSize: 60, color: '#059669', marginBottom: 12 }} />
-        <div style={{ fontSize: 24, fontWeight: 800, color: '#1C1C1E', marginBottom: 6 }}>Payment Processed</div>
+        <div style={{ fontSize: 24, fontWeight: 800, color: '#1C1C1E', marginBottom: 6 }}>
+          {isVa ? 'Transfer Required' : isRedirect ? 'Redirected to Payment Page' : 'Payment Processed'}
+        </div>
         <div style={{ fontSize: 13, color: '#6B7280' }}>
-          The payment has been routed and processed successfully.
+          {isVa
+            ? 'Transfer the exact amount to the BCA Virtual Account below.'
+            : isRedirect
+            ? 'Complete your card payment in the tab that just opened.'
+            : 'The payment has been routed and processed successfully.'}
         </div>
       </div>
+
+      {isVa && (
+        <div style={{
+          background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 12,
+          padding: '16px 20px', marginBottom: 20, textAlign: 'center',
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#1D4ED8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+            BCA Virtual Account Number
+          </div>
+          <Text copyable style={{ fontSize: 22, fontWeight: 800, fontFamily: 'monospace', color: '#1E40AF', letterSpacing: '0.1em' }}>
+            {result.vaNumber}
+          </Text>
+          <div style={{ fontSize: 11, color: '#6B7280', marginTop: 8 }}>
+            Pay via BCA mobile / ATM
+          </div>
+        </div>
+      )}
 
       <div style={{ background: '#F9FAFB', borderRadius: 12, padding: '20px 24px', marginBottom: 24 }}>
         <div style={{

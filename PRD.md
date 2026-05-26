@@ -1,6 +1,6 @@
 # Product Requirements Document
 # Payment Orchestration System (POS)
-**Version:** 1.5
+**Version:** 1.6
 **Date:** 2026-05-26
 **Type:** Final Year Project (FYP)
 
@@ -90,7 +90,7 @@ The MVP goal is a fully functional routing engine integrated with real sandbox p
 
 ### Providers
 - ✅ Billplz sandbox (Malaysia — FPX bank transfer)
-- ✅ Midtrans sandbox (Indonesia — Virtual Account, QRIS)
+- ✅ Midtrans sandbox (Indonesia — Virtual Account/BCA, QRIS, GoPay, Card via Snap API)
 - ✅ Xendit sandbox (Philippines — GCash, Maya, GrabPay, cards via Invoice API; claim disbursements via Disbursements API)
 - ✅ Mock provider (controllable success/failure, simulates any region/method)
 - ❌ PayMongo (Philippines — sandbox geo-restricted to PH; replaced by Xendit; adapter retained, disabled in DB)
@@ -427,11 +427,40 @@ Not all providers support outbound claim disbursements — only Xendit exposes a
 | Provider | PREMIUM_COLLECTION | CLAIMS_DISBURSEMENT | Notes |
 |---|---|---|---|
 | Billplz (MY) | ✅ | ❌ | `/bills` endpoint is collection-only; no payout API in sandbox |
-| Midtrans (ID) | ✅ | ❌ | `/charge` endpoint is collection-only; Iris Disbursement API requires separate approval |
+| Midtrans (ID) | ✅ | ❌ | Core API (`/charge`) for VA/QRIS/GoPay; Snap API (`/snap/v1/transactions`) for Card; Iris Disbursement API requires separate approval |
 | Xendit (PH) | ✅ | ✅ | `initiatePayment` routes to `/v2/invoices` (collection) or `/disbursements` (claims) based on `paymentType` |
 | Mock | ✅ | ✅ | Handles all payment types for all regions; used as fallback for MY/ID claim disbursements |
 
 **Routing consequence:** MY and ID claim disbursements are automatically routed to the Mock provider (the only eligible provider for those regions that declares disbursement support). PH claim disbursements route to Xendit via the real Disbursements API.
+
+#### Midtrans Adapter — Design Notes
+
+Midtrans exposes two separate APIs and the adapter uses both depending on payment method:
+
+| Method | API Used | Endpoint | Returns |
+|---|---|---|---|
+| `VIRTUAL_ACCOUNT` | Core API | `POST /v2/charge` (`payment_type: bank_transfer`, `bank: bca`) | BCA VA number in `va_numbers[0].va_number`; no redirect URL |
+| `QRIS` | Core API | `POST /v2/charge` (`payment_type: qris`) | QR code URL in `actions[].generate-qr-code` |
+| `GOPAY` / `EWALLET` | Core API | `POST /v2/charge` (`payment_type: gopay`) | Deep-link URL in `actions[].deeplink-redirect`; EWALLET maps to GoPay (dominant sandbox e-wallet) |
+| `CARD` | Snap API | `POST /snap/v1/transactions` (`enabled_payments: ["credit_card"]`) | Hosted payment page `redirect_url`; opened in new tab automatically |
+
+**Why Snap for CARD?** Midtrans Core API card charges require client-side tokenization via Midtrans.js running in the browser — the `token_id` must be generated on the frontend before calling the backend. Snap API avoids this by returning a hosted payment page URL where the customer enters card details directly. This keeps all card-handling within Midtrans's PCI-compliant environment without any frontend SDK integration.
+
+**`providerTransactionId` = `merchantOrderId` (all Midtrans methods)**
+
+The adapter stores `merchantOrderId` (i.e., the `order_id` sent to Midtrans) as `providerTransactionId` rather than Midtrans's internal `transaction_id`. Reasons:
+
+1. **Status polling works for all methods** — `GET /v2/{orderId}/status` is valid on the Core API for all payment types. Midtrans's internal `transaction_id` only exists once a charge is created (not available for Snap sessions until the customer pays).
+2. **Snap card sessions have no `transaction_id` at charge time** — the Snap API returns a `token` and `redirect_url`, not a `transaction_id`. Polling `/v2/{snapToken}/status` against the Core API fails with a connection error because Snap tokens are not valid Core API transaction identifiers.
+3. **Webhook matching is consistent** — Midtrans webhooks (both Core API and Snap) include `order_id` in the payload. `parseWebhookPayload` extracts `order_id` as the identifier, which matches the stored `providerTransactionId` for all methods. Using `transaction_id` from the webhook would fail for Snap card flows where no `transaction_id` was stored at initiation time.
+
+**VA number surfacing**
+
+For `VIRTUAL_ACCOUNT` payments the BCA VA number is extracted from `va_numbers[0].va_number` in the charge response and returned as `vaNumber` in `PaymentResult` → persisted to `transactions.va_number` (V23 migration) → included in `InitiatePaymentResponse`. The checkout UI displays it as a copyable blue callout with "Pay via BCA mobile / ATM" instructions. There is no redirect URL for VA payments — the customer transfers money independently.
+
+**Webhook signature verification**
+
+Midtrans embeds the signature in the webhook body itself (not in a header). Verification: `SHA-512(order_id + status_code + gross_amount + serverKey)` compared against `payload.signature_key`. The `serverKey` is the same key used for API auth — there is no separate webhook secret for Midtrans (unlike Billplz and Xendit).
 
 ### Feature 3: Mock Provider
 Configurable behavior via admin dashboard or `application.yml`:
@@ -685,7 +714,7 @@ The `/payment-demo` page is a simulated insurance back-office system, not just a
 | Provider | Region | Methods | Disbursement | Sandbox |
 |---|---|---|---|---|
 | Billplz | Malaysia | FPX bank transfer | ❌ | Free, no registration required |
-| Midtrans | Indonesia | Virtual Account, QRIS, GoPay | ❌ | Free sandbox at midtrans.com |
+| Midtrans | Indonesia | Virtual Account (BCA), QRIS, GoPay, Card (Snap API) | ❌ | Free sandbox at midtrans.com; card payments use Snap hosted page |
 | Xendit | Philippines | GCash, Maya, GrabPay, Card (Invoice API); Bank disbursement (Disbursements API) | ✅ | Free, globally accessible at dashboard.xendit.co |
 | Mock | All | Configurable | ✅ | Built-in, no external account |
 
@@ -816,10 +845,22 @@ Base URL: `/api/v1`
   "policyNumber": "POL-2026-MY-00123",
   "routingReason": "Rule #2 matched: MY region, amount < RM100",
   "redirectUrl": "https://billplz.com/bills/abc123",
+  "vaNumber": null,
   "fee": 0.30,
   "createdAt": "2026-03-30T10:00:00Z"
 }
 ```
+
+`vaNumber` is only populated for Midtrans `VIRTUAL_ACCOUNT` payments (e.g. `"vaNumber": "12345678901234"`). It is `null` for all other providers and payment methods. When `vaNumber` is present, `redirectUrl` will be `null` — the customer makes a bank transfer to the VA number instead of being redirected.
+
+**Response field summary by Midtrans payment method:**
+
+| Method | `status` | `redirectUrl` | `vaNumber` |
+|---|---|---|---|
+| `VIRTUAL_ACCOUNT` | `PROCESSING` | `null` | BCA VA number string |
+| `CARD` (Snap) | `PENDING` | Snap hosted page URL | `null` |
+| `QRIS` | `PROCESSING` | QR code image URL | `null` |
+| `GOPAY` / `EWALLET` | `PROCESSING` | GoPay deep-link URL | `null` |
 
 ### Payments — Disbursement (Claims Payout)
 | Method | Path | Auth | Description |
@@ -1154,6 +1195,7 @@ where:
 | V20 | `payment_methods` (new) | Composite PK (code, region), name VARCHAR(100), is_active BOOLEAN; 13 seed rows; composite FK from transactions, provider_fee_rates, recon_statements |
 | V21 | `demo_policies` (new) | id UUID PK, holder_name, holder_email, insurance_type, policy_number, claim_reference, amount DECIMAL(19,4), currency, region, payment_method, payment_type, status VARCHAR(20) DEFAULT 'PENDING', transaction_id UUID, created_at, updated_at; 6 seed rows (4 premium + 2 claims across MY/ID/PH) |
 | V22 | `provider_configs` + `provider_fee_rates` (alter) | Inserts XENDIT into provider_configs (enabled, 2.5% fee); sets PAYMONGO is_enabled=false; inserts 5 Xendit PH fee rate rows (GCASH 2.5%, MAYA 2.2%, GRABPAY 2.5%, CARD PHP15+3.5%, EWALLET 2.5%) |
+| V23 | `transactions` (alter) | Adds `va_number VARCHAR(100)` — populated for Midtrans VIRTUAL_ACCOUNT payments only; null for all other providers and methods |
 
 ### RabbitMQ Queue Topology (Implementation Reference)
 ```yaml

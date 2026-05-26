@@ -62,6 +62,9 @@ public class Transaction {
     @Column(name = "redirect_url")
     private String redirectUrl;
 
+    @Column(name = "va_number", length = 100)
+    private String vaNumber;
+
     @Column(precision = 19, scale = 4)
     private BigDecimal fee;
 

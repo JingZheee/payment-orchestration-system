@@ -64,5 +64,6 @@ export interface InitiatePaymentResponse {
   routingReason: string;
   fee: number;
   redirectUrl: string | null;
+  vaNumber: string | null;
   createdAt: string;
 }
