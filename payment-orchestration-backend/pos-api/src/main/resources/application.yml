@@ -37,6 +37,7 @@ rabbitmq:
     retry-30s: retry.q.30s
     retry-60s: retry.q.60s
     retry-120s: retry.q.120s
+    retry-processing: retry.processing.queue
     payment-dlq: payment.dlq
     notification: payment.notification.queue
 

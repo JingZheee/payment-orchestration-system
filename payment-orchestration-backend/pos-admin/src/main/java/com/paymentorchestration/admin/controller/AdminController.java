@@ -19,6 +19,7 @@ import com.paymentorchestration.domain.repository.ProviderFeeRateRepository;
 import com.paymentorchestration.domain.repository.ProviderMetricsRepository;
 import com.paymentorchestration.domain.repository.TransactionEventRepository;
 import com.paymentorchestration.domain.repository.TransactionRepository;
+import com.paymentorchestration.payment.messaging.RetryPublisher;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -51,6 +52,7 @@ public class AdminController {
     private final TransactionEventRepository transactionEventRepository;
     private final ProviderConfigRepository providerConfigRepository;
     private final ProviderFeeRateRepository providerFeeRateRepository;
+    private final RetryPublisher retryPublisher;
 
     private record ProviderMeta(String label, String webhookType) {}
 
@@ -135,6 +137,31 @@ public class AdminController {
         detail.put("transaction", tx);
         detail.put("events", events);
         return ResponseEntity.ok(ApiResponse.ok(detail));
+    }
+
+    @PostMapping("/transactions/{id}/requeue")
+    public ResponseEntity<ApiResponse<Transaction>> requeueTransaction(@PathVariable("id") UUID id) {
+        Transaction tx = transactionRepository.findById(id)
+                .orElseThrow(() -> new PosException("Transaction not found: " + id, HttpStatus.NOT_FOUND));
+
+        if (tx.getStatus() != PaymentStatus.RETRY_EXHAUSTED) {
+            throw new PosException(
+                    "Only RETRY_EXHAUSTED transactions can be re-queued — current status: " + tx.getStatus(),
+                    HttpStatus.CONFLICT);
+        }
+
+        tx.setStatus(PaymentStatus.PROCESSING);
+        transactionRepository.save(tx);
+
+        TransactionEvent event = new TransactionEvent();
+        event.setTransactionId(tx.getId());
+        event.setEventType("REQUEUED");
+        event.setDescription("Manually re-queued by admin. Retry attempt 1 scheduled (30 s delay).");
+        transactionEventRepository.save(event);
+
+        retryPublisher.publish(tx.getId(), 1);
+
+        return ResponseEntity.ok(ApiResponse.ok(tx, "Transaction re-queued"));
     }
 
     // ── Provider Config ─────────────────────────────────────────────────────────

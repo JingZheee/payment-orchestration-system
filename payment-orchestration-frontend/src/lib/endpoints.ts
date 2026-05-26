@@ -12,8 +12,9 @@ export const API = {
   },
 
   TRANSACTIONS: {
-    LIST:   '/admin/transactions',
-    DETAIL: (id: string) => `/admin/transactions/${id}`,
+    LIST:    '/admin/transactions',
+    DETAIL:  (id: string) => `/admin/transactions/${id}`,
+    REQUEUE: (id: string) => `/admin/transactions/${id}/requeue`,
   },
 
   ROUTING_RULES: {

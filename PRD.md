@@ -1,7 +1,7 @@
 # Product Requirements Document
 # Payment Orchestration System (POS)
-**Version:** 1.4
-**Date:** 2026-05-25
+**Version:** 1.5
+**Date:** 2026-05-26
 **Type:** Final Year Project (FYP)
 
 ---
@@ -346,22 +346,39 @@ payment-orchestration-frontend/src/
 ```
 Exchanges & Queues:
 
-[Provider Webhook]  → webhook.exchange (direct)
-                           └→ webhook.queue              (WebhookProcessorConsumer)
-                                 └→ DLX on failure → webhook.dlq (manual review)
+[Provider Webhook]  POST /webhooks/{provider}
+                      → verify signature + parse payload inline (fast, cheap)
+                      → publish WebhookMessage to webhook.exchange
+                      → return 200 immediately
 
-[Payment Retry]     → retry.exchange (direct)
-                           └→ retry.q.30s   (TTL: 30s,  DLX: retry.exchange)
-                           └→ retry.q.60s   (TTL: 60s,  DLX: retry.exchange)
-                           └→ retry.q.120s  (TTL: 120s, DLX: retry.exchange)
-                                 └→ after 3 attempts → payment.dlq (DLQ — admin visible)
+                    webhook.exchange (direct)
+                      └→ webhook.queue              ← WebhookConsumer (async DB update)
+                              └→ on NACK → webhook.dlq  (failed webhook processing — manual review)
 
-[Payment Success]   → notification.exchange (direct)
-                           └→ payment.notification.queue (NotificationConsumer — toggleable)
-                                 → writes TransactionEvent (PREMIUM_ACTIVATED / CLAIM_DISBURSED)
-                                 → marks linked demo_policy record ACTIVATED / DISBURSED
-                                 No TTL, no DLX — messages persist until consumer processes them
+[Payment Retry]     retry.exchange (direct)
+                      └→ retry.q.30s   (TTL: 30s,  DLX → retry.processing.queue)
+                      └→ retry.q.60s   (TTL: 60s,  DLX → retry.processing.queue)
+                      └→ retry.q.120s  (TTL: 120s, DLX → retry.processing.queue)
+                      └→ retry.processing.queue    ← RetryConsumer (polls provider for status)
+                      └→ payment.dlq               ← DlqConsumer (marks RETRY_EXHAUSTED)
+
+[Payment Success]   notification.exchange (direct)
+                      └→ payment.notification.queue ← NotificationConsumer (toggleable at runtime)
+                              → writes TransactionEvent (PREMIUM_ACTIVATED / CLAIM_DISBURSED)
+                              → marks linked demo_policy record ACTIVATED / DISBURSED
+                              No TTL, no DLX — messages persist until consumer processes them
 ```
+
+**Queue responsibilities:**
+
+| Queue | Consumer | Purpose |
+|---|---|---|
+| `webhook.queue` | `WebhookConsumer` | Inbound provider webhook events — updates transaction status |
+| `webhook.dlq` | Manual review | Webhook messages that failed processing (NACK'd) |
+| `retry.q.30s/60s/120s` | — | TTL holding queues; expired messages DLX to `retry.processing.queue` |
+| `retry.processing.queue` | `RetryConsumer` | Polls provider for status after TTL expiry |
+| `payment.dlq` | `DlqConsumer` | Exhausted retries — marks transaction `RETRY_EXHAUSTED` |
+| `payment.notification.queue` | `NotificationConsumer` | Post-payment insurance activation / email dispatch |
 
 **Why RabbitMQ, not Kafka:**
 - RabbitMQ is purpose-built for task queues, routing, and dead letter patterns
@@ -425,24 +442,32 @@ Configurable behavior via admin dashboard or `application.yml`:
 - Supports all regions and currencies — stands in for any real provider during demo
 
 ### Feature 4: Async Webhook Processing (RabbitMQ)
-```
-POST /webhooks/{provider}
-  → IdempotencyCheck (already processed? return cached 200)
-  → SignatureVerification (HMAC per provider — reject if invalid)
-  → WebhookLog insert (raw body + headers, signature_valid=true)
-  → Publish WebhookReceivedEvent to webhook.queue
-  → Return 200 immediately (provider gets fast ACK)
 
-[Async — WebhookProcessorConsumer]
-  → Consume from webhook.queue
-  → PayloadParsing (normalize to WebhookParseResult)
-  → TransactionStatusUpdate
-  → TransactionEvent insert
+**Fast-ack pattern** — the controller does only cheap, synchronous work (signature verification + payload parsing), publishes a `WebhookMessage` to the queue, and returns 200 immediately. All DB work runs asynchronously in `WebhookConsumer`.
+
+```
+POST /webhooks/{provider}   [WebhookController — synchronous, lightweight]
+  → Signature verification  (HMAC-SHA256 / x-callback-token per provider)
+  → Payload parsing         (normalize raw body / form params → WebhookMessage)
+  → Publish WebhookMessage  (provider, providerTransactionId, status, rawPayload,
+                             signatureValid, receivedAt) to webhook.exchange → webhook.queue
+  → Return 200 immediately  (provider gets fast ACK before any DB work)
+
+[Async — WebhookConsumer listening on webhook.queue]
+  → Reconstruct WebhookParseResult from WebhookMessage
+  → If signatureValid=false: log to webhook_logs only, do not update transaction
+  → If signatureValid=true:
+      → Update transaction status (PROCESSING → SUCCESS / FAILED)
+      → Write TransactionEvent (STATUS_UPDATED with previous → new status)
+      → If newly SUCCESS: publish PaymentSucceededEvent to notification queue
+      → Log to webhook_logs (with transaction_id + processed_at)
   → ACK message
-  → On failure: NACK → RabbitMQ routes to webhook.dlq
+  → On unhandled exception: NACK → RabbitMQ dead-letters to webhook.dlq
 ```
 
-**Why async matters:** Providers expect a fast 200 response (typically < 5s timeout). If your processor is slow or throws, the provider retries the webhook indefinitely. By ACKing immediately and processing async, you decouple receipt reliability from processing reliability.
+**Why async matters:** Payment providers (Billplz, Midtrans, Xendit) expect a 200 response within ~5 seconds or they retry the webhook — potentially hundreds of times. The fast-ack pattern decouples receipt reliability from processing reliability: even if the DB is momentarily slow, the provider gets its ACK and stops retrying. If the consumer crashes mid-processing, the message is NACK'd and lands in `webhook.dlq` for manual inspection — no webhook is silently lost.
+
+**Why `webhook.dlq` now has a real purpose:** Before this refactor, `WebhookController` processed webhooks synchronously, so `webhook.dlq` was dead infrastructure — nothing ever flowed into it. With async processing, any exception thrown by `WebhookConsumer` results in a NACK, and the raw `WebhookMessage` lands in `webhook.dlq` where an admin can inspect the payload and trigger a re-process.
 
 ### Feature 5: Admin Dashboard
 Key screens:
@@ -457,21 +482,30 @@ Key screens:
 
 ### Feature 6: Retry Queue with Dead Letter Queue (RabbitMQ)
 
-Replaces the naive `@Scheduled` DB polling approach with event-driven retries:
+Replaces the naive `@Scheduled` DB polling approach with event-driven retries. The retry pipeline is fully separate from the webhook pipeline — `retry.processing.queue` is dedicated to `RetryConsumer`, while `webhook.queue` is dedicated to `WebhookConsumer`. They do not share any queue.
 
 ```
-Payment fails or times out
-  → PublishRetryMessage { transactionId, attemptNumber, providerUsed }
-  → retry.queue with TTL = backoff_ms(attemptNumber)
-       attempt 1: TTL 30,000ms  (30 seconds)
-       attempt 2: TTL 60,000ms  (60 seconds)
-       attempt 3: TTL 120,000ms (120 seconds)
-  → On TTL expiry: message routed back to RetryConsumer
-  → RetryConsumer: calls queryPaymentStatus() on provider
-       → If SUCCESS/FAILED: update transaction, done
-       → If still PROCESSING + attempts < 3: re-publish with attempt+1
-       → If attempts == 3: publish to payment.dlq
-  → DLQ consumer: marks transaction RETRY_EXHAUSTED, writes event, notifies dashboard
+Payment initiated → provider returns PENDING or PROCESSING (webhook expected later)
+  → RetryPublisher publishes RetryMessage { transactionId, attemptNumber }
+       attempt 1 → retry.q.30s   (TTL: 30,000ms)
+       attempt 2 → retry.q.60s   (TTL: 60,000ms)
+       attempt 3 → retry.q.120s  (TTL: 120,000ms)
+       attempt 4+ → payment.dlq  (terminal)
+
+  → On TTL expiry: message DLX'd to retry.exchange → retry.processing.queue
+
+[RetryConsumer listening on retry.processing.queue]
+  → Load transaction from DB
+  → If already SUCCESS/FAILED/RETRY_EXHAUSTED: skip (webhook arrived first)
+  → Call queryPaymentStatus() on provider
+       → If SUCCESS or FAILED: update transaction, publish PaymentSucceededEvent if SUCCESS, done
+       → If still PENDING/PROCESSING + attempt < 4: re-publish with attempt+1
+       → If attempt ≥ 4: message was already routed directly to payment.dlq
+
+[DlqConsumer listening on payment.dlq]
+  → Mark transaction RETRY_EXHAUSTED
+  → Write TransactionEvent ("Payment failed after N retry attempts")
+  → Transaction visible in admin DLQ panel
 ```
 
 **Demo moment:** Set Mock provider to DELAYED mode → initiate payment → watch retry queue drain through 3 attempts on the dashboard → transaction appears in DLQ panel → admin clicks "Re-queue" after switching Mock to SUCCESS mode → transaction completes.
@@ -982,10 +1016,10 @@ The system is considered MVP-complete when an examiner can watch a 10-minute dem
 - ✅ `PaymentService.initiatePayment()` calls routing engine, writes `transaction_events`
 - ✅ `IdempotencyService` + `IdempotencyFilter`
 - ✅ `/payments/{id}/status` and `/payments/{id}/events`
-- ✅ `WebhookController` publishes to `webhook.queue` (async — returns 200 immediately)
-- ✅ `WebhookProcessorConsumer` `@RabbitListener` consumes, processes, updates transaction
-- ✅ Retry queue: `RetryPublisher` publishes failed payments with TTL-based backoff
-- ✅ `RetryConsumer` handles retries, increments attempt count, routes to DLQ after 3 failures
+- ✅ `WebhookController` verifies signature + parses payload, publishes `WebhookMessage` to `webhook.queue`, returns 200 immediately
+- ✅ `WebhookConsumer` `@RabbitListener(webhook.queue)` processes async — updates transaction status, writes event, logs to `webhook_logs`; NACK → `webhook.dlq`
+- ✅ Retry queue: `RetryPublisher` publishes `RetryMessage` with TTL-based backoff; TTL expiry DLX's to `retry.processing.queue`
+- ✅ `RetryConsumer` `@RabbitListener(retry.processing.queue)` polls provider, re-publishes or routes to `payment.dlq` after 3 attempts
 - ✅ `DlqConsumer` marks transaction `RETRY_EXHAUSTED`, writes event, available in admin API
 
 **Validation:** Full lifecycle: initiate → mock webhook arrives → queued → consumed → SUCCESS. Set Mock to FAIL → watch 3 retry attempts in RabbitMQ UI → transaction appears in DLQ.
@@ -1130,27 +1164,57 @@ rabbitmq:
     - "5672:5672"    # AMQP
     - "15672:15672"  # Management UI (guest/guest in dev)
 
-# Exchanges declared on startup (RabbitMQ Config Bean)
-webhook.exchange       → direct → webhook.queue
-                                    DLX: webhook.dlx → webhook.dlq
+# Exchanges declared on startup (RabbitMqConfig @Bean)
+webhook.exchange (direct)
+  → webhook.queue          routing-key: webhook.queue
+      DLX on NACK → webhook.exchange, routing-key: webhook.dlq
+  → webhook.dlq            routing-key: webhook.dlq
 
-retry.exchange         → direct → retry.q.30s  (x-message-ttl: 30000,  DLX: retry.exchange)
-                                → retry.q.60s  (x-message-ttl: 60000,  DLX: retry.exchange)
-                                → retry.q.120s (x-message-ttl: 120000, DLX: retry.exchange)
-                                → payment.dlq  (terminal — after 3 attempts)
+retry.exchange (direct)
+  → retry.q.30s            x-message-ttl: 30000,  DLX → retry.exchange, routing-key: retry.processing.queue
+  → retry.q.60s            x-message-ttl: 60000,  DLX → retry.exchange, routing-key: retry.processing.queue
+  → retry.q.120s           x-message-ttl: 120000, DLX → retry.exchange, routing-key: retry.processing.queue
+  → retry.processing.queue routing-key: retry.processing.queue   ← RetryConsumer
+  → payment.dlq            routing-key: payment.dlq              ← DlqConsumer (attempt 4+)
 
-notification.exchange  → direct → payment.notification.queue
-                                    Durable, no TTL, no DLX
-                                    Consumer id: "notificationConsumer" (toggleable at runtime)
-                                    Routing key = queue name
+notification.exchange (direct)
+  → payment.notification.queue
+      Durable, no TTL, no DLX
+      Consumer id: "notificationConsumer" (toggleable at runtime)
 
-# application.yml additions (V1.2)
+# application.yml — queue names
 rabbitmq:
   exchanges:
+    webhook: webhook.exchange
+    retry: retry.exchange
     notification: notification.exchange
   queues:
+    webhook: webhook.queue
+    webhook-dlq: webhook.dlq
+    retry-30s: retry.q.30s
+    retry-60s: retry.q.60s
+    retry-120s: retry.q.120s
+    retry-processing: retry.processing.queue
+    payment-dlq: payment.dlq
     notification: payment.notification.queue
 ```
+
+**Consumer → queue mapping (implementation):**
+
+| Class | Module | Listens on | Concern |
+|---|---|---|---|
+| `WebhookConsumer` | pos-admin | `webhook.queue` | Process inbound provider webhook events |
+| `RetryConsumer` | pos-admin | `retry.processing.queue` | Poll provider status after TTL expiry |
+| `DlqConsumer` | pos-admin | `payment.dlq` | Mark exhausted transactions `RETRY_EXHAUSTED` |
+| `NotificationConsumer` | pos-admin | `payment.notification.queue` | Activate policy / dispatch email |
+
+**Publisher → exchange mapping (implementation):**
+
+| Class | Module | Publishes to | Message type |
+|---|---|---|---|
+| `WebhookPublisher` | pos-payment | `webhook.exchange → webhook.queue` | `WebhookMessage` |
+| `RetryPublisher` | pos-payment | `retry.exchange → retry.q.{30s/60s/120s}` or `payment.dlq` | `RetryMessage` |
+| `PaymentSucceededPublisher` | pos-payment | `notification.exchange → payment.notification.queue` | `PaymentSucceededEvent` |
 
 ### What Makes This Defensible in a Viva
 1. **"Why not just use Xendit?"** — Xendit *is* one of our providers (Philippines region — GCash, Maya, GrabPay, cards, and disbursements). We route *to* Xendit alongside Billplz (Malaysia) and Midtrans (Indonesia). The orchestration layer is what selects *which* provider, when to fail over, and how to optimize cost across all three. Xendit doesn't solve that problem — it is one variable in the solution.

@@ -43,7 +43,7 @@ public class RetryConsumer {
     private final RetryPublisher retryPublisher;
     private final PaymentSucceededPublisher paymentSucceededPublisher;
 
-    @RabbitListener(queues = "${rabbitmq.queues.webhook}")
+    @RabbitListener(queues = "${rabbitmq.queues.retry-processing}")
     @Transactional
     public void handleRetry(RetryMessage message) {
         UUID txId = message.getTransactionId();

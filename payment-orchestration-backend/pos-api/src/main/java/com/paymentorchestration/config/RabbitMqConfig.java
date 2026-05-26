@@ -21,12 +21,13 @@ public class RabbitMqConfig {
 
     // Queues
     @Value("${rabbitmq.queues.webhook}")        private String webhookQueue;
-    @Value("${rabbitmq.queues.webhook-dlq}")    private String webhookDlq;
-    @Value("${rabbitmq.queues.retry-30s}")      private String retry30s;
-    @Value("${rabbitmq.queues.retry-60s}")      private String retry60s;
-    @Value("${rabbitmq.queues.retry-120s}")     private String retry120s;
-    @Value("${rabbitmq.queues.payment-dlq}")    private String paymentDlq;
-    @Value("${rabbitmq.queues.notification}")   private String notificationQueue;
+    @Value("${rabbitmq.queues.webhook-dlq}")        private String webhookDlq;
+    @Value("${rabbitmq.queues.retry-30s}")          private String retry30s;
+    @Value("${rabbitmq.queues.retry-60s}")          private String retry60s;
+    @Value("${rabbitmq.queues.retry-120s}")         private String retry120s;
+    @Value("${rabbitmq.queues.retry-processing}")   private String retryProcessing;
+    @Value("${rabbitmq.queues.payment-dlq}")        private String paymentDlq;
+    @Value("${rabbitmq.queues.notification}")       private String notificationQueue;
 
     // --- Exchanges ---
 
@@ -65,7 +66,7 @@ public class RabbitMqConfig {
         return QueueBuilder.durable(retry30s)
                 .withArgument("x-message-ttl", 30_000)
                 .withArgument("x-dead-letter-exchange", retryExchange)
-                .withArgument("x-dead-letter-routing-key", webhookQueue)
+                .withArgument("x-dead-letter-routing-key", retryProcessing)
                 .build();
     }
 
@@ -74,7 +75,7 @@ public class RabbitMqConfig {
         return QueueBuilder.durable(retry60s)
                 .withArgument("x-message-ttl", 60_000)
                 .withArgument("x-dead-letter-exchange", retryExchange)
-                .withArgument("x-dead-letter-routing-key", webhookQueue)
+                .withArgument("x-dead-letter-routing-key", retryProcessing)
                 .build();
     }
 
@@ -83,8 +84,13 @@ public class RabbitMqConfig {
         return QueueBuilder.durable(retry120s)
                 .withArgument("x-message-ttl", 120_000)
                 .withArgument("x-dead-letter-exchange", retryExchange)
-                .withArgument("x-dead-letter-routing-key", webhookQueue)
+                .withArgument("x-dead-letter-routing-key", retryProcessing)
                 .build();
+    }
+
+    @Bean
+    public Queue retryProcessingQueue() {
+        return QueueBuilder.durable(retryProcessing).build();
     }
 
     @Bean
@@ -156,11 +162,9 @@ public class RabbitMqConfig {
         return BindingBuilder.bind(paymentDlq()).to(retryExchange()).with(paymentDlq);
     }
 
-    // Expired TTL messages land on retry.exchange with routing key = webhookQueue.
-    // Without this binding they are silently dropped — RetryConsumer never fires.
     @Bean
-    public Binding retryToWebhookBinding() {
-        return BindingBuilder.bind(webhookQueue()).to(retryExchange()).with(webhookQueue);
+    public Binding retryProcessingBinding() {
+        return BindingBuilder.bind(retryProcessingQueue()).to(retryExchange()).with(retryProcessing);
     }
 
     @Bean

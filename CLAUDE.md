@@ -327,10 +327,10 @@ Weights are configurable in `application.yml` under `routing.scorer.*`.
 
 | Field | Value |
 |---|---|
-| **Current module** | full-stack — all major features implemented |
-| **Current task** | Add Xendit sandbox keys to application-dev.yml, then smoke test PH payments end-to-end (Invoice redirect + claim disbursement) |
-| **Last completed** | Routing Engine page (/routing) — composite score formula, live simulator with paymentType filter, sub-score breakdown, excluded providers panel; Dashboard shortcut card; PRD Feature 11 documented |
-| **Blockers** | None |
+| **Current module** | full-stack — async webhook refactor + Dead Letter Queue page |
+| **Current task** | Start backend, verify RabbitMQ topology in management UI (localhost:15672), then smoke test DLQ page with Mock FAIL mode |
+| **Last completed** | Dead Letter Queue page fully implemented (requeue endpoint + full frontend); async webhook refactor (WebhookConsumer on webhook.queue, RetryConsumer on retry.processing.queue) |
+| **Blockers** | Backend not restarted yet after docker compose reset — queue topology unverified |
 
 ### Admin API Endpoints — Payment Methods
 ```

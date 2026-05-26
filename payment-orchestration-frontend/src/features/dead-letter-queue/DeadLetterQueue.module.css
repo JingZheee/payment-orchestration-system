@@ -1,0 +1,82 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-page);
+}
+
+/* ── Table cell typography ───────────────────────────────── */
+
+.cellMonospace {
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.cellAmount {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.cellDate {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.cellMuted {
+  color: var(--text-disabled);
+  font-size: 12px;
+}
+
+.regionTag {
+  border-radius: 6px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+}
+
+/* ── Retry count badge ───────────────────────────────────── */
+
+.retryBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.12);
+  color: #991B1B;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* ── Action cell ─────────────────────────────────────────── */
+
+.actionCell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.requeueBtn {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  border-color: rgba(252, 185, 0, 0.5) !important;
+  color: #7B5800 !important;
+}
+
+.requeueBtn:hover:not(:disabled) {
+  border-color: #FCB900 !important;
+  background: rgba(252, 185, 0, 0.08) !important;
+  color: #7B5800 !important;
+}
+
+.chevronBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 4px;
+  line-height: 1;
+  flex-shrink: 0;
+}

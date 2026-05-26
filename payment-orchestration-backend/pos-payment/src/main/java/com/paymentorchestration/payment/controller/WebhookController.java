@@ -2,8 +2,8 @@ package com.paymentorchestration.payment.controller;
 
 import com.paymentorchestration.common.dto.ApiResponse;
 import com.paymentorchestration.common.enums.Provider;
-import com.paymentorchestration.common.exception.WebhookVerificationException;
-import com.paymentorchestration.payment.service.PaymentService;
+import com.paymentorchestration.payment.dto.WebhookMessage;
+import com.paymentorchestration.payment.messaging.WebhookPublisher;
 import com.paymentorchestration.provider.dto.WebhookParseResult;
 import com.paymentorchestration.provider.port.PaymentProviderPort;
 import jakarta.annotation.PostConstruct;
@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -23,14 +24,14 @@ import java.util.stream.Collectors;
  * Receives inbound webhooks from payment providers.
  *
  * Endpoint: POST /api/v1/webhooks/{provider}
- *   e.g.  POST /api/v1/webhooks/BILLPLZ
- *         POST /api/v1/webhooks/MIDTRANS
- *         POST /api/v1/webhooks/PAYMONGO
- *         POST /api/v1/webhooks/MOCK
  *
  * This endpoint is intentionally PUBLIC (no JWT required) because providers
  * call it from their servers. Authenticity is verified via HMAC-SHA256 / RSA
  * signature checked by each provider adapter.
+ *
+ * Fast-ack pattern: signature verification and parsing happen inline (cheap),
+ * then the parsed event is published to webhook.queue and 200 is returned
+ * immediately. WebhookConsumer owns the DB work asynchronously.
  *
  * Security note: even if signature verification fails we log the attempt and
  * return 200 to prevent provider retry storms; the transaction is NOT updated.
@@ -41,8 +42,8 @@ import java.util.stream.Collectors;
 @Slf4j
 public class WebhookController {
 
-    private final PaymentService paymentService;
     private final List<PaymentProviderPort> allProviders;
+    private final WebhookPublisher webhookPublisher;
 
     private Map<Provider, PaymentProviderPort> providerMap;
 
@@ -57,9 +58,6 @@ public class WebhookController {
             @PathVariable("provider") String provider,
             HttpServletRequest request) {
 
-        // For form-encoded requests (Billplz), use Tomcat's getParameterMap() directly.
-        // This gives properly decoded values without any manual URL-decoding that could
-        // produce different results. For JSON bodies (Midtrans, PayMongo) read the stream.
         Map<String, String> formParams = new LinkedHashMap<>();
         byte[] rawBody;
         String contentType = request.getContentType() != null ? request.getContentType() : "";
@@ -75,7 +73,6 @@ public class WebhookController {
             }
         }
 
-        // Lowercase all header names so adapters can do case-insensitive lookups.
         Map<String, String> headers = new HashMap<>();
         Enumeration<String> headerNames = request.getHeaderNames();
         if (headerNames != null) {
@@ -102,18 +99,26 @@ public class WebhookController {
         boolean signatureValid = adapter.verifyWebhookSignature(rawBody, headers, formParams);
         if (!signatureValid) {
             log.warn("[webhook] invalid signature from provider {}", providerEnum);
-            // Still parse and log, but PaymentService will not update the transaction
         }
 
         WebhookParseResult parsed = formParams.isEmpty()
                 ? adapter.parseWebhookPayload(new String(rawBody, StandardCharsets.UTF_8))
                 : adapter.parseWebhookPayload(formParams);
 
-        paymentService.handleWebhook(parsed, signatureValid);
+        WebhookMessage message = WebhookMessage.builder()
+                .provider(parsed.getProvider())
+                .providerTransactionId(parsed.getProviderTransactionId())
+                .status(parsed.getStatus())
+                .rawPayload(parsed.getRawPayload())
+                .signatureValid(signatureValid)
+                .receivedAt(Instant.now())
+                .build();
 
-        log.info("[webhook] processed provider={} txn={} status={} signatureValid={}",
-                providerEnum, parsed.getProviderTransactionId(), parsed.getStatus(), signatureValid);
+        webhookPublisher.publish(message);
 
-        return ResponseEntity.ok(ApiResponse.ok(null, "Webhook processed"));
+        log.info("[webhook] accepted provider={} txn={} signatureValid={} — queued for async processing",
+                providerEnum, parsed.getProviderTransactionId(), signatureValid);
+
+        return ResponseEntity.ok(ApiResponse.ok(null, "Accepted"));
     }
 }
