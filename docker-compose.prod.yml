@@ -13,12 +13,16 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    networks:
+      - pos-network
 
   rabbitmq:
     image: rabbitmq:3-management
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
+      # Disable the built-in guest account
+      RABBITMQ_DEFAULT_VHOST: /
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
@@ -27,6 +31,8 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    networks:
+      - pos-network
 
   backend:
     build:
@@ -59,12 +65,20 @@ services:
       PROVIDERS_PAYMONGO_WEBHOOK-SECRET: ${PAYMONGO_WEBHOOK_SECRET}
       PROVIDERS_PAYMONGO_BASE-URL: https://api.paymongo.com/v1
       PROVIDERS_MOCK_DEFAULT-MODE: ALWAYS_SUCCESS
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9080/actuator/health | grep -q UP || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
     restart: unless-stopped
+    networks:
+      - pos-network
 
   frontend:
     build:
@@ -72,9 +86,16 @@ services:
     ports:
       - "80:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
+    networks:
+      - pos-network
 
 volumes:
   postgres_data:
   rabbitmq_data:
+
+networks:
+  pos-network:
+    driver: bridge
