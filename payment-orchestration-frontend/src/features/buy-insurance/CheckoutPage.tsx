@@ -697,7 +697,7 @@ export default function CheckoutPage() {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
         <Text type="secondary">No product selected.</Text>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/buy')}>Browse Plans</Button>
+        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/store')}>Browse Plans</Button>
       </div>
     );
   }
@@ -726,7 +726,7 @@ export default function CheckoutPage() {
           </div>
           <Button
             type="primary" block size="large"
-            onClick={() => navigate('/buy')}
+            onClick={() => navigate('/store')}
             style={{ height: 46, borderRadius: 10, fontWeight: 700, background: '#FCB900', borderColor: '#FCB900', color: '#111827' }}
           >
             Back to Plans
@@ -793,7 +793,7 @@ export default function CheckoutPage() {
           <LockOutlined style={{ color: '#9CA3AF', fontSize: 12 }} />
           <Text style={{ fontSize: 12, color: '#9CA3AF' }}>256-bit SSL</Text>
           <Divider type="vertical" style={{ margin: '0 6px', borderColor: '#E5E7EB' }} />
-          <Button type="link" icon={<ArrowLeftOutlined />} onClick={() => navigate('/buy')} style={{ color: '#6B7280', padding: 0, fontSize: 13 }}>
+          <Button type="link" icon={<ArrowLeftOutlined />} onClick={() => navigate('/store')} style={{ color: '#6B7280', padding: 0, fontSize: 13 }}>
             Plans
           </Button>
         </div>

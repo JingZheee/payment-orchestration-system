@@ -232,7 +232,7 @@ export default function PaymentDemo() {
                 <Button
                   size="small"
                   disabled={isDone}
-                  onClick={() => navigate(`/payment-demo/pay/${row.id}`, { state: { policy: row } })}
+                  onClick={() => navigate(`/admin/payment-demo/pay/${row.id}`, { state: { policy: row } })}
                   style={{
                     background: isDone ? '#F3F4F6' : actionColor,
                     borderColor: isDone ? '#E5E7EB' : actionColor,

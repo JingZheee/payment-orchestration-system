@@ -9,37 +9,37 @@ const NAV_SECTIONS = [
   {
     heading: 'Overview',
     items: [
-      { path: '/dashboard',    label: 'Dashboard',    icon: 'dashboard' },
-      { path: '/transactions', label: 'Transactions', icon: 'payments' },
+      { path: '/admin/dashboard',    label: 'Dashboard',    icon: 'dashboard' },
+      { path: '/admin/transactions', label: 'Transactions', icon: 'payments' },
     ],
   },
   {
     heading: 'Routing',
     items: [
-      { path: '/routing-rules', label: 'Routing Rules',  icon: 'account_tree' },
-      { path: '/routing',       label: 'Routing Engine', icon: 'hub' },
+      { path: '/admin/routing-rules', label: 'Routing Rules',  icon: 'account_tree' },
+      { path: '/admin/routing',       label: 'Routing Engine', icon: 'hub' },
     ],
   },
   {
     heading: 'Configuration',
     items: [
-      { path: '/providers',       label: 'Providers',        icon: 'account_balance' },
-      { path: '/fee-rates',       label: 'Fee Rates',        icon: 'percent' },
-      { path: '/payment-methods', label: 'Payment Methods',  icon: 'credit_card' },
-      { path: '/users',           label: 'Users',            icon: 'group' },
+      { path: '/admin/providers',       label: 'Providers',        icon: 'account_balance' },
+      { path: '/admin/fee-rates',       label: 'Fee Rates',        icon: 'percent' },
+      { path: '/admin/payment-methods', label: 'Payment Methods',  icon: 'credit_card' },
+      { path: '/admin/users',           label: 'Users',            icon: 'group' },
     ],
   },
   {
     heading: 'Analytics',
     items: [
-      { path: '/metrics',        label: 'Metrics',        icon: 'analytics' },
-      { path: '/reconciliation', label: 'Reconciliation', icon: 'account_balance_wallet' },
+      { path: '/admin/metrics',        label: 'Metrics',        icon: 'analytics' },
+      { path: '/admin/reconciliation', label: 'Reconciliation', icon: 'account_balance_wallet' },
     ],
   },
   {
     heading: 'System',
     items: [
-      { path: '/dead-letter-queue', label: 'Dead Letter Queue', icon: 'error_outline' },
+      { path: '/admin/dead-letter-queue', label: 'Dead Letter Queue', icon: 'error_outline' },
     ],
   },
 ];
@@ -140,7 +140,7 @@ export default function AppLayout() {
         {/* Footer */}
         <div style={{ marginTop: 'auto', paddingTop: 24, borderTop: '1px solid #F6F3F5' }}>
           <button
-            onClick={() => navigate('/payment-demo')}
+            onClick={() => navigate('/admin/payment-demo')}
             style={{
               width: '100%',
               padding: '10px 16px',

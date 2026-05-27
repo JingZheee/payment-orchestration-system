@@ -55,7 +55,7 @@ export default function CompletePaymentPage() {
       .then(data => {
         // Already paid — redirect to result page
         if (data.status === 'SUCCESS' || data.status === 'ACTIVATED') {
-          navigate(`/payment-result?policyId=${policyId}`, { replace: true });
+          navigate(`/store/result?policyId=${policyId}`, { replace: true });
           return;
         }
         setQuote(data);
@@ -70,7 +70,7 @@ export default function CompletePaymentPage() {
     try {
       const res = await storeService.initiateStorePayment({
         policyId,
-        redirectUrl: `${window.location.origin}/payment-result`,
+        redirectUrl: `${window.location.origin}/store/result`,
       });
       window.location.href = res.redirectUrl;
     } catch (err: unknown) {
@@ -89,7 +89,7 @@ export default function CompletePaymentPage() {
           <ExclamationCircleFilled style={{ fontSize: 56, color: '#F59E0B', marginBottom: 16 }} />
           <div style={{ fontSize: 20, fontWeight: 800, color: '#1C1C1E', marginBottom: 8 }}>Invalid Payment Link</div>
           <div style={{ fontSize: 14, color: '#6B7280', marginBottom: 28 }}>This link is missing required information. Please use the link from your quote email.</div>
-          <Button type="primary" block size="large" onClick={() => navigate('/buy')}
+          <Button type="primary" block size="large" onClick={() => navigate('/store')}
             style={{ height: 46, borderRadius: 10, fontWeight: 700, background: '#FCB900', borderColor: '#FCB900', color: '#111827' }}>
             Browse Plans
           </Button>
@@ -115,7 +115,7 @@ export default function CompletePaymentPage() {
           <ExclamationCircleFilled style={{ fontSize: 56, color: '#DC2626', marginBottom: 16 }} />
           <div style={{ fontSize: 20, fontWeight: 800, color: '#1C1C1E', marginBottom: 8 }}>Quote Not Found</div>
           <div style={{ fontSize: 14, color: '#6B7280', marginBottom: 28 }}>{error}</div>
-          <Button type="primary" block size="large" onClick={() => navigate('/buy')}
+          <Button type="primary" block size="large" onClick={() => navigate('/store')}
             style={{ height: 46, borderRadius: 10, fontWeight: 700, background: '#FCB900', borderColor: '#FCB900', color: '#111827' }}>
             Start New Application
           </Button>
@@ -148,7 +148,7 @@ export default function CompletePaymentPage() {
           >
             {paying ? 'Redirecting…' : 'Resume Payment'}
           </Button>
-          <Button block size="large" onClick={() => navigate('/buy')}
+          <Button block size="large" onClick={() => navigate('/store')}
             style={{ height: 42, borderRadius: 10, fontWeight: 600, color: '#6B7280' }}>
             Cancel — Back to Plans
           </Button>
@@ -242,7 +242,7 @@ export default function CompletePaymentPage() {
                 {paying ? 'Redirecting to payment…' : `Pay ${formatAmount(Number(quote.amount), quote.currency)}`}
               </Button>
 
-              <Button block size="large" onClick={() => navigate('/buy')}
+              <Button block size="large" onClick={() => navigate('/store')}
                 style={{ height: 42, borderRadius: 10, fontWeight: 600, color: '#6B7280' }}>
                 Cancel — Back to Plans
               </Button>

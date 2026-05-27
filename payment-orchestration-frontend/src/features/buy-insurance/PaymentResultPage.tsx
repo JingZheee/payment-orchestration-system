@@ -93,7 +93,7 @@ export default function PaymentResultPage() {
             type="primary"
             size="large"
             block
-            onClick={() => navigate('/buy')}
+            onClick={() => navigate('/store')}
             style={{ height: 48, borderRadius: 12, background: '#FCB900', borderColor: '#FCB900', color: '#1C1C1E', fontWeight: 700 }}
           >
             Browse Insurance Plans
@@ -254,7 +254,7 @@ export default function PaymentResultPage() {
             <Button
               block
               size="large"
-              onClick={() => navigate('/buy')}
+              onClick={() => navigate('/store')}
               style={{ height: 46, borderRadius: 10, fontWeight: 600 }}
             >
               Buy Another Plan
@@ -265,7 +265,7 @@ export default function PaymentResultPage() {
                 block
                 size="large"
                 icon={<ArrowRightOutlined />}
-                onClick={() => navigate('/dashboard')}
+                onClick={() => navigate('/admin/dashboard')}
                 style={{
                   height: 46, borderRadius: 10, fontWeight: 600,
                   background: '#FCB900', borderColor: '#FCB900', color: '#1C1C1E',

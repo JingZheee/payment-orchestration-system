@@ -335,7 +335,7 @@ function AlreadyProcessedPanel({
       </div>
       <Button
         size="large"
-        onClick={() => navigate('/payment-demo')}
+        onClick={() => navigate('/admin/payment-demo')}
         icon={<ArrowLeftOutlined />}
         style={{ height: 48, borderRadius: 10, fontWeight: 600 }}
       >
@@ -435,7 +435,7 @@ function SuccessPanel({
           block
           size="large"
           icon={<ArrowLeftOutlined />}
-          onClick={() => navigate('/payment-demo')}
+          onClick={() => navigate('/admin/payment-demo')}
           style={{ height: 46, borderRadius: 10, fontWeight: 600 }}
         >
           Back to Demo
@@ -444,7 +444,7 @@ function SuccessPanel({
           type="primary"
           block
           size="large"
-          onClick={() => navigate('/transactions')}
+          onClick={() => navigate('/admin/transactions')}
           style={{
             height: 46, borderRadius: 10, fontWeight: 600,
             background: '#FCB900', borderColor: '#FCB900', color: '#1C1C1E',
@@ -521,7 +521,7 @@ export default function PaymentCheckoutPage() {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
         <Text type="secondary" style={{ fontSize: 14 }}>Policy not found.</Text>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/payment-demo')}>
+        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/admin/payment-demo')}>
           Back to Demo
         </Button>
       </div>
@@ -566,7 +566,7 @@ export default function PaymentCheckoutPage() {
           <Button
             type="link"
             icon={<ArrowLeftOutlined />}
-            onClick={() => navigate('/payment-demo')}
+            onClick={() => navigate('/admin/payment-demo')}
             style={{ color: '#6B7280', padding: 0, fontSize: 13 }}
           >
             Back to Demo

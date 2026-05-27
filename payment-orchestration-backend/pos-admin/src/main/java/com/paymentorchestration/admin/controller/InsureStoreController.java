@@ -78,7 +78,7 @@ public class InsureStoreController {
         policy.setStatus("QUOTE");
         DemoPolicy saved = demoPolicyRepository.save(policy);
 
-        String paymentLink = req.appBaseUrl() + "/complete-payment?policyId=" + saved.getId();
+        String paymentLink = req.appBaseUrl() + "/store/complete?policyId=" + saved.getId();
         emailNotificationService.sendQuoteEmail(saved, paymentLink);
 
         return ResponseEntity.ok(ApiResponse.ok(

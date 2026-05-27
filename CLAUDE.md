@@ -343,14 +343,19 @@ DELETE /api/v1/admin/payment-methods/{region}/{code} — delete (returns 409 if 
 ### Frontend Routes (complete)
 | Path | Component |
 |---|---|
-| `/dashboard` | Dashboard |
-| `/transactions` | Transactions |
-| `/routing-rules` | RoutingRules |
-| `/routing` | RoutingEnginePage |
-| `/providers` | Providers |
-| `/fee-rates` | FeeRates |
-| `/payment-methods` | PaymentMethods |
-| `/metrics` | Metrics |
-| `/reconciliation` | Reconciliation |
-| `/dead-letter-queue` | DeadLetterQueue |
-| `/payment-demo` | PaymentDemo |
+| `/store` | InsureStorePage |
+| `/store/checkout` | CheckoutPage |
+| `/store/complete` | CompletePaymentPage |
+| `/store/result` | PaymentResultPage |
+| `/admin/dashboard` | Dashboard |
+| `/admin/transactions` | Transactions |
+| `/admin/routing-rules` | RoutingRules |
+| `/admin/routing` | RoutingEnginePage |
+| `/admin/providers` | Providers |
+| `/admin/fee-rates` | FeeRates |
+| `/admin/payment-methods` | PaymentMethods |
+| `/admin/metrics` | Metrics |
+| `/admin/reconciliation` | Reconciliation |
+| `/admin/dead-letter-queue` | DeadLetterQueue |
+| `/admin/payment-demo` | PaymentDemo |
+| `/admin/users` | Users |

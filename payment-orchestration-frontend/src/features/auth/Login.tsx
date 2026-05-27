@@ -7,7 +7,7 @@ import type { LoginRequest } from '../../shared/types/auth';
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/dashboard';
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/admin/dashboard';
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

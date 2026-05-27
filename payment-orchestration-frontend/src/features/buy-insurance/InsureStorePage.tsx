@@ -459,7 +459,7 @@ export default function InsureStorePage() {
                 <ProductCard
                   key={p.id}
                   product={p}
-                  onSelect={() => navigate('/buy/checkout', { state: { product: p } })}
+                  onSelect={() => navigate('/store/checkout', { state: { product: p } })}
                 />
               ))}
             </div>

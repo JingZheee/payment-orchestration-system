@@ -73,7 +73,7 @@ export default function Dashboard() {
 
       {/* Routing Engine shortcut */}
       <div
-        onClick={() => navigate('/routing')}
+        onClick={() => navigate('/admin/routing')}
         style={{
           background: 'linear-gradient(135deg, #FFFBEA 0%, #FFF3CD 100%)',
           borderRadius: 16,

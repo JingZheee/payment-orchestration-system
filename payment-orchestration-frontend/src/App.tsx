@@ -25,18 +25,21 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
 
-      {/* Public customer-facing pages — no auth required */}
-      <Route path="/buy" element={<InsureStorePage />} />
-      <Route path="/buy/checkout" element={<CheckoutPage />} />
-      <Route path="/complete-payment" element={<CompletePaymentPage />} />
-      <Route path="/payment-result" element={<PaymentResultPage />} />
+      {/* Root redirect */}
+      <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
+
+      {/* Public customer-facing store — no auth required */}
+      <Route path="/store" element={<InsureStorePage />} />
+      <Route path="/store/checkout" element={<CheckoutPage />} />
+      <Route path="/store/complete" element={<CompletePaymentPage />} />
+      <Route path="/store/result" element={<PaymentResultPage />} />
 
       <Route element={<RequireAuth />}>
         {/* Full-page checkout — no sidebar */}
-        <Route path="/payment-demo/pay/:policyId" element={<PaymentCheckoutPage />} />
+        <Route path="/admin/payment-demo/pay/:policyId" element={<PaymentCheckoutPage />} />
 
-        <Route path="/" element={<AppLayout />}>
-          <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route path="/admin" element={<AppLayout />}>
+          <Route index element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="dashboard"          element={<Dashboard />} />
           <Route path="transactions"       element={<Transactions />} />
           <Route path="routing-rules"      element={<RoutingRules />} />

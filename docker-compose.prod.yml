@@ -1,0 +1,80 @@
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: pos_prod
+      POSTGRES_USER: pos
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pos -d pos_prod"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./payment-orchestration-backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/pos_prod
+      SPRING_DATASOURCE_USERNAME: pos
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM-POOL-SIZE: 10
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASS}
+      SPRING_MAIL_HOST: ${MAIL_HOST}
+      SPRING_MAIL_PORT: ${MAIL_PORT}
+      SPRING_MAIL_USERNAME: ${MAIL_USERNAME}
+      SPRING_MAIL_PASSWORD: ${MAIL_PASSWORD}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "true"
+      JWT_SECRET: ${JWT_SECRET}
+      PROVIDERS_BILLPLZ_API-KEY: ${BILLPLZ_API_KEY}
+      PROVIDERS_BILLPLZ_COLLECTION-ID: ${BILLPLZ_COLLECTION_ID}
+      PROVIDERS_BILLPLZ_WEBHOOK-SECRET: ${BILLPLZ_WEBHOOK_SECRET}
+      PROVIDERS_BILLPLZ_BASE-URL: https://www.billplz-sandbox.com/api/v3
+      PROVIDERS_MIDTRANS_SERVER-KEY: ${MIDTRANS_SERVER_KEY}
+      PROVIDERS_MIDTRANS_CLIENT-KEY: ${MIDTRANS_CLIENT_KEY}
+      PROVIDERS_MIDTRANS_WEBHOOK-SECRET: ${MIDTRANS_WEBHOOK_SECRET}
+      PROVIDERS_MIDTRANS_BASE-URL: https://api.sandbox.midtrans.com/v2
+      PROVIDERS_PAYMONGO_SECRET-KEY: ${PAYMONGO_SECRET_KEY}
+      PROVIDERS_PAYMONGO_WEBHOOK-SECRET: ${PAYMONGO_WEBHOOK_SECRET}
+      PROVIDERS_PAYMONGO_BASE-URL: https://api.paymongo.com/v1
+      PROVIDERS_MOCK_DEFAULT-MODE: ALWAYS_SUCCESS
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./payment-orchestration-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
