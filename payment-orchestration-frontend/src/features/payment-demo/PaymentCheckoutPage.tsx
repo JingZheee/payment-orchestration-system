@@ -21,8 +21,6 @@ const REGION_METHODS: Record<string, string[]> = {
   ID: ['VIRTUAL_ACCOUNT', 'QRIS', 'GOPAY', 'CARD', 'EWALLET'],
   PH: ['MAYA', 'GCASH', 'GRABPAY', 'CARD', 'EWALLET'],
 };
-const REGION_FLAG: Record<string, string> = { MY: '🇲🇾', ID: '🇮🇩', PH: '🇵🇭' };
-const REGION_NAME: Record<string, string> = { MY: 'Malaysia', ID: 'Indonesia', PH: 'Philippines' };
 const STRATEGY_LABELS: Record<string, string> = {
   REGION_BASED: 'Region-Based', LOWEST_FEE: 'Lowest Fee',
   SUCCESS_RATE: 'Success Rate', COMPOSITE_SCORE: 'Composite Score',

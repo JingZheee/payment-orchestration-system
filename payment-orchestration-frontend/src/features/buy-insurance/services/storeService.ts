@@ -16,15 +16,26 @@ export interface StoreProduct {
   currency: string;
 }
 
-export interface CheckoutRequest {
+export interface StoreQuoteRequest {
   holderName: string;
   holderEmail: string;
   insuranceType: string;
   amount: number;
   paymentMethod: string;
-  redirectUrl: string;
   region: string;
   currency: string;
+  appBaseUrl: string;
+}
+
+export interface StoreQuoteResponse {
+  policyId: string;
+  quoteReference: string;
+  message: string;
+}
+
+export interface StorePayRequest {
+  policyId: string;
+  redirectUrl: string;
 }
 
 export interface CheckoutResponse {
@@ -34,9 +45,9 @@ export interface CheckoutResponse {
 }
 
 export interface StoreResult {
-  transactionId: string;
+  transactionId: string | null;
   status: string;
-  provider: string;
+  provider: string | null;
   routingStrategy: string | null;
   routingReason: string | null;
   fee: number | null;
@@ -46,6 +57,7 @@ export interface StoreResult {
   holderName: string | null;
   holderEmail: string | null;
   insuranceType: string | null;
+  paymentMethod: string | null;
   createdAt: string;
 }
 
@@ -57,18 +69,18 @@ export const storeService = {
     return data.data;
   },
 
-  checkout: async (req: CheckoutRequest): Promise<CheckoutResponse> => {
-    const { data } = await api.post<ApiResponse<CheckoutResponse>>(
-      API.STORE.CHECKOUT,
-      req,
-    );
+  createQuote: async (req: StoreQuoteRequest): Promise<StoreQuoteResponse> => {
+    const { data } = await api.post<ApiResponse<StoreQuoteResponse>>(API.STORE.QUOTE, req);
     return data.data;
   },
 
-  getResult: async (billId: string): Promise<StoreResult> => {
-    const { data } = await api.get<ApiResponse<StoreResult>>(
-      API.STORE.RESULT(billId),
-    );
+  initiateStorePayment: async (req: StorePayRequest): Promise<CheckoutResponse> => {
+    const { data } = await api.post<ApiResponse<CheckoutResponse>>(API.STORE.PAY, req);
+    return data.data;
+  },
+
+  getResult: async (policyId: string): Promise<StoreResult> => {
+    const { data } = await api.get<ApiResponse<StoreResult>>(API.STORE.RESULT(policyId));
     return data.data;
   },
 };

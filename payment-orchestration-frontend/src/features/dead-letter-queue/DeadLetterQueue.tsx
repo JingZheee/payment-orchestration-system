@@ -8,7 +8,6 @@ import { PaymentType } from '../../shared/types/enums';
 import type { Transaction } from '../../shared/types/transaction';
 import PageHeader from '../../shared/components/PageHeader';
 import TableCard from '../../shared/components/TableCard';
-import StatusBadge from '../../shared/components/StatusBadge';
 import ProviderBadge from '../../shared/components/ProviderBadge';
 import InfoBanner from '../../shared/components/InfoBanner';
 import EmptyState from '../../shared/components/EmptyState';

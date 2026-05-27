@@ -18,6 +18,7 @@ import Users from './features/users/Users';
 import InsureStorePage from './features/buy-insurance/InsureStorePage';
 import CheckoutPage from './features/buy-insurance/CheckoutPage';
 import PaymentResultPage from './features/buy-insurance/PaymentResultPage';
+import CompletePaymentPage from './features/buy-insurance/CompletePaymentPage';
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
       {/* Public customer-facing pages — no auth required */}
       <Route path="/buy" element={<InsureStorePage />} />
       <Route path="/buy/checkout" element={<CheckoutPage />} />
+      <Route path="/complete-payment" element={<CompletePaymentPage />} />
       <Route path="/payment-result" element={<PaymentResultPage />} />
 
       <Route element={<RequireAuth />}>

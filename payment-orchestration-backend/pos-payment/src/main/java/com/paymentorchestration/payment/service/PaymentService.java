@@ -71,11 +71,11 @@ public class PaymentService {
     @Transactional
     public InitiatePaymentResponse initiatePayment(InitiatePaymentRequest request,
                                                     String idempotencyKey) {
-        // 0. Duplicate-payment guard — reject if the linked policy is already paid
+        // 0. Duplicate-payment guard — only block if policy is already successfully paid
         DemoPolicy demoPolicy = null;
         if (request.getPolicyId() != null) {
             demoPolicy = demoPolicyRepository.findById(request.getPolicyId()).orElse(null);
-            if (demoPolicy != null && !"PENDING".equals(demoPolicy.getStatus())) {
+            if (demoPolicy != null && ("ACTIVATED".equals(demoPolicy.getStatus()) || "DISBURSED".equals(demoPolicy.getStatus()))) {
                 throw new DuplicatePaymentException(request.getPolicyId().toString());
             }
         }
@@ -146,6 +146,10 @@ public class PaymentService {
             transaction.setStatus(PaymentStatus.FAILED);
             transactionRepository.save(transaction);
             writeEvent(transaction.getId(), "PROVIDER_ERROR", e.getMessage());
+            if (demoPolicy != null) {
+                demoPolicy.setStatus("FAILED");
+                demoPolicyRepository.save(demoPolicy);
+            }
             return toResponse(transaction);
         }
 
@@ -168,11 +172,22 @@ public class PaymentService {
             }
         }
 
-        // 5. Schedule retry if payment is still pending a webhook
+        // 5. Update policy for async (PENDING/PROCESSING) and failed results
         if (result.getStatus() == PaymentStatus.PROCESSING
                 || result.getStatus() == PaymentStatus.PENDING) {
             retryPublisher.publish(transaction.getId(), 1);
             writeEvent(transaction.getId(), "RETRY_SCHEDULED", "Attempt 1 queued (30s)");
+            if (demoPolicy != null) {
+                demoPolicy.setTransactionId(transaction.getId());
+                demoPolicy.setStatus("PENDING");
+                demoPolicyRepository.save(demoPolicy);
+            }
+        }
+        if (result.getStatus() == PaymentStatus.FAILED) {
+            if (demoPolicy != null) {
+                demoPolicy.setStatus("FAILED");
+                demoPolicyRepository.save(demoPolicy);
+            }
         }
 
         log.info("[payment] transactionId={} status={} provider={}",

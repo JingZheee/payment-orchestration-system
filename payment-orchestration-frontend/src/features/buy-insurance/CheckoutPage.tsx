@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Alert, Button, Checkbox, Divider, Input, Select, Steps, Typography,
 } from 'antd';
-import { ArrowLeftOutlined, LockOutlined, CheckCircleFilled } from '@ant-design/icons';
+import { ArrowLeftOutlined, LockOutlined, MailOutlined } from '@ant-design/icons';
 import { storeService, type StoreProduct } from './services/storeService';
 
 const { Text } = Typography;
@@ -673,7 +673,7 @@ function PaymentStep({
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-const STEP_LABELS = ['Personal Info', 'Coverage Details', 'Declaration', 'Review & Pay'];
+const STEP_LABELS = ['Personal Info', 'Coverage Details', 'Declaration', 'Review & Quote'];
 
 export default function CheckoutPage() {
   const { state } = useLocation();
@@ -690,6 +690,8 @@ export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState(defaultMethod);
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState<string | null>(null);
+  const [quoteSubmitted, setQuoteSubmitted] = useState(false);
+  const [quoteRef, setQuoteRef]     = useState('');
 
   if (!product) {
     return (
@@ -700,35 +702,71 @@ export default function CheckoutPage() {
     );
   }
 
+  if (quoteSubmitted) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#F9FAFB', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <div style={{ background: 'white', borderRadius: 20, padding: '48px 40px', maxWidth: 440, width: '100%', textAlign: 'center', boxShadow: '0 8px 40px rgba(0,0,0,0.09)' }}>
+          <div style={{ width: 72, height: 72, borderRadius: '50%', background: '#FFF9E6', border: '2px solid #FCB900', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+            <MailOutlined style={{ fontSize: 32, color: '#FCB900' }} />
+          </div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: '#111827', marginBottom: 10 }}>Check Your Email</div>
+          <div style={{ fontSize: 14, color: '#6B7280', lineHeight: 1.75, marginBottom: 24 }}>
+            We've sent a payment link to<br />
+            <strong style={{ color: '#111827' }}>{personal.email}</strong>
+            <br /><br />
+            Open it to complete your <strong>{product.insuranceType}</strong> policy purchase.
+            No need to re-enter your details — everything is saved.
+          </div>
+          <div style={{ background: '#FFF9E6', border: '1px solid #FDE68A', borderRadius: 10, padding: '14px 18px', marginBottom: 10, textAlign: 'left' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#B45309', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Quote Reference</div>
+            <div style={{ fontSize: 16, fontWeight: 800, fontFamily: 'monospace', color: '#78350F' }}>{quoteRef}</div>
+          </div>
+          <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 28 }}>
+            Quote valid for 7 days · Check your spam folder if you don't see the email
+          </div>
+          <Button
+            type="primary" block size="large"
+            onClick={() => navigate('/buy')}
+            style={{ height: 46, borderRadius: 10, fontWeight: 700, background: '#FCB900', borderColor: '#FCB900', color: '#111827' }}
+          >
+            Back to Plans
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   function toggleDeclaration(i: number, v: boolean) {
     const next = [...declarations]; next[i] = v; setDeclarations(next);
   }
 
   function canAdvance(): boolean {
-    if (step === 0) return validatePersonal(product.region, personal);
-    if (step === 1) return validateCoverage(product.code, coverage);
+    if (step === 0) return validatePersonal(product!.region, personal);
+    if (step === 1) return validateCoverage(product!.code, coverage);
     if (step === 2) return declarations.every(Boolean);
     return true;
   }
 
-  async function handlePay() {
+  async function handleGetQuote() {
     setLoading(true); setError(null);
     try {
-      const res = await storeService.checkout({
+      const res = await storeService.createQuote({
         holderName:    personal.name,
         holderEmail:   personal.email,
-        insuranceType: product.insuranceType,
-        amount:        product.amount,
+        insuranceType: product!.insuranceType,
+        amount:        product!.amount,
         paymentMethod,
-        redirectUrl:   `${window.location.origin}/payment-result`,
-        region:        product.region,
-        currency:      product.currency,
+        region:        product!.region,
+        currency:      product!.currency,
+        appBaseUrl:    window.location.origin,
       });
-      window.location.href = res.redirectUrl;
+      setQuoteRef(res.quoteReference);
+      setQuoteSubmitted(true);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
         ?? 'Something went wrong. Please try again.';
       setError(msg);
+    } finally {
       setLoading(false);
     }
   }
@@ -787,13 +825,13 @@ export default function CheckoutPage() {
           <div style={{ background: 'white', borderRadius: 14, border: '1px solid #F0F0F0', boxShadow: '0 2px 16px rgba(0,0,0,0.05)', padding: '32px 36px' }}>
             <div style={{ marginBottom: 24 }}>
               <div style={{ fontSize: 18, fontWeight: 700, color: '#111827', marginBottom: 4 }}>
-                {['Personal Information', 'Coverage Details', 'Declaration & Disclosure', 'Review & Payment'][step]}
+                {['Personal Information', 'Coverage Details', 'Declaration & Disclosure', 'Review & Get Quote'][step]}
               </div>
               <div style={{ fontSize: 13, color: '#9CA3AF' }}>
                 {step === 0 && 'Enter your personal details as per your national identification document.'}
                 {step === 1 && `Tell us more about your ${product.insuranceType.toLowerCase()} coverage needs.`}
                 {step === 2 && 'Please read and confirm each statement carefully before proceeding.'}
-                {step === 3 && 'Review your application summary and complete payment.'}
+                {step === 3 && 'Review your application summary. A payment link will be sent to your email.'}
               </div>
             </div>
 
@@ -843,11 +881,11 @@ export default function CheckoutPage() {
               ) : (
                 <Button
                   type="primary" size="large" block loading={loading}
-                  onClick={handlePay}
-                  icon={!loading ? <CheckCircleFilled /> : undefined}
+                  onClick={handleGetQuote}
+                  icon={!loading ? <MailOutlined /> : undefined}
                   style={{ height: 46, borderRadius: 10, fontWeight: 700, fontSize: 14, background: '#FCB900', borderColor: '#FCB900', color: '#111827', boxShadow: '0 2px 12px rgba(252,185,0,0.28)' }}
                 >
-                  {loading ? 'Routing payment…' : `Pay ${formatAmount(product.amount, product.currency)}`}
+                  {loading ? 'Saving quote…' : 'Get My Quote — Email Payment Link'}
                 </Button>
               )}
             </div>

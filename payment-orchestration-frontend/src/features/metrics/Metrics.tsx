@@ -196,7 +196,7 @@ export default function Metrics() {
                   axisLine={false} tickLine={false}
                 />
                 <Tooltip
-                  formatter={(v: number) => [`${(v * 100).toFixed(2)}%`, 'Success Rate']}
+                  formatter={(v: unknown) => [`${((v as number) * 100).toFixed(2)}%`, 'Success Rate']}
                   contentStyle={{ borderRadius: 10, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
                 />
                 <Bar dataKey="successRate" radius={[6, 6, 0, 0]}>

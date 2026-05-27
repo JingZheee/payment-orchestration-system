@@ -327,10 +327,10 @@ Weights are configurable in `application.yml` under `routing.scorer.*`.
 
 | Field | Value |
 |---|---|
-| **Current module** | InsureStore — DB-driven products, multi-region, professional checkout + store redesign |
-| **Current task** | Restart backend to pick up V24+V25 migrations, then smoke test InsureStore MY FPX end-to-end |
-| **Last completed** | V24+V25 migrations; StoreProduct entity/repo; multi-region checkout (ID/PH); 4-step checkout wizard; full InsureStorePage redesign with sticky navbar, hero, trust band, footer; Products as Dropdown + region as Select in navbar |
-| **Blockers** | Backend not restarted — V24+V25 migrations not live; Xendit sandbox keys not yet in application-dev.yml |
+| **Current module** | InsureStore — payment status lifecycle bug fixes + idempotent re-pay flow |
+| **Current task** | Restart backend → smoke test: MY FPX quote → pay → abandon → re-open email link → Resume Payment button works |
+| **Last completed** | PaymentService guard fix (QUOTE now allowed); pay() rewrite with PENDING re-send + FAILED retry; CompletePaymentPage "Resume Payment" UI; PRD v1.8 with US-21 + updated lifecycle diagram |
+| **Blockers** | Backend needs restart; Xendit sandbox keys not in application-dev.yml |
 
 ### Admin API Endpoints — Payment Methods
 ```

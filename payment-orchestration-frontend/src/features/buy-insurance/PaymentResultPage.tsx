@@ -5,6 +5,7 @@ import {
   CheckCircleFilled,
   CloseCircleFilled,
   ExclamationCircleFilled,
+  SyncOutlined,
   ArrowRightOutlined,
   CopyOutlined,
 } from '@ant-design/icons';
@@ -26,6 +27,12 @@ const PROVIDER_LABELS: Record<string, string> = {
   MOCK: 'Mock Provider',
 };
 
+function formatAmount(amount: number, currency: string): string {
+  if (currency === 'IDR') return `IDR ${amount.toLocaleString('id-ID')}`;
+  if (currency === 'PHP') return `PHP ${amount.toFixed(2)}`;
+  return `MYR ${amount.toFixed(2)}`;
+}
+
 function DetailRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
@@ -43,25 +50,21 @@ export default function PaymentResultPage() {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
-  // Parse Billplz redirect params — Billplz appends billplz[id], billplz[paid], etc.
+  // policyId is appended to the redirect URL by the backend before sending to the provider.
+  // All three providers (Billplz/Midtrans/Xendit) preserve query params when redirecting back.
   const params = new URLSearchParams(window.location.search);
-  const billId = params.get('billplz[id]') ?? params.get('billplz%5Bid%5D') ?? '';
-  const paidParam = params.get('billplz[paid]') ?? params.get('billplz%5Bpaid%5D') ?? '';
-  const isPaid = paidParam.toLowerCase() === 'true';
-
-  // If no billplz params, check if we were redirected without them (e.g. direct navigation)
-  const hasBillplzParams = !!billId;
+  const policyId = params.get('policyId') ?? '';
 
   useEffect(() => {
-    if (!billId) {
+    if (!policyId) {
       setLoading(false);
       return;
     }
-    storeService.getResult(billId)
+    storeService.getResult(policyId)
       .then(setResult)
       .catch(() => setResult(null))
       .finally(() => setLoading(false));
-  }, [billId]);
+  }, [policyId]);
 
   function copyPolicyNumber() {
     const policyNum = result?.policyNumber ?? '';
@@ -73,8 +76,11 @@ export default function PaymentResultPage() {
     }
   }
 
-  // ── No Billplz params — user navigated directly ──────────────────────────────
-  if (!hasBillplzParams && !loading) {
+  const isPaid   = result?.status === 'SUCCESS';
+  const isPending = result?.status === 'PENDING' || result?.status === 'PROCESSING';
+
+  // ── No policyId param — user navigated directly ──────────────────────────────
+  if (!policyId && !loading) {
     return (
       <div style={{ minHeight: '100vh', background: '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
         <div style={{ background: 'white', borderRadius: 20, padding: '48px 40px', maxWidth: 420, width: '100%', textAlign: 'center', boxShadow: '0 8px 40px rgba(0,0,0,0.09)' }}>
@@ -139,45 +145,51 @@ export default function PaymentResultPage() {
         }}>
           {/* Status icon */}
           <div style={{ textAlign: 'center', marginBottom: 28 }}>
-            {isPaid ? (
+            {isPending ? (
+              <SyncOutlined spin style={{ fontSize: 64, color: '#F59E0B', marginBottom: 14 }} />
+            ) : isPaid ? (
               <CheckCircleFilled style={{ fontSize: 64, color: '#059669', marginBottom: 14 }} />
             ) : (
               <CloseCircleFilled style={{ fontSize: 64, color: '#DC2626', marginBottom: 14 }} />
             )}
             <div style={{ fontSize: 26, fontWeight: 800, color: '#1C1C1E', marginBottom: 6 }}>
-              {isPaid ? 'Payment Successful' : 'Payment Unsuccessful'}
+              {isPending ? 'Payment Processing' : isPaid ? 'Payment Successful' : 'Payment Unsuccessful'}
             </div>
             <div style={{ fontSize: 14, color: '#6B7280' }}>
-              {isPaid
+              {isPending
+                ? 'Your payment is being processed. Please check back shortly.'
+                : isPaid
                 ? 'Your insurance policy is being activated. A confirmation will be sent to your email.'
                 : 'Your payment was not completed. No charges have been made.'}
             </div>
           </div>
 
           {/* Policy info */}
-          {result && isPaid && (
+          {result && (isPaid || isPending) && (
             <>
               <div style={{
-                background: '#F0FDF4', borderRadius: 12,
+                background: isPaid ? '#F0FDF4' : '#FFFBEB', borderRadius: 12,
                 padding: '16px 20px', marginBottom: 20,
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               }}>
                 <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: isPaid ? '#166534' : '#92400E', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
                     Policy Number
                   </div>
-                  <div style={{ fontSize: 16, fontWeight: 900, color: '#166534', fontFamily: 'monospace' }}>
+                  <div style={{ fontSize: 16, fontWeight: 900, color: isPaid ? '#166534' : '#92400E', fontFamily: 'monospace' }}>
                     {result.policyNumber ?? '—'}
                   </div>
                 </div>
-                <Button
-                  size="small"
-                  icon={<CopyOutlined />}
-                  onClick={copyPolicyNumber}
-                  style={{ borderRadius: 8, fontSize: 12 }}
-                >
-                  {copied ? 'Copied!' : 'Copy'}
-                </Button>
+                {result.policyNumber && (
+                  <Button
+                    size="small"
+                    icon={<CopyOutlined />}
+                    onClick={copyPolicyNumber}
+                    style={{ borderRadius: 8, fontSize: 12 }}
+                  >
+                    {copied ? 'Copied!' : 'Copy'}
+                  </Button>
+                )}
               </div>
 
               {/* Policy details */}
@@ -185,7 +197,7 @@ export default function PaymentResultPage() {
                 {result.holderName && <DetailRow label="Policyholder" value={result.holderName} />}
                 {result.holderEmail && <DetailRow label="Email" value={result.holderEmail} />}
                 {result.insuranceType && <DetailRow label="Plan" value={result.insuranceType} />}
-                <DetailRow label="Premium" value={`MYR ${Number(result.amount).toFixed(2)}`} />
+                <DetailRow label="Premium" value={formatAmount(Number(result.amount), result.currency)} />
               </div>
 
               <Divider style={{ margin: '16px 0', borderColor: '#F3F4F6' }} />
@@ -199,7 +211,7 @@ export default function PaymentResultPage() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Text type="secondary" style={{ fontSize: 13 }}>Provider</Text>
                     <Tag style={{ borderRadius: 999, border: 'none', background: '#EFF6FF', color: '#1D4ED8', fontWeight: 700, margin: 0 }}>
-                      {PROVIDER_LABELS[result.provider] ?? result.provider}
+                      {PROVIDER_LABELS[result.provider ?? ''] ?? result.provider}
                     </Tag>
                   </div>
                   {result.routingStrategy && (
@@ -213,7 +225,7 @@ export default function PaymentResultPage() {
                   {result.fee != null && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <Text type="secondary" style={{ fontSize: 13 }}>Processing Fee</Text>
-                      <Text strong style={{ fontSize: 13 }}>MYR {Number(result.fee).toFixed(4)}</Text>
+                      <Text strong style={{ fontSize: 13 }}>{formatAmount(Number(result.fee), result.currency)}</Text>
                     </div>
                   )}
                 </div>

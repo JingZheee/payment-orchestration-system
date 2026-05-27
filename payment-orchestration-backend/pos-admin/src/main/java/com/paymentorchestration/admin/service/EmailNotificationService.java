@@ -58,6 +58,30 @@ public class EmailNotificationService {
         }
     }
 
+    public void sendQuoteEmail(DemoPolicy policy, String paymentLink) {
+        if (mailSender == null) {
+            log.warn("[email] JavaMailSender not configured — skipping quote email for policyId={}", policy.getId());
+            return;
+        }
+        try {
+            String subject = "Your InsureRoute Quote — " + policy.getInsuranceType()
+                    + " (" + policy.getPolicyNumber() + ")";
+            String html = buildQuoteHtml(policy, paymentLink);
+
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress);
+            helper.setTo(policy.getHolderEmail());
+            helper.setSubject(subject);
+            helper.setText(html, true);
+
+            mailSender.send(message);
+            log.info("[email] sent quote email to {} for policyId={}", policy.getHolderEmail(), policy.getId());
+        } catch (Exception e) {
+            log.warn("[email] failed to send quote email for policyId={}: {}", policy.getId(), e.getMessage());
+        }
+    }
+
     public void sendPaymentFailedEmail(DemoPolicy policy, Transaction tx) {
         if (mailSender == null) {
             log.warn("[email] JavaMailSender not configured — skipping failure email for transactionId={}", tx.getId());
@@ -195,6 +219,52 @@ public class EmailNotificationService {
                 row("Amount",          amount),
                 row("Payment Provider", event.getProvider().name()),
                 row("Date",            date)
+        );
+    }
+
+    private String buildQuoteHtml(DemoPolicy policy, String paymentLink) {
+        String amount = formatAmount(policy.getAmount(), policy.getCurrency());
+        return """
+            <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb;">
+              <div style="background:#FCB900;padding:32px 32px 24px;text-align:center;">
+                <div style="font-size:28px;font-weight:700;color:#261900;letter-spacing:-0.5px;">Your Quote is Ready</div>
+                <div style="font-size:14px;color:#5c4200;margin-top:6px;">Click below to complete your insurance application</div>
+              </div>
+              <div style="padding:32px;">
+                <p style="font-size:16px;color:#1c1c1e;margin:0 0 8px;">Dear <strong>%s</strong>,</p>
+                <p style="font-size:14px;color:#6b7280;margin:0 0 24px;line-height:1.6;">
+                  Thank you for applying with InsureRoute. Your quote has been saved and is ready for payment.
+                  Simply click the button below to complete your purchase — no need to re-enter your details.
+                </p>
+                <table style="width:100%%;border-collapse:collapse;font-size:14px;margin-bottom:28px;">
+                  %s
+                  %s
+                  %s
+                  %s
+                </table>
+                <div style="text-align:center;margin-bottom:24px;">
+                  <a href="%s" style="display:inline-block;background:#FCB900;color:#261900;font-weight:700;font-size:15px;text-decoration:none;padding:14px 40px;border-radius:8px;letter-spacing:0.01em;">
+                    Complete Payment →
+                  </a>
+                </div>
+                <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:12px 16px;margin-bottom:20px;">
+                  <p style="font-size:13px;color:#92400E;margin:0;line-height:1.6;">
+                    <strong>Quote valid for 7 days.</strong> After this period, you will need to re-apply.
+                    If you did not request this quote, you can safely ignore this email.
+                  </p>
+                </div>
+                <p style="font-size:13px;color:#9ca3af;margin:0;border-top:1px solid #f3f4f6;padding-top:20px;line-height:1.6;">
+                  This is an automated message from InsureRoute. Please keep your quote reference for your records.
+                </p>
+              </div>
+            </div>
+            """.formatted(
+                policy.getHolderName(),
+                row("Quote Reference", policy.getPolicyNumber()),
+                row("Insurance Plan",  policy.getInsuranceType()),
+                row("Premium Amount",  amount),
+                row("Payment Method",  policy.getPaymentMethod()),
+                paymentLink
         );
     }
 

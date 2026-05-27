@@ -48,7 +48,7 @@ public class DemoPolicy {
     @Column(name = "payment_type", nullable = false, length = 30)
     private String paymentType;
 
-    /** PENDING | ACTIVATED | DISBURSED */
+    /** QUOTE → PENDING → ACTIVATED | FAILED → (retry) | RETRY_EXHAUSTED | DISBURSED */
     @Column(nullable = false, length = 20)
     private String status = "PENDING";
 

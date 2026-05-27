@@ -217,7 +217,6 @@ export default function RoutingEnginePage() {
   const hasResults = !!simParams && !isLoading;
 
   const scores = scoresQuery.data ?? [];
-  const winner = scores[0];
 
   // Providers excluded due to payment type
   const eligibleProviderNames = new Set(scores.map(s => s.provider));
@@ -244,7 +243,7 @@ export default function RoutingEnginePage() {
       <div style={{ background: '#FFFFFF', borderRadius: 16, padding: 28, border: '1px solid #F3F4F6' }}>
         <div style={{ marginBottom: 20 }}>
           <h2 style={{ fontSize: 16, fontWeight: 700, color: '#1C1C1E', margin: 0 }}>Composite Score Formula</h2>
-          <p style={{ color: '#6B7280', fontSize: 13, marginTop: 4, margin: 0, marginTop: 4 }}>
+          <p style={{ color: '#6B7280', fontSize: 13, margin: 0, marginTop: 4 }}>
             Every eligible provider is scored using a weighted formula. Hover a card to see what each factor measures.
           </p>
         </div>

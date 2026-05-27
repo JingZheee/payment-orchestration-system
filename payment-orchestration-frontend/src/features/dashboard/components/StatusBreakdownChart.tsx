@@ -42,7 +42,7 @@ export default function StatusBreakdownChart({ summary }: Props) {
               {data.map((entry, i) => <Cell key={i} fill={entry.color} stroke="none" />)}
             </Pie>
             <Tooltip
-              formatter={(value: number, name: string) => [value.toLocaleString(), name]}
+              formatter={(value: unknown, name: unknown) => [(value as number).toLocaleString(), name as string]}
               contentStyle={{ borderRadius: 10, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
             />
           </PieChart>

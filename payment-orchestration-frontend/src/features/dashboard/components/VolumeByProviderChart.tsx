@@ -38,7 +38,7 @@ export default function VolumeByProviderChart({ summary }: Props) {
             />
             <Tooltip
               cursor={{ fill: 'rgba(252,185,0,0.05)' }}
-              formatter={(value: number) => [value.toLocaleString(), 'Transactions']}
+              formatter={(value: unknown) => [(value as number).toLocaleString(), 'Transactions']}
               contentStyle={{ borderRadius: 10, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
             />
             <Bar dataKey="value" radius={[6, 6, 0, 0]}>

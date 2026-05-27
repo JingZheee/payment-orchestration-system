@@ -20,6 +20,7 @@ public record StoreResultResponse(
         String holderName,
         String holderEmail,
         String insuranceType,
+        String paymentMethod,
         Instant createdAt
 ) {
     public static StoreResultResponse from(Transaction t, DemoPolicy policy) {
@@ -36,7 +37,28 @@ public record StoreResultResponse(
                 policy != null ? policy.getHolderName() : null,
                 policy != null ? policy.getHolderEmail() : t.getCustomerEmail(),
                 policy != null ? policy.getInsuranceType() : null,
+                policy != null ? policy.getPaymentMethod() : null,
                 t.getCreatedAt()
+        );
+    }
+
+    /** Used when a quote exists but payment has not yet been initiated. */
+    public static StoreResultResponse fromQuote(DemoPolicy policy) {
+        return new StoreResultResponse(
+                null,
+                "QUOTE",
+                null,
+                null,
+                null,
+                null,
+                policy.getAmount(),
+                policy.getCurrency(),
+                policy.getPolicyNumber(),
+                policy.getHolderName(),
+                policy.getHolderEmail(),
+                policy.getInsuranceType(),
+                policy.getPaymentMethod(),
+                policy.getCreatedAt()
         );
     }
 }

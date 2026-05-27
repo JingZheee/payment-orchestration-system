@@ -1,7 +1,7 @@
 # Product Requirements Document
 # Payment Orchestration System (POS)
-**Version:** 1.6
-**Date:** 2026-05-26
+**Version:** 1.8
+**Date:** 2026-05-27
 **Type:** Final Year Project (FYP)
 
 ---
@@ -87,6 +87,14 @@ The MVP goal is a fully functional routing engine integrated with real sandbox p
 - ✅ Duplicate payment prevention — layered defence: (1) backend guard in `PaymentService` checks `demo_policies.status` before initiating — throws `DuplicatePaymentException` (HTTP 409) if already ACTIVATED/DISBURSED; (2) policy status and `transaction_id` updated atomically on SUCCESS so the guard is durable across restarts; (3) frontend Pay button disabled when `status !== PENDING`; RETRY_EXHAUSTED transactions leave policy as PENDING so the policyholder can retry with a different method
 - ✅ Fee rates are fully runtime-manageable — admins can create and delete rows via `POST`/`DELETE /admin/fee-rates` without any DB migration; provider auto-locks region (BILLPLZ→MY, MIDTRANS→ID, XENDIT→PH); payment method dropdown populated from the live `payment_methods` table
 - ✅ Customer email notification on payment success — branded HTML email dispatched to the policy holder's email address (`demo_policies.holder_email`) after every successful `PREMIUM_COLLECTION` ("Your Policy is Now Active") and `CLAIMS_DISBURSEMENT` ("Claim Disbursement Processed") payment; email failure is non-fatal and never affects the payment transaction
+- ✅ InsureStore — customer-facing insurance storefront at `/buy`; DB-driven product catalogue from `store_products` table; region selector (MY/ID/PH) with per-region product set and currency
+- ✅ InsureStore — multi-region product support: V24+V25 migrations seed 15 products (5 MY/MYR, 5 ID/IDR, 5 PH/PHP) covering life, medical, motor, travel, and accident insurance
+- ✅ InsureStore — 4-step checkout wizard: Personal Info (NRIC/NIK/PhilSys with auto-parse for MY), Coverage Details (product-specific fields per insurance type), Declaration & Disclosure (BNM/OJK/IC-PH regulatory text per region), Review & Quote
+- ✅ InsureStore — quote-based payment flow: form submission creates a `QUOTE` record and emails the customer a one-click payment link; payment is only initiated when the customer explicitly clicks the link — eliminates back-button duplicate payment issues
+- ✅ InsureStore — quote email: branded HTML email with plan summary, quote reference, "Complete Payment →" button, 7-day validity notice; sent via `EmailNotificationService` (same SMTP stack as payment confirmation emails)
+- ✅ InsureStore — `/complete-payment?policyId=UUID` page: shows quote summary; "Pay [amount]" button initiates payment via the routing engine; idempotent re-pay — PENDING state returns the **existing** provider checkout URL (no new transaction created, per industry standard); FAILED/RETRY_EXHAUSTED state shows retry banner and allows a fresh attempt with a new merchant order ID; ACTIVATED auto-redirects to payment-result; ACTIVATED/DISBURSED rejected with 409
+- ✅ InsureStore — provider routing is fully region-aware: MY quotes route to Billplz, ID to Midtrans, PH to Xendit/Mock — the same `RoutingEngine` used by all other payment flows; no special-casing in the store controller
+- ✅ InsureStore — payment result page at `/payment-result?policyId=UUID`: shows payment status from DB (SUCCESS/FAILED/PENDING), provider used, routing strategy, processing fee (region-formatted), and policy number with copy button; works for all three providers
 
 ### Providers
 - ✅ Billplz sandbox (Malaysia — FPX bank transfer)
@@ -284,6 +292,59 @@ The MVP goal is a fully functional routing engine integrated with real sandbox p
 *Example (Claim):* Elena's claim disbursement completes → email arrives at `elena.villanueva@ph.com` with subject "Claim Disbursement Processed — Reference CLM-2026-PH-002" → body shows disbursed amount, claim reference, provider, and date.
 
 **Implementation:** `EmailNotificationService` is called by `NotificationConsumer` after the demo policy record is updated. Uses `JavaMailSender` (Spring Mail) with Mailtrap sandbox SMTP in dev. Email is non-fatal — SMTP failure logs a warning and does not roll back the database transaction.
+
+---
+
+### US-18: Customer Insurance Store
+**As a** prospective policyholder browsing insurance options,
+**I want** to see a professional storefront with products relevant to my country,
+**so that** I can compare plans and select one without needing to speak to an agent.
+
+*Example:* Customer visits `/buy`, selects "Indonesia" from the region dropdown → sees 5 IDR-priced products (Life, Medical, Motor, Travel, Accident) with coverage highlights and monthly premiums. Clicks "Get Started →" on the Medical plan → enters checkout.
+
+---
+
+### US-19: Quote-Based Checkout
+**As a** prospective policyholder filling out an insurance application,
+**I want** to receive a payment link by email rather than being redirected to a payment page immediately,
+**so that** I can review the quote at my own pace, share it with a family member, or complete it later without losing my application details.
+
+*Example:* Customer completes the 4-step wizard (personal info, coverage, declaration, review) → clicks "Get My Quote — Email Payment Link" → sees "Check Your Email" confirmation screen with quote reference `POL-MY-xxxxxxx` → receives a branded HTML email within seconds → nothing has been charged yet.
+
+**Why quote-first instead of direct redirect:**
+- Eliminates back-button duplicate payments — payment is only initiated when the customer explicitly clicks the email link
+- Customers are not forced to pay immediately on an unfamiliar device or connection
+- The quote record captures the lead even if the customer never pays — visible to ops team in `demo_policies` table (status = QUOTE)
+- Mirrors the flow used by major insurers (Great Eastern, Prudential) who email policy documents before collecting payment
+
+---
+
+### US-20: Complete Payment from Email
+**As a** prospective policyholder who received a quote email,
+**I want** to click the payment link and be taken directly to a summary page with a single "Pay" button,
+**so that** I don't have to re-enter any details and can complete the purchase in one click.
+
+*Example:* Customer opens email → clicks "Complete Payment →" → arrives at `/complete-payment?policyId=UUID` → sees a summary card (name, plan, payment method, amount) and a prominent amber "Pay MYR 99.00" button → clicks Pay → routing engine selects provider based on region → redirected to Billplz (MY) / Midtrans (ID) / Xendit (PH) hosted payment page → completes payment → redirected to `/payment-result?policyId=UUID` showing policy number, provider used, and routing strategy.
+
+**Payment resumption (industry-standard idempotency):** If the customer presses back from the provider page (or re-opens the email link), `/complete-payment` detects `status=PENDING` and shows a "Resume Payment" button. Clicking it calls `POST /store/pay` again, which detects the existing PENDING transaction and returns the **same** provider checkout URL — no new transaction is created. This matches the pattern used by Midtrans, Xendit, and Billplz, where provider checkout URLs (Snap token, invoice URL, bill URL) are valid for up to 24 hours and can be re-presented. Double-charging is architecturally impossible: `PaymentService` blocks re-initiation for ACTIVATED/DISBURSED policies, and the PENDING path never creates a second transaction.
+
+---
+
+### US-21: Payment Resumption and Retry
+**As a** prospective policyholder who started a payment but didn't complete it,
+**I want** to re-open my payment email link and resume exactly where I left off — or try again if my payment failed —
+**so that** I never lose my application details and can complete the purchase without starting from scratch.
+
+*Scenario A (abandoned payment):* Customer clicks "Pay" on `/complete-payment`, is redirected to Billplz, closes the browser. Re-opens the email link → sees "Payment In Progress" screen with a "Resume Payment" button → clicks it → redirected to the **same** Billplz payment page (no new transaction created; same bill URL, valid for up to 30 days).
+
+*Scenario B (failed payment):* Customer's FPX bank rejects the transaction. Provider sends FAILED webhook → policy status → FAILED → `/complete-payment` shows the quote summary again with a red "Previous payment attempt failed" banner → customer clicks "Pay MYR 99.00" again → new transaction created (new merchantOrderId) → routed to provider again.
+
+*Scenario C (already paid):* Customer re-opens the email link after successful payment → `GET /store/result` returns ACTIVATED → frontend auto-redirects to `/payment-result` — the Pay button is never shown.
+
+**Implementation notes:**
+- `POST /store/pay` is idempotent for PENDING: checks `policy.transactionId != null` + `transaction.redirectUrl != null` → returns stored URL, no provider API call
+- Retry merchantOrderId format: `INS-{8-char-policy-id}-R{timestamp-mod-10000}` — prevents provider `order_id` already-exists errors
+- `PaymentService.initiatePayment()` only throws `DuplicatePaymentException` for ACTIVATED/DISBURSED policies — QUOTE, FAILED, and RETRY_EXHAUSTED all pass through to allow new transactions
 
 ---
 
@@ -611,6 +672,229 @@ After `NotificationConsumer` activates or disburses a policy, it calls `EmailNot
 **Dev SMTP:** Mailtrap sandbox (`sandbox.smtp.mailtrap.io:2525`) — all emails are caught in a web inbox, never reach real recipients. Credentials live in `application-dev.yml` (gitignored).
 
 **Demo moment:** Trigger a payment in the Payment Demo page → open Mailtrap inbox → see the branded HTML email arrive within seconds with policy details.
+
+---
+
+### Feature 12: InsureStore — Customer-Facing Insurance Portal
+
+A public-facing insurance storefront and checkout flow that demonstrates the routing engine from the *customer's* perspective. No login required. Accessible at `/buy`.
+
+**Architecture principle:** InsureStore is a thin frontend layer on top of the same routing infrastructure used by the admin Payment Demo. The store controller (`InsureStoreController`) creates a `DemoPolicy` record and calls `PaymentService.initiatePayment()` — the same service, the same routing engine, the same provider adapters. The only difference is who initiates the payment (a customer vs an admin).
+
+#### Store Page (`/buy`)
+
+- **Sticky navbar:** brand, "Products" dropdown (category filter: All / Life / Medical / Motor / Travel / Accident), region `Select` (MY 🇲🇾 / ID 🇮🇩 / PH 🇵🇭), SSL badge
+- **Hero section:** tagline, subtitle, 4 trust stats (50K+ policyholders, 99% uptime, 3 regions, 4 providers)
+- **Product cards:** category icon in tinted circle, badge (e.g. "Most Popular"), name, tagline, amber coverage highlight (first feature), bullet list of remaining features, "Starting from [amount]" with "Get Started →" button
+- **Trust band:** "Fast Claims", "Regulatory Compliant", "Bank-Grade Security" columns; regulatory badge switches per region (BNM/OJK/IC)
+- **Dark footer:** brand, nav links, license and regulatory disclaimer text
+- Products fetched from DB (`store_products` table); region change refreshes the product list via TanStack Query with `queryKey: ['store-products', region]`
+
+#### Checkout Wizard (`/buy/checkout`)
+
+A 4-step form that collects everything needed to issue a quote. Steps are gated — "Continue" only activates when the current step validates.
+
+| Step | Title | Key fields |
+|---|---|---|
+| 1 | Personal Information | Full name, national ID (NRIC/NIK/PhilSys depending on region), DOB (auto-parsed from NRIC for MY), gender (auto-detected from NRIC last digit for MY), phone, email, occupation, marital status |
+| 2 | Coverage Details | Product-specific fields per insurance type: life (sum insured, smoker, beneficiary), medical (pre-existing conditions, height/weight), motor (vehicle reg, make, model, year, engine CC, NCD), travel (destination, dates, passport, travellers), accident (occupational class, PA sum insured) |
+| 3 | Declaration & Disclosure | 4 checkboxes (all required); text varies by region — Malaysian applications cite BNM FSA 2013, Indonesian cite OJK UU 40/2014, Philippine cite IC PD 1460 |
+| 4 | Review & Quote | Application summary, selected payment method (options vary by region), "Get My Quote — Email Payment Link" button |
+
+**NRIC auto-parse (Malaysia only):** Format `YYMMDD-PB-XXXG` — date of birth extracted from first 6 digits (year disambiguation: `≤ 25 → 2000+YY, > 25 → 1900+YY`), gender from last digit (even = Female, odd = Male). Auto-fills DOB and gender pills below the input as the user types.
+
+**Payment methods by region:**
+
+| Region | Methods |
+|---|---|
+| MY | FPX (Online Banking), E-Wallet |
+| ID | Virtual Account, QRIS, GoPay |
+| PH | GCash, Maya, GrabPay |
+
+#### Quote-Based Payment Flow
+
+The quote flow decouples form submission from payment initiation. This is the industry-standard approach used by Etiqa, Prudential MY, and Great Eastern: the application is saved as a quote before any money moves.
+
+```
+Customer fills wizard → clicks "Get My Quote"
+    ↓
+POST /store/quote
+    → DemoPolicy saved (status = QUOTE, transactionId = null)
+    → Quote email sent to customer
+    → Returns { policyId, quoteReference }
+    ↓
+"Check Your Email" confirmation screen (no payment provider redirect)
+    → Shows quote reference (e.g. POL-MY-1234567)
+    → "Quote valid for 7 days" notice
+    → Back to Plans button
+
+Customer opens email → clicks "Complete Payment →"
+    ↓
+/complete-payment?policyId=UUID
+    → GET /store/result?policyId=UUID → fetches quote details (status = QUOTE)
+    → Shows: policyholder name, plan, payment method, premium amount
+    → Single "Pay [amount]" button
+    ↓
+POST /store/pay { policyId, redirectUrl }
+    ┌─ QUOTE status ──────────────────────────────────────────────────────────────┐
+    │  → Routing engine selects provider by region (Billplz/Midtrans/Xendit)      │
+    │  → PaymentService creates transaction, links it to policy                   │
+    │  → DemoPolicy status → PENDING (set by PaymentService on PENDING/PROCESSING)│
+    │  → Returns provider redirect URL                                             │
+    └─────────────────────────────────────────────────────────────────────────────┘
+    ┌─ PENDING status (re-open email link / back from provider page) ─────────────┐
+    │  → Fetches existing transaction by policy.transactionId                     │
+    │  → Returns existing transaction.redirectUrl (no new transaction created)    │
+    └─────────────────────────────────────────────────────────────────────────────┘
+    ┌─ FAILED / RETRY_EXHAUSTED status ───────────────────────────────────────────┐
+    │  → Allows re-initiation; generates a fresh merchantOrderId suffix (-R####)  │
+    │  → to avoid provider order_id conflicts on retry                            │
+    └─────────────────────────────────────────────────────────────────────────────┘
+    ┌─ ACTIVATED / DISBURSED status ──────────────────────────────────────────────┐
+    │  → HTTP 409 Conflict — "This policy has already been paid."                 │
+    └─────────────────────────────────────────────────────────────────────────────┘
+    ↓
+Customer redirected to provider's hosted payment page
+    ↓
+Provider redirects to /payment-result?policyId=UUID
+    → GET /store/result?policyId=UUID → fetches transaction + policy
+    → Shows: status (SUCCESS/PENDING/FAILED), policy number, provider, routing strategy, fee
+```
+
+**`policyId` propagation:** `appendPolicyId()` appends `?policyId=UUID` to the `redirectUrl` before it is sent to the provider. All three providers (Billplz, Midtrans, Xendit) preserve existing query params when constructing their redirect callback URL, so `policyId` is always present on the return leg.
+
+**Payment resumption (idempotent re-send):** If the customer closes the browser mid-payment and re-opens the email link, `POST /store/pay` detects `status = PENDING` and returns the *existing* provider URL — the same Billplz bill URL / Midtrans Snap redirect / Xendit invoice URL created during the original request. No new transaction is created. This matches the approach endorsed by Midtrans documentation ("store the Snap token and redirect_url associated with your Order ID so you can re-present it") and is consistent with Xendit's invoice model (invoice URL valid for 24 hours, re-presentable). The `/complete-payment` page renders a **"Resume Payment"** button for PENDING state that calls `POST /store/pay` and navigates to the returned URL.
+
+**Retry after failure:** If the provider rejects the payment (DemoPolicy status → FAILED), re-opening the payment link shows the quote summary with a red "Previous payment attempt failed" banner and a fresh Pay button. `POST /store/pay` is allowed for FAILED/RETRY_EXHAUSTED policies — it generates a new `merchantOrderId` with a `-R####` suffix to avoid provider order_id conflicts on the retry attempt.
+
+**Double-charge prevention (layered defence):**
+1. `PaymentService` guard blocks `DuplicatePaymentException` for ACTIVATED/DISBURSED — the final hard stop
+2. `InsureStoreController.pay()` returns the existing URL for PENDING — never creates a second transaction
+3. Frontend ACTIVATED/DISBURSED detection redirects to `/payment-result` immediately, bypassing the Pay button entirely
+
+#### Database — Product Catalogue
+
+```
+store_products
+  id              UUID PK
+  code            VARCHAR(30) UNIQUE      -- e.g. "life_my", "medical_id", "travel_ph"
+  name            VARCHAR(100)
+  insurance_type  VARCHAR(60)             -- Life / Medical / Motor / Travel / Accident
+  tagline         VARCHAR(200)
+  amount          DECIMAL(10,2)
+  billing_period  VARCHAR(20)             -- "Monthly" / "Annual"
+  features        TEXT                    -- pipe-separated, e.g. "Feature A|Feature B|Feature C"
+  badge           VARCHAR(50)             -- "Most Popular" / "Best Value" / null
+  sort_order      INT
+  active          BOOLEAN DEFAULT true
+  region          VARCHAR(2)              -- MY / ID / PH
+  currency        VARCHAR(3)              -- MYR / IDR / PHP
+```
+
+Features are stored as a pipe-separated string and split by `StoreProductResponse.from()` at serialization time. No join table or JSONB needed.
+
+#### API Endpoints — Store (Public, No Auth)
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/store/products?region=MY` | List active products for region, ordered by `sort_order` |
+| POST | `/store/quote` | Save application as quote; send email; return `{ policyId, quoteReference }` |
+| POST | `/store/pay` | Initiate payment for existing quote; return provider redirect URL |
+| GET | `/store/result?policyId=UUID` | Get result for any policy state (QUOTE/PENDING/SUCCESS/FAILED) |
+
+**Quote Request:**
+```json
+{
+  "holderName": "Ahmad bin Yusof",
+  "holderEmail": "ahmad@example.com",
+  "insuranceType": "Life",
+  "amount": 99.00,
+  "paymentMethod": "FPX",
+  "region": "MY",
+  "currency": "MYR",
+  "appBaseUrl": "http://localhost:5173"
+}
+```
+
+**Pay Request:**
+```json
+{
+  "policyId": "uuid-of-quote",
+  "redirectUrl": "http://localhost:5173/payment-result"
+}
+```
+
+**Result Response (QUOTE state — no transaction yet):**
+```json
+{
+  "transactionId": null,
+  "status": "QUOTE",
+  "provider": null,
+  "routingStrategy": null,
+  "routingReason": null,
+  "fee": null,
+  "amount": 99.00,
+  "currency": "MYR",
+  "policyNumber": "POL-MY-1234567",
+  "holderName": "Ahmad bin Yusof",
+  "holderEmail": "ahmad@example.com",
+  "insuranceType": "Life",
+  "paymentMethod": "FPX",
+  "createdAt": "2026-05-27T10:00:00Z"
+}
+```
+
+**Result Response (SUCCESS state — after payment):**
+```json
+{
+  "transactionId": "txn-uuid",
+  "status": "SUCCESS",
+  "provider": "BILLPLZ",
+  "routingStrategy": "LOWEST_FEE",
+  "routingReason": "Rule #2 (priority=2): PREMIUM_COLLECTION → LOWEST_FEE strategy selected Billplz",
+  "fee": 0.30,
+  "amount": 99.00,
+  "currency": "MYR",
+  "policyNumber": "POL-MY-1234567",
+  "holderName": "Ahmad bin Yusof",
+  "holderEmail": "ahmad@example.com",
+  "insuranceType": "Life",
+  "paymentMethod": "FPX",
+  "createdAt": "2026-05-27T10:00:00Z"
+}
+```
+
+#### Demo Policy Status Lifecycle (InsureStore)
+
+```
+QUOTE           payment not yet initiated; customer received email, has not clicked "Pay"
+  │
+  │ POST /store/pay (first call)
+  ▼
+PENDING         payment initiated at provider; waiting for webhook callback
+  │               └─ re-open email link → POST /store/pay returns existing provider URL
+  │                  (no new transaction; same URL presented to customer)
+  ├─ webhook SUCCESS ──────────────────────────────────────────────────────────────┐
+  │                                                                                │
+  ▼                                                                                │
+ACTIVATED       premium collected; policy active (set by NotificationConsumer)    │
+                                                                                   │
+  ├─ webhook FAILED / retry exhausted ─────────────────────────────────────────┐  │
+  │                                                                             │  │
+  ▼                                                                             │  │
+FAILED          payment rejected; customer can retry via same email link        │  │
+  │             (retry generates new merchantOrderId suffix to avoid            │  │
+  │              provider order_id conflicts)                                   │  │
+  │                                                                             │  │
+  └─ POST /store/pay (retry) ────────────────────────────────────────────────▶ PENDING (new transaction)
+```
+
+| Status | `POST /store/pay` behaviour | Frontend |
+|---|---|---|
+| `QUOTE` | Initiate payment; create transaction | Pay button |
+| `PENDING` | Return existing provider checkout URL | "Resume Payment" button |
+| `FAILED` / `RETRY_EXHAUSTED` | Re-initiate with new merchantOrderId | Pay button + red retry banner |
+| `ACTIVATED` / `DISBURSED` | HTTP 409 — already paid | Auto-redirect to `/payment-result` |
 
 ---
 
@@ -996,6 +1280,14 @@ Request mirrors `/payments/initiate` with `claimReference` (required) and `polic
 
 **Demo Policy Status values:** `PENDING` → `ACTIVATED` (premium) or `DISBURSED` (claim disbursement)
 
+### Store (Public — No JWT required)
+| Method | Path | Description |
+|---|---|---|
+| GET | `/store/products?region=MY` | List active products for the given region, ordered by `sort_order` |
+| POST | `/store/quote` | Save application as quote; email payment link to customer; return `{ policyId, quoteReference }` |
+| POST | `/store/pay` | Initiate payment for an existing QUOTE record; validates status=QUOTE before calling routing engine |
+| GET | `/store/result?policyId=UUID` | Fetch result for any policy state — works for QUOTE (no transaction), PENDING, SUCCESS, FAILED |
+
 ### Admin — Notification Queue
 | Method | Path | Description |
 |---|---|---|
@@ -1216,6 +1508,8 @@ where:
 | V21 | `demo_policies` (new) | id UUID PK, holder_name, holder_email, insurance_type, policy_number, claim_reference, amount DECIMAL(19,4), currency, region, payment_method, payment_type, status VARCHAR(20) DEFAULT 'PENDING', transaction_id UUID, created_at, updated_at; 6 seed rows (4 premium + 2 claims across MY/ID/PH) |
 | V22 | `provider_configs` + `provider_fee_rates` (alter) | Inserts XENDIT into provider_configs (enabled, 2.5% fee); sets PAYMONGO is_enabled=false; inserts 5 Xendit PH fee rate rows (GCASH 2.5%, MAYA 2.2%, GRABPAY 2.5%, CARD PHP15+3.5%, EWALLET 2.5%) |
 | V23 | `transactions` (alter) | Adds `va_number VARCHAR(100)` — populated for Midtrans VIRTUAL_ACCOUNT payments only; null for all other providers and methods |
+| V24 | `store_products` (new) | id UUID PK, code VARCHAR(30) UNIQUE, name, insurance_type, tagline, amount DECIMAL(10,2), billing_period, features TEXT (pipe-separated), badge, sort_order INT, active BOOLEAN; 5 MY seed rows (life/medical/motor/travel/accident) |
+| V25 | `store_products` (alter) | Adds `region VARCHAR(2)` and `currency VARCHAR(3)`; defaults existing rows to MY/MYR; seeds 5 ID (IDR) and 5 PH (PHP) products with `_id` and `_ph` code suffixes |
 
 ### RabbitMQ Queue Topology (Implementation Reference)
 ```yaml
@@ -1288,3 +1582,4 @@ rabbitmq:
 7. **"What happens downstream after a payment succeeds?"** — A `PaymentSucceededEvent` is published to a durable RabbitMQ notification queue. A consumer picks it up and activates the linked insurance policy (or marks the claim as disbursed) by writing to `transaction_events` and updating the `demo_policies` table. You can stop the consumer live, queue up 5 payments, then restart — all 5 process instantly without loss. This proves the system is not tightly coupled: the payment path and the insurance activation path are independent and survivable.
 8. **"Why do you poll the provider instead of relying purely on webhooks?"** — We don't poll instead of webhooks — we use both, with webhooks as the primary signal. The active retry loop is a deliberate trade-off for the demo environment: a production system would use webhooks as the real-time signal and a scheduled hourly reconciliation job to backfill any missed events. We chose an active retry loop because (a) our demo scale is trivially small so rate limits are irrelevant, (b) ngrok is unreliable in a live demo setting so we can't bet a 10-minute examiner slot on webhook delivery, and (c) the retry queue draining and DLQ panel are visibly demonstrable in real time — a scheduled reconciliation job that runs hourly gives us nothing to show. The retry consumer also skips silently if the webhook already resolved the transaction, so there is no double-processing risk.
 9. **"Isn't the demo policy table just fake data?"** — Yes, intentionally. In production, these records would be pushed in by a separate Policy Administration System (PAS) via the same API. The demo simulates what the PAS would do, so the examiner sees a realistic insurance back-office flow rather than a blank payment form. The `POST /admin/demo-policies` endpoint is exactly the contract a real PAS integration would call.
+10. **"Why does the InsureStore email a payment link instead of redirecting immediately?"** — This is the industry-standard "quote-first" pattern used by Etiqa, Prudential MY, and Great Eastern. It solves three real problems: (1) **Back-button duplicate payments** — if the customer is redirected to the payment provider immediately and presses back, pressing "Pay" again would create a second transaction for the same policy; our flow never opens the provider page until the customer explicitly clicks the email link, making double-charging architecturally impossible. (2) **Customer trust** — insurance premiums are not impulse purchases; customers may want to review the quote, read the fine print, or discuss with a family member before paying. Forcing an immediate redirect treats a RM500/year policy like a RM5 coffee. (3) **Lead capture** — the `QUOTE` record is saved in `demo_policies` the moment the form is submitted, even if the customer never pays. An ops team could follow up on abandoned quotes. The trade-off is one extra step for the customer (opening email), which major insurers have found acceptable given the trust benefit.

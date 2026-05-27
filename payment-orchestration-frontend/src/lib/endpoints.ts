@@ -63,8 +63,9 @@ export const API = {
 
   STORE: {
     PRODUCTS: '/store/products',
-    CHECKOUT: '/store/checkout',
-    RESULT:   (billId: string) => `/store/result?billId=${encodeURIComponent(billId)}`,
+    QUOTE:    '/store/quote',
+    PAY:      '/store/pay',
+    RESULT:   (policyId: string) => `/store/result?policyId=${encodeURIComponent(policyId)}`,
   },
 
   USERS: {

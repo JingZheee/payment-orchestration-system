@@ -2,8 +2,8 @@
 Last updated: 2026-05-27
 
 ## Completed
-- [x] PRD.md v1.6 — all sessions documented; Midtrans adapter design notes added
-- [x] Maven multi-module backend — all 7 modules, Flyway V1–V23, all entities/repos/adapters
+- [x] PRD.md v1.8 — all features documented; v1.7 InsureStore, v1.8 payment resumption + US-21
+- [x] Maven multi-module backend — all 7 modules, Flyway V1–V25, all entities/repos/adapters
 - [x] Spring Security + JWT; CORS, 401/403 fix
 - [x] DB-driven payment methods — PaymentMethodEntity, composite PK; enum deleted everywhere
 - [x] AdminPaymentMethodController — GET/POST/PUT/DELETE with soft-delete
@@ -26,24 +26,24 @@ Last updated: 2026-05-27
 - [x] V23 migration — va_number column added to transactions
 - [x] User Management module — UserAdminController + Users frontend page
 - [x] AppLayout sidebar — grouped into 5 sections; duplicate Admin label + search bar removed
-- [x] InsureStore — V24 migration; store_products table + 5 seeded MY products (DB-driven)
-- [x] InsureStore — StoreProduct entity, StoreProductRepository, StoreProductResponse DTO
-- [x] InsureStore — GET /store/products endpoint (public, region-filtered)
-- [x] InsureStore — Multi-region support: V25 migration adds region/currency; seeds 5 ID + 5 PH products
-- [x] InsureStore — DemoCheckoutRequest + InsureStoreController use dynamic region/currency (not hardcoded MY/MYR)
-- [x] CheckoutPage — 4-step wizard: Personal Info (NRIC/NIK/PhilSys) → Coverage → Declaration → Payment
-- [x] CheckoutPage — Product-specific coverage fields per type (life/medical/motor/travel/accident)
-- [x] CheckoutPage — BNM/OJK/IC-PH declaration text per region; payment methods per region
-- [x] InsureStorePage — Full redesign: sticky navbar, hero with trust stats, enhanced product cards
-- [x] InsureStorePage — Coverage highlight box, type icons, trust band, dark footer
-- [x] InsureStorePage — Region selector as Select dropdown in navbar; category as Dropdown under Products
+- [x] InsureStore — V24+V25 migrations; store_products table; 15 seeded products (MY/ID/PH)
+- [x] InsureStore — StoreProduct entity/repo/DTO; GET /store/products; multi-region support
+- [x] CheckoutPage — 4-step wizard (Personal→Coverage→Declaration→Review); NRIC auto-parse
+- [x] InsureStorePage — sticky navbar, hero, trust band, dark footer; region Select + Products Dropdown
+- [x] InsureStore — quote-based flow: POST /store/quote saves QUOTE, emails payment link
+- [x] InsureStore — CompletePaymentPage at /complete-payment?policyId=UUID
+- [x] InsureStore — PaymentResultPage reads policyId; works for all three providers
+- [x] InsureStore — POST /store/pay idempotent: PENDING→returns existing URL, FAILED→allows retry
+- [x] PaymentService guard fix — only blocks ACTIVATED/DISBURSED (was incorrectly blocking QUOTE)
+- [x] PaymentService — updates demoPolicy.transactionId+status for PENDING/PROCESSING results
+- [x] PaymentService — sets demoPolicy.status=FAILED on provider error or FAILED result
+- [x] Frontend build clean — all 7 pre-existing TS errors fixed (unused imports, Recharts types, etc.)
 
 ## Up next (start here next session)
-- [ ] Restart backend — picks up V24+V25 migrations + all store changes
+- [ ] Restart backend — pick up all backend changes (PaymentService guard fix, pay() rewrite)
 - [ ] Smoke test InsureStore end-to-end: MY FPX → Billplz → payment-result page
-- [ ] Smoke test VA payment — VA number in checkout UI (Midtrans Snap)
+- [ ] Smoke test PENDING resumption: pay → abandon → re-open email link → Resume Payment
 - [ ] Add Xendit sandbox keys to application-dev.yml, smoke test PH invoice + disbursement
-- [ ] Verify failure email — trigger RETRY_EXHAUSTED via Mock ALWAYS_FAIL → confirm Mailtrap
 - [ ] Demo data seeding — 100+ realistic transactions across all 3 regions for dashboard KPIs
 - [ ] Viva prep — run 10-minute demo script end-to-end, note rough edges
 
@@ -55,9 +55,10 @@ Last updated: 2026-05-27
 - Payment methods are DB-managed strings (not Java enum); composite PK (code, region)
 - Frontend: React 18 + Vite + antd v6, feature-based structure
 - Store products are DB-driven (store_products table); features stored as pipe-separated TEXT
-- Multi-region checkout: region/currency taken from product row; routing engine picks provider automatically
-- Checkout is a 4-step wizard; only holderName/holderEmail/insuranceType/amount/paymentMethod/region/currency sent to backend
+- Quote-based checkout: form creates QUOTE record + email; payment only on email link click
+- POST /store/pay is idempotent for PENDING (returns existing URL, no new transaction)
+- FAILED/RETRY_EXHAUSTED allowed to re-initiate with fresh merchantOrderId (-R#### suffix)
 
 ## Blockers
-- Backend not yet restarted — V24+V25 migrations not live until restart
+- Backend needs restart to activate all session changes
 - Xendit sandbox keys must be added to application-dev.yml before PH payments can be tested
