@@ -31,18 +31,20 @@ Last updated: 2026-05-27
 - [x] CheckoutPage — 4-step wizard (Personal→Coverage→Declaration→Review); NRIC auto-parse
 - [x] InsureStorePage — sticky navbar, hero, trust band, dark footer; region Select + Products Dropdown
 - [x] InsureStore — quote-based flow: POST /store/quote saves QUOTE, emails payment link
-- [x] InsureStore — CompletePaymentPage at /complete-payment?policyId=UUID
+- [x] InsureStore — CompletePaymentPage: two-panel layout, branded method icons, VA inline display
 - [x] InsureStore — PaymentResultPage reads policyId; works for all three providers
 - [x] InsureStore — POST /store/pay idempotent: PENDING→returns existing URL, FAILED→allows retry
-- [x] PaymentService guard fix — only blocks ACTIVATED/DISBURSED (was incorrectly blocking QUOTE)
-- [x] PaymentService — updates demoPolicy.transactionId+status for PENDING/PROCESSING results
-- [x] PaymentService — sets demoPolicy.status=FAILED on provider error or FAILED result
-- [x] Frontend build clean — all 7 pre-existing TS errors fixed (unused imports, Recharts types, etc.)
+- [x] V26 migration — payment_method nullable on demo_policies (method deferred to pay-time)
+- [x] Payment method moved to pay-time: removed from quote, added to StorePayRequest
+- [x] DemoCheckoutResponse — vaNumber field added; VA inline display on CompletePaymentPage
+- [x] PaymentService — FAILED paths now set demoPolicy.transactionId (was missing, caused stale pointer)
+- [x] DlqConsumer — now syncs demoPolicy.status="RETRY_EXHAUSTED" so re-payment bypasses PENDING idempotency check
 
 ## Up next (start here next session)
-- [ ] Restart backend — pick up all backend changes (PaymentService guard fix, pay() rewrite)
-- [ ] Smoke test InsureStore end-to-end: MY FPX → Billplz → payment-result page
-- [ ] Smoke test PENDING resumption: pay → abandon → re-open email link → Resume Payment
+- [ ] Restart backend — pick up all backend changes from this and prior sessions
+- [ ] Smoke test RETRY_EXHAUSTED re-pay: mock ALWAYS_FAIL → exhaust → switch to ALWAYS_SUCCESS → retry → ACTIVATED
+- [ ] Smoke test InsureStore end-to-end: MY FPX quote → pay → redirect → payment-result page
+- [ ] Smoke test PENDING resumption: pay → abandon → re-open email link → Resume Payment works
 - [ ] Add Xendit sandbox keys to application-dev.yml, smoke test PH invoice + disbursement
 - [ ] Demo data seeding — 100+ realistic transactions across all 3 regions for dashboard KPIs
 - [ ] Viva prep — run 10-minute demo script end-to-end, note rough edges
@@ -53,11 +55,12 @@ Last updated: 2026-05-27
 - RabbitMQ (not Kafka); active retry (30s→60s→120s→DLQ) is deliberate demo trade-off
 - No DB mocking in tests — Testcontainers with real PostgreSQL only
 - Payment methods are DB-managed strings (not Java enum); composite PK (code, region)
-- Frontend: React 18 + Vite + antd v6, feature-based structure
+- Frontend: React 18 + Vite + antd v5, feature-based structure
 - Store products are DB-driven (store_products table); features stored as pipe-separated TEXT
 - Quote-based checkout: form creates QUOTE record + email; payment only on email link click
 - POST /store/pay is idempotent for PENDING (returns existing URL, no new transaction)
 - FAILED/RETRY_EXHAUSTED allowed to re-initiate with fresh merchantOrderId (-R#### suffix)
+- Payment method selected at pay-time (CompletePaymentPage), not at quote-time (CheckoutPage)
 
 ## Blockers
 - Backend needs restart to activate all session changes

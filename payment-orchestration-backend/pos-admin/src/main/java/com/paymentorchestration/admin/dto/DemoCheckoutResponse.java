@@ -5,5 +5,6 @@ import java.util.UUID;
 public record DemoCheckoutResponse(
         UUID policyId,
         UUID transactionId,
-        String redirectUrl
+        String redirectUrl,
+        String vaNumber
 ) {}

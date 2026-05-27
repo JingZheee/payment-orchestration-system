@@ -21,7 +21,6 @@ export interface StoreQuoteRequest {
   holderEmail: string;
   insuranceType: string;
   amount: number;
-  paymentMethod: string;
   region: string;
   currency: string;
   appBaseUrl: string;
@@ -36,12 +35,14 @@ export interface StoreQuoteResponse {
 export interface StorePayRequest {
   policyId: string;
   redirectUrl: string;
+  paymentMethod: string;
 }
 
 export interface CheckoutResponse {
   policyId: string;
   transactionId: string;
-  redirectUrl: string;
+  redirectUrl: string | null;
+  vaNumber: string | null;
 }
 
 export interface StoreResult {
@@ -58,6 +59,7 @@ export interface StoreResult {
   holderEmail: string | null;
   insuranceType: string | null;
   paymentMethod: string | null;
+  region: string | null;
   createdAt: string;
 }
 

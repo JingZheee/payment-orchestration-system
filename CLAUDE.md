@@ -327,9 +327,9 @@ Weights are configurable in `application.yml` under `routing.scorer.*`.
 
 | Field | Value |
 |---|---|
-| **Current module** | InsureStore — payment status lifecycle bug fixes + idempotent re-pay flow |
-| **Current task** | Restart backend → smoke test: MY FPX quote → pay → abandon → re-open email link → Resume Payment button works |
-| **Last completed** | PaymentService guard fix (QUOTE now allowed); pay() rewrite with PENDING re-send + FAILED retry; CompletePaymentPage "Resume Payment" UI; PRD v1.8 with US-21 + updated lifecycle diagram |
+| **Current module** | InsureStore — RETRY_EXHAUSTED re-payment bug fix |
+| **Current task** | Restart backend → smoke test RETRY_EXHAUSTED re-pay: set mock to ALWAYS_FAIL → exhaust retries → switch to ALWAYS_SUCCESS → click Retry → verify policy reaches ACTIVATED |
+| **Last completed** | DlqConsumer now syncs demoPolicy.status="RETRY_EXHAUSTED"; PaymentService FAILED paths now set transactionId; both bugs that caused infinite RETRY_EXHAUSTED loop are fixed |
 | **Blockers** | Backend needs restart; Xendit sandbox keys not in application-dev.yml |
 
 ### Admin API Endpoints — Payment Methods

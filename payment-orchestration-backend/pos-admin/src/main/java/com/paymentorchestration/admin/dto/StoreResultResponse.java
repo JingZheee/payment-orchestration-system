@@ -21,6 +21,7 @@ public record StoreResultResponse(
         String holderEmail,
         String insuranceType,
         String paymentMethod,
+        String region,
         Instant createdAt
 ) {
     public static StoreResultResponse from(Transaction t, DemoPolicy policy) {
@@ -38,6 +39,7 @@ public record StoreResultResponse(
                 policy != null ? policy.getHolderEmail() : t.getCustomerEmail(),
                 policy != null ? policy.getInsuranceType() : null,
                 policy != null ? policy.getPaymentMethod() : null,
+                policy != null ? policy.getRegion() : (t.getRegion() != null ? t.getRegion().name() : null),
                 t.getCreatedAt()
         );
     }
@@ -57,7 +59,8 @@ public record StoreResultResponse(
                 policy.getHolderName(),
                 policy.getHolderEmail(),
                 policy.getInsuranceType(),
-                policy.getPaymentMethod(),
+                null,
+                policy.getRegion(),
                 policy.getCreatedAt()
         );
     }

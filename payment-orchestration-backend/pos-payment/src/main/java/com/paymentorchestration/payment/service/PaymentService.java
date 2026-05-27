@@ -147,6 +147,7 @@ public class PaymentService {
             transactionRepository.save(transaction);
             writeEvent(transaction.getId(), "PROVIDER_ERROR", e.getMessage());
             if (demoPolicy != null) {
+                demoPolicy.setTransactionId(transaction.getId());
                 demoPolicy.setStatus("FAILED");
                 demoPolicyRepository.save(demoPolicy);
             }
@@ -185,6 +186,7 @@ public class PaymentService {
         }
         if (result.getStatus() == PaymentStatus.FAILED) {
             if (demoPolicy != null) {
+                demoPolicy.setTransactionId(transaction.getId());
                 demoPolicy.setStatus("FAILED");
                 demoPolicyRepository.save(demoPolicy);
             }

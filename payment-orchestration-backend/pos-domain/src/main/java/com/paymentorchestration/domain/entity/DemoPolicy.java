@@ -42,7 +42,7 @@ public class DemoPolicy {
     @Column(nullable = false, length = 2)
     private String region;
 
-    @Column(name = "payment_method", nullable = false, length = 30)
+    @Column(name = "payment_method", length = 30)
     private String paymentMethod;
 
     @Column(name = "payment_type", nullable = false, length = 30)

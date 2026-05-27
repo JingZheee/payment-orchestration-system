@@ -73,7 +73,6 @@ public class InsureStoreController {
         policy.setAmount(req.amount());
         policy.setCurrency(currency.name());
         policy.setRegion(regionCode);
-        policy.setPaymentMethod(req.paymentMethod());
         policy.setPaymentType("PREMIUM_COLLECTION");
         policy.setStatus("QUOTE");
         DemoPolicy saved = demoPolicyRepository.save(policy);
@@ -105,9 +104,10 @@ public class InsureStoreController {
             Transaction existing = transactionRepository.findById(policy.getTransactionId())
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                             "Transaction not found for policy: " + req.policyId()));
-            if (existing.getRedirectUrl() != null) {
+            if (existing.getRedirectUrl() != null || existing.getVaNumber() != null) {
                 return ResponseEntity.ok(ApiResponse.ok(
-                        new DemoCheckoutResponse(policy.getId(), existing.getId(), existing.getRedirectUrl())
+                        new DemoCheckoutResponse(policy.getId(), existing.getId(),
+                                existing.getRedirectUrl(), existing.getVaNumber())
                 ));
             }
         }
@@ -125,6 +125,10 @@ public class InsureStoreController {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Unexpected policy state: " + policy.getStatus());
         }
+
+        // Persist the payment method chosen at pay-time (overrides any prior value)
+        policy.setPaymentMethod(req.paymentMethod());
+        demoPolicyRepository.save(policy);
 
         Region   region   = Region.valueOf(policy.getRegion());
         Currency currency = Currency.valueOf(policy.getCurrency());
@@ -154,7 +158,8 @@ public class InsureStoreController {
         // PaymentService handles all policy status/transactionId transitions
 
         return ResponseEntity.ok(ApiResponse.ok(
-                new DemoCheckoutResponse(policy.getId(), payRes.getTransactionId(), payRes.getRedirectUrl())
+                new DemoCheckoutResponse(policy.getId(), payRes.getTransactionId(),
+                        payRes.getRedirectUrl(), payRes.getVaNumber())
         ));
     }
 

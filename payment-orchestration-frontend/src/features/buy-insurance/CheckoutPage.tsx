@@ -34,27 +34,6 @@ function parseNRIC(nric: string): { dob: string; gender: string } | null {
   return { dob: `${dd}/${mm}/${year}`, gender: parseInt(d[11]) % 2 === 0 ? 'Female' : 'Male' };
 }
 
-// ── Payment methods per region ────────────────────────────────────────────────
-
-interface MethodOption { id: string; label: string; abbr: string; description: string }
-
-const METHODS_BY_REGION: Record<string, MethodOption[]> = {
-  MY: [
-    { id: 'FPX',      label: 'Online Banking (FPX)', abbr: 'FPX', description: 'Internet banking — select your bank at checkout' },
-    { id: 'EWALLET',  label: 'e-Wallet',             abbr: 'eW',  description: 'Touch \'n Go, Boost, or ShopeePay' },
-  ],
-  ID: [
-    { id: 'VIRTUAL_ACCOUNT', label: 'Bank Transfer (VA)', abbr: 'VA',  description: 'BCA, BNI, BRI, Mandiri, or Permata virtual account' },
-    { id: 'QRIS',            label: 'QRIS',               abbr: 'QR',  description: 'Scan with GoPay, OVO, Dana, or any QRIS-supported app' },
-    { id: 'GOPAY',           label: 'GoPay',              abbr: 'GP',  description: 'Pay via the Gojek app' },
-  ],
-  PH: [
-    { id: 'GCASH',    label: 'GCash',         abbr: 'GC',  description: 'Pay via GCash mobile wallet' },
-    { id: 'MAYA',     label: 'Maya',          abbr: 'MY',  description: 'Pay via Maya (formerly PayMaya)' },
-    { id: 'GRABPAY',  label: 'GrabPay',       abbr: 'GP',  description: 'Pay via the Grab app' },
-  ],
-};
-
 // ── Declarations per region ───────────────────────────────────────────────────
 
 const DECLARATIONS_BY_REGION: Record<string, { body: string; regulator: string }> = {
@@ -567,42 +546,10 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function MethodRow({ method, selected, onSelect }: { method: MethodOption; selected: boolean; onSelect: () => void }) {
-  return (
-    <button
-      type="button" onClick={onSelect}
-      style={{
-        width: '100%', border: selected ? '1.5px solid #FCB900' : '1px solid #E5E7EB',
-        borderRadius: 10, padding: '12px 16px', cursor: 'pointer',
-        background: selected ? '#FFFBEB' : 'white',
-        display: 'flex', alignItems: 'center', gap: 14,
-        textAlign: 'left', outline: 'none',
-      }}
-    >
-      <div style={{
-        width: 36, height: 36, borderRadius: 8, flexShrink: 0,
-        background: selected ? '#FCB900' : '#F3F4F6',
-        color: selected ? '#111827' : '#6B7280',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 11, fontWeight: 700,
-      }}>{method.abbr}</div>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>{method.label}</div>
-        {selected && <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>{method.description}</div>}
-      </div>
-      <div style={{
-        width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
-        border: selected ? '5px solid #FCB900' : '1.5px solid #D1D5DB', background: 'white',
-      }} />
-    </button>
-  );
-}
-
 function PaymentStep({
-  product, personal, coverage, selectedMethod, onSelectMethod,
+  product, personal, coverage,
 }: {
   product: StoreProduct; personal: Personal; coverage: Coverage;
-  selectedMethod: string; onSelectMethod: (id: string) => void;
 }) {
   const base = product.code.replace(/_id$|_ph$/, '');
   const coverageRows: { label: string; value: string }[] = [];
@@ -631,8 +578,6 @@ function PaymentStep({
     if (coverage.paSumInsured)      coverageRows.push({ label: 'Sum Insured', value: `${parseInt(coverage.paSumInsured).toLocaleString()}` });
   }
 
-  const methods = METHODS_BY_REGION[product.region] ?? METHODS_BY_REGION.MY;
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div style={{ background: '#FAFAFA', border: '1px solid #F0F0F0', borderRadius: 10, padding: '18px 20px' }}>
@@ -657,14 +602,11 @@ function PaymentStep({
         </div>
       </div>
 
-      <div>
-        <div style={{ fontSize: 11, fontWeight: 600, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
-          Payment Method
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {methods.map(m => (
-            <MethodRow key={m.id} method={m} selected={selectedMethod === m.id} onSelect={() => onSelectMethod(m.id)} />
-          ))}
+      <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 10, padding: '14px 16px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+        <span style={{ fontSize: 18, flexShrink: 0 }}>💳</span>
+        <div style={{ fontSize: 13, color: '#1E40AF', lineHeight: 1.6 }}>
+          <strong>You'll choose your payment method in the next step.</strong>
+          <br />After submitting, check your email for a secure payment link where you can select how to pay.
         </div>
       </div>
     </div>
@@ -681,13 +623,10 @@ export default function CheckoutPage() {
 
   const product: StoreProduct | undefined = (state as { product?: StoreProduct })?.product;
 
-  const defaultMethod = (METHODS_BY_REGION[product?.region ?? 'MY'] ?? METHODS_BY_REGION.MY)[0].id;
-
   const [step, setStep]             = useState(0);
   const [personal, setPersonal]     = useState<Personal>({ name: '', nationalId: '', dob: '', gender: '', phone: '', email: '', occupation: '', maritalStatus: '' });
   const [coverage, setCoverage]     = useState<Coverage>({});
   const [declarations, setDeclarations] = useState([false, false, false, false]);
-  const [paymentMethod, setPaymentMethod] = useState(defaultMethod);
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState<string | null>(null);
   const [quoteSubmitted, setQuoteSubmitted] = useState(false);
@@ -755,7 +694,6 @@ export default function CheckoutPage() {
         holderEmail:   personal.email,
         insuranceType: product!.insuranceType,
         amount:        product!.amount,
-        paymentMethod,
         region:        product!.region,
         currency:      product!.currency,
         appBaseUrl:    window.location.origin,
@@ -831,7 +769,7 @@ export default function CheckoutPage() {
                 {step === 0 && 'Enter your personal details as per your national identification document.'}
                 {step === 1 && `Tell us more about your ${product.insuranceType.toLowerCase()} coverage needs.`}
                 {step === 2 && 'Please read and confirm each statement carefully before proceeding.'}
-                {step === 3 && 'Review your application summary. A payment link will be sent to your email.'}
+                {step === 3 && 'Review your application summary. You\'ll choose your payment method in the email link.'}
               </div>
             </div>
 
@@ -841,7 +779,6 @@ export default function CheckoutPage() {
             {step === 3 && (
               <PaymentStep
                 product={product} personal={personal} coverage={coverage}
-                selectedMethod={paymentMethod} onSelectMethod={setPaymentMethod}
               />
             )}
 

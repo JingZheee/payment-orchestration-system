@@ -40,6 +40,12 @@ public class DlqConsumer {
                     + " retry attempts. No further retries will be made.");
             transactionEventRepository.save(event);
 
+            // Sync policy status so re-payment is not blocked by the PENDING idempotency check
+            demoPolicyRepository.findByTransactionId(tx.getId()).ifPresent(policy -> {
+                policy.setStatus("RETRY_EXHAUSTED");
+                demoPolicyRepository.save(policy);
+            });
+
             log.info("[dlq] Transaction {} marked as RETRY_EXHAUSTED", tx.getId());
 
             sendFailureEmail(tx);

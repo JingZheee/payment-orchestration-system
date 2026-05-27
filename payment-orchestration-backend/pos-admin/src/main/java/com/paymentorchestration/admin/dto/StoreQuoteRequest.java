@@ -11,7 +11,7 @@ public record StoreQuoteRequest(
         @NotBlank String holderEmail,
         @NotBlank String insuranceType,
         @NotNull @Positive BigDecimal amount,
-        @NotBlank String paymentMethod,
+        String paymentMethod,
         @NotBlank String region,
         @NotBlank String currency,
         @NotBlank String appBaseUrl
