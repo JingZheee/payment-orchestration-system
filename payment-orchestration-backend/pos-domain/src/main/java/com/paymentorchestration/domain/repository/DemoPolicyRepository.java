@@ -14,4 +14,6 @@ public interface DemoPolicyRepository extends JpaRepository<DemoPolicy, UUID> {
     Optional<DemoPolicy> findByPolicyNumberAndPaymentType(String policyNumber, String paymentType);
 
     Optional<DemoPolicy> findByClaimReference(String claimReference);
+
+    Optional<DemoPolicy> findByTransactionId(UUID transactionId);
 }

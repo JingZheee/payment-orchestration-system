@@ -15,11 +15,19 @@ import PaymentMethods from './features/payment-methods/PaymentMethods';
 import PaymentCheckoutPage from './features/payment-demo/PaymentCheckoutPage';
 import RoutingEnginePage from './features/routing/RoutingEnginePage';
 import Users from './features/users/Users';
+import InsureStorePage from './features/buy-insurance/InsureStorePage';
+import CheckoutPage from './features/buy-insurance/CheckoutPage';
+import PaymentResultPage from './features/buy-insurance/PaymentResultPage';
 
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+
+      {/* Public customer-facing pages — no auth required */}
+      <Route path="/buy" element={<InsureStorePage />} />
+      <Route path="/buy/checkout" element={<CheckoutPage />} />
+      <Route path="/payment-result" element={<PaymentResultPage />} />
 
       <Route element={<RequireAuth />}>
         {/* Full-page checkout — no sidebar */}

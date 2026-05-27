@@ -208,6 +208,13 @@ public class PaymentService {
                     if (parsed.getStatus() == PaymentStatus.SUCCESS
                             && previous != PaymentStatus.SUCCESS) {
                         paymentSucceededPublisher.publish(transaction);
+                        demoPolicyRepository.findByTransactionId(transaction.getId())
+                                .ifPresent(policy -> {
+                                    String newStatus = transaction.getPaymentType() == PaymentType.CLAIMS_DISBURSEMENT
+                                            ? "DISBURSED" : "ACTIVATED";
+                                    policy.setStatus(newStatus);
+                                    demoPolicyRepository.save(policy);
+                                });
                     }
                     webhookLog.setTransactionId(transaction.getId());
                     webhookLog.setProcessedAt(Instant.now());

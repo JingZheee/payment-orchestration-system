@@ -327,10 +327,10 @@ Weights are configurable in `application.yml` under `routing.scorer.*`.
 
 | Field | Value |
 |---|---|
-| **Current module** | pos-admin + frontend — User module, failure email, UI fixes |
-| **Current task** | Restart backend, then smoke test: CARD (Midtrans Snap), VA number display, Xendit PH invoice + disbursement, RETRY_EXHAUSTED failure email in Mailtrap |
-| **Last completed** | User management module (UserAdminController + Users page); failure email on RETRY_EXHAUSTED (DlqConsumer + EmailNotificationService); sidebar search bar + duplicate Admin label removed; sidebar nav grouped into 5 sections; PRD updated with retry architecture rationale + viva Q8 |
-| **Blockers** | Backend not restarted — V23 migration + all session changes not live; Xendit sandbox keys not yet in application-dev.yml |
+| **Current module** | InsureStore — DB-driven products, multi-region, professional checkout + store redesign |
+| **Current task** | Restart backend to pick up V24+V25 migrations, then smoke test InsureStore MY FPX end-to-end |
+| **Last completed** | V24+V25 migrations; StoreProduct entity/repo; multi-region checkout (ID/PH); 4-step checkout wizard; full InsureStorePage redesign with sticky navbar, hero, trust band, footer; Products as Dropdown + region as Select in navbar |
+| **Blockers** | Backend not restarted — V24+V25 migrations not live; Xendit sandbox keys not yet in application-dev.yml |
 
 ### Admin API Endpoints — Payment Methods
 ```

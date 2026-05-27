@@ -61,6 +61,12 @@ export const API = {
     DELETE: (id: string) => `/admin/demo-policies/${id}`,
   },
 
+  STORE: {
+    PRODUCTS: '/store/products',
+    CHECKOUT: '/store/checkout',
+    RESULT:   (billId: string) => `/store/result?billId=${encodeURIComponent(billId)}`,
+  },
+
   USERS: {
     LIST:   '/admin/users',
     BY_ID:  (id: string) => `/admin/users/${id}`,
