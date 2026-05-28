@@ -138,6 +138,7 @@ public class PaymentService {
                     .customerEmail(request.getCustomerEmail())
                     .description(request.getDescription())
                     .redirectUrl(request.getRedirectUrl())
+                    .metadata(request.getMetadata())
                     .build();
 
             result = provider.initiatePayment(providerRequest);

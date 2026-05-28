@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Divider, Spin, Typography } from 'antd';
+import { Button, Divider, Select, Spin, Typography } from 'antd';
 import {
   ArrowRightOutlined,
   CheckCircleFilled,
@@ -157,20 +157,93 @@ function PolicySummaryPanel({ quote }: { quote: StoreResult }) {
   );
 }
 
+// ── VA bank picker ────────────────────────────────────────────────────────────
+
+const VA_BANKS = [
+  { code: 'bca',  label: 'BCA',  name: 'Bank Central Asia',      color: '#003DA5' },
+  { code: 'bni',  label: 'BNI',  name: 'Bank Negara Indonesia',  color: '#F37021' },
+  { code: 'bri',  label: 'BRI',  name: 'Bank Rakyat Indonesia',  color: '#00529C' },
+  { code: 'cimb', label: 'CIMB', name: 'CIMB Niaga',             color: '#C8102E' },
+];
+
+function BankLogo({ code, size = 32 }: { code: string; size?: number }) {
+  const bank = VA_BANKS.find(b => b.code === code);
+  if (!bank) return null;
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: size * 0.28,
+      background: bank.color, flexShrink: 0,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      color: '#fff', fontWeight: 800,
+      fontSize: bank.label.length > 3 ? size * 0.28 : size * 0.33,
+      letterSpacing: '-0.02em',
+    }}>
+      {bank.label}
+    </div>
+  );
+}
+
+function BankPicker({ selected, onSelect }: { selected: string; onSelect: (code: string) => void }) {
+  return (
+    <div style={{ marginTop: -2, borderLeft: '3px solid #0F766E', paddingLeft: 14, paddingBottom: 4 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+        Select Bank
+      </div>
+      <Select
+        value={selected}
+        onChange={onSelect}
+        size="large"
+        style={{ width: '100%' }}
+        popupMatchSelectWidth
+        labelRender={({ value }) => {
+          const bank = VA_BANKS.find(b => b.code === value);
+          if (!bank) return <span>{String(value)}</span>;
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <BankLogo code={bank.code} size={24} />
+              <div>
+                <span style={{ fontWeight: 700, fontSize: 14, color: '#1C1C1E' }}>{bank.label}</span>
+                <span style={{ fontSize: 12, color: '#6B7280', marginLeft: 8 }}>{bank.name}</span>
+              </div>
+            </div>
+          );
+        }}
+        options={VA_BANKS.map(b => ({ value: b.code, label: b.name }))}
+        optionRender={(opt) => {
+          const bank = VA_BANKS.find(b => b.code === opt.value);
+          if (!bank) return <span>{opt.label}</span>;
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 0' }}>
+              <BankLogo code={bank.code} size={36} />
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: '#1C1C1E', lineHeight: 1.3 }}>{bank.label}</div>
+                <div style={{ fontSize: 12, color: '#6B7280' }}>{bank.name}</div>
+              </div>
+            </div>
+          );
+        }}
+      />
+    </div>
+  );
+}
+
 // ── Right panel: payment form ─────────────────────────────────────────────────
 
 function PaymentFormPanel({
-  quote, paymentMethod, onSelectMethod, paying, error, onPay, onCancel,
+  quote, paymentMethod, onSelectMethod, bankCode, onSelectBank, paying, error, onPay, onCancel,
 }: {
   quote: StoreResult;
   paymentMethod: string;
   onSelectMethod: (m: string) => void;
+  bankCode: string;
+  onSelectBank: (code: string) => void;
   paying: boolean;
   error: string | null;
   onPay: () => void;
   onCancel: () => void;
 }) {
   const methods = REGION_METHODS[quote.region ?? 'MY'] ?? REGION_METHODS.MY;
+  const isVaSelected = paymentMethod === 'VIRTUAL_ACCOUNT';
 
   return (
     <div style={{ flex: 1, padding: '44px 48px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
@@ -185,7 +258,12 @@ function PaymentFormPanel({
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {methods.map(m => (
-            <MethodRow key={m} method={m} selected={paymentMethod === m} onSelect={() => onSelectMethod(m)} />
+            <Fragment key={m}>
+              <MethodRow method={m} selected={paymentMethod === m} onSelect={() => onSelectMethod(m)} />
+              {m === 'VIRTUAL_ACCOUNT' && isVaSelected && (
+                <BankPicker selected={bankCode} onSelect={onSelectBank} />
+              )}
+            </Fragment>
           ))}
         </div>
       </div>
@@ -252,7 +330,9 @@ export default function CompletePaymentPage() {
   const [paying,  setPaying]                  = useState(false);
   const [error,   setError]                   = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod]     = useState('');
+  const [bankCode, setBankCode]               = useState('bca');
   const [vaNumber, setVaNumber]               = useState<string | null>(null);
+  const [selectedBankName, setSelectedBankName] = useState('BCA');
 
   const params   = new URLSearchParams(window.location.search);
   const policyId = params.get('policyId') ?? '';
@@ -282,8 +362,10 @@ export default function CompletePaymentPage() {
         policyId,
         redirectUrl: `${window.location.origin}/store/result`,
         paymentMethod,
+        bankCode: paymentMethod === 'VIRTUAL_ACCOUNT' ? bankCode : undefined,
       });
       if (res.vaNumber) {
+        setSelectedBankName(VA_BANKS.find(b => b.code === bankCode)?.label ?? 'Bank');
         setVaNumber(res.vaNumber);
         setPaying(false);
       } else if (res.redirectUrl) {
@@ -415,7 +497,7 @@ export default function CompletePaymentPage() {
 
             <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 14, padding: '24px', marginBottom: 24, textAlign: 'center' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#1D4ED8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
-                Virtual Account Number
+                {selectedBankName} Virtual Account Number
               </div>
               <div style={{ fontSize: 28, fontWeight: 900, fontFamily: 'monospace', color: '#1E40AF', letterSpacing: '0.12em', marginBottom: 12 }}>
                 {vaNumber}
@@ -474,6 +556,8 @@ export default function CompletePaymentPage() {
               quote={quote}
               paymentMethod={paymentMethod}
               onSelectMethod={setPaymentMethod}
+              bankCode={bankCode}
+              onSelectBank={setBankCode}
               paying={paying}
               error={error}
               onPay={handlePay}

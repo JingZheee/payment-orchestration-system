@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Divider, Spin, Tag, Typography } from 'antd';
+import { Button, Spin, Typography } from 'antd';
 import {
   CheckCircleFilled,
   CloseCircleFilled,
@@ -13,19 +13,6 @@ import { storeService, type StoreResult } from './services/storeService';
 
 const { Text } = Typography;
 
-const STRATEGY_LABELS: Record<string, string> = {
-  REGION_BASED: 'Region-Based',
-  LOWEST_FEE: 'Lowest Fee',
-  SUCCESS_RATE: 'Success Rate',
-  COMPOSITE_SCORE: 'Composite Score',
-};
-
-const PROVIDER_LABELS: Record<string, string> = {
-  BILLPLZ: 'Billplz',
-  MIDTRANS: 'Midtrans',
-  XENDIT: 'Xendit',
-  MOCK: 'Mock Provider',
-};
 
 function formatAmount(amount: number, currency: string): string {
   if (currency === 'IDR') return `IDR ${amount.toLocaleString('id-ID')}`;
@@ -200,52 +187,6 @@ export default function PaymentResultPage() {
                 <DetailRow label="Premium" value={formatAmount(Number(result.amount), result.currency)} />
               </div>
 
-              <Divider style={{ margin: '16px 0', borderColor: '#F3F4F6' }} />
-
-              {/* Routing details */}
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
-                  Payment Routing
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text type="secondary" style={{ fontSize: 13 }}>Provider</Text>
-                    <Tag style={{ borderRadius: 999, border: 'none', background: '#EFF6FF', color: '#1D4ED8', fontWeight: 700, margin: 0 }}>
-                      {PROVIDER_LABELS[result.provider ?? ''] ?? result.provider}
-                    </Tag>
-                  </div>
-                  {result.routingStrategy && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text type="secondary" style={{ fontSize: 13 }}>Strategy</Text>
-                      <Tag style={{ borderRadius: 999, border: 'none', background: '#F3F4F6', color: '#374151', fontWeight: 600, margin: 0 }}>
-                        {STRATEGY_LABELS[result.routingStrategy] ?? result.routingStrategy}
-                      </Tag>
-                    </div>
-                  )}
-                  {result.fee != null && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text type="secondary" style={{ fontSize: 13 }}>Processing Fee</Text>
-                      <Text strong style={{ fontSize: 13 }}>{formatAmount(Number(result.fee), result.currency)}</Text>
-                    </div>
-                  )}
-                </div>
-
-                {result.routingReason && (
-                  <div style={{ background: '#FFFBEB', borderRadius: 8, padding: '10px 14px', marginTop: 12 }}>
-                    <Text style={{ fontSize: 12, color: '#92400E' }}>{result.routingReason}</Text>
-                  </div>
-                )}
-              </div>
-
-              <Divider style={{ margin: '16px 0', borderColor: '#F3F4F6' }} />
-
-              <div>
-                <Text style={{ fontSize: 11, color: '#9CA3AF' }}>Transaction ID</Text>
-                <br />
-                <Text style={{ fontSize: 11, fontFamily: 'monospace', color: '#374151' }}>
-                  {result.transactionId}
-                </Text>
-              </div>
             </>
           )}
 

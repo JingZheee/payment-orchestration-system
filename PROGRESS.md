@@ -1,5 +1,5 @@
 # Progress Snapshot
-Last updated: 2026-05-27
+Last updated: 2026-05-28
 
 ## Completed
 - [x] PRD.md v1.8 — all features documented; v1.7 InsureStore, v1.8 payment resumption + US-21
@@ -28,23 +28,25 @@ Last updated: 2026-05-27
 - [x] AppLayout sidebar — grouped into 5 sections; duplicate Admin label + search bar removed
 - [x] InsureStore — V24+V25 migrations; store_products table; 15 seeded products (MY/ID/PH)
 - [x] InsureStore — StoreProduct entity/repo/DTO; GET /store/products; multi-region support
-- [x] CheckoutPage — 4-step wizard (Personal→Coverage→Declaration→Review); NRIC auto-parse
-- [x] InsureStorePage — sticky navbar, hero, trust band, dark footer; region Select + Products Dropdown
+- [x] CheckoutPage — 4-step wizard; InsureStorePage hero + region selector
 - [x] InsureStore — quote-based flow: POST /store/quote saves QUOTE, emails payment link
 - [x] InsureStore — CompletePaymentPage: two-panel layout, branded method icons, VA inline display
 - [x] InsureStore — PaymentResultPage reads policyId; works for all three providers
 - [x] InsureStore — POST /store/pay idempotent: PENDING→returns existing URL, FAILED→allows retry
 - [x] V26 migration — payment_method nullable on demo_policies (method deferred to pay-time)
-- [x] Payment method moved to pay-time: removed from quote, added to StorePayRequest
-- [x] DemoCheckoutResponse — vaNumber field added; VA inline display on CompletePaymentPage
-- [x] PaymentService — FAILED paths now set demoPolicy.transactionId (was missing, caused stale pointer)
-- [x] DlqConsumer — now syncs demoPolicy.status="RETRY_EXHAUSTED" so re-payment bypasses PENDING idempotency check
+- [x] PaymentService — FAILED paths now set demoPolicy.transactionId; DlqConsumer syncs RETRY_EXHAUSTED status
+- [x] Midtrans VA bank selection — BankPicker dropdown (BCA/BNI/BRI/CIMB) in both InsureStore + PaymentDemo
+- [x] VA bank picker redesigned — antd Select with brand-colour bank badges + optionRender; slides in under VA row
+- [x] PaymentResultPage (store/result) — routing section removed; customer-only view (policy no., holder, amount)
+- [x] Failure email — "Retry Payment →" button with link to /store/complete?policyId=; claims email unchanged
+- [x] Quote email — Payment Method row removed (method chosen at pay-time, not quote-time)
+- [x] app.base-url config — injected into EmailNotificationService; wired through docker-compose.prod.yml + .env.example
 
 ## Up next (start here next session)
-- [ ] Restart backend — pick up all backend changes from this and prior sessions
-- [ ] Smoke test RETRY_EXHAUSTED re-pay: mock ALWAYS_FAIL → exhaust → switch to ALWAYS_SUCCESS → retry → ACTIVATED
-- [ ] Smoke test InsureStore end-to-end: MY FPX quote → pay → redirect → payment-result page
-- [ ] Smoke test PENDING resumption: pay → abandon → re-open email link → Resume Payment works
+- [ ] Restart backend — pick up all session changes
+- [ ] Smoke test RETRY_EXHAUSTED re-pay: mock ALWAYS_FAIL → exhaust → switch ALWAYS_SUCCESS → retry → ACTIVATED
+- [ ] Verify failure email now includes "Retry Payment" button with correct policyId link
+- [ ] Smoke test InsureStore end-to-end: MY FPX quote → pay → redirect → result page (no routing section)
 - [ ] Add Xendit sandbox keys to application-dev.yml, smoke test PH invoice + disbursement
 - [ ] Demo data seeding — 100+ realistic transactions across all 3 regions for dashboard KPIs
 - [ ] Viva prep — run 10-minute demo script end-to-end, note rough edges
@@ -56,11 +58,13 @@ Last updated: 2026-05-27
 - No DB mocking in tests — Testcontainers with real PostgreSQL only
 - Payment methods are DB-managed strings (not Java enum); composite PK (code, region)
 - Frontend: React 18 + Vite + antd v5, feature-based structure
-- Store products are DB-driven (store_products table); features stored as pipe-separated TEXT
 - Quote-based checkout: form creates QUOTE record + email; payment only on email link click
 - POST /store/pay is idempotent for PENDING (returns existing URL, no new transaction)
 - FAILED/RETRY_EXHAUSTED allowed to re-initiate with fresh merchantOrderId (-R#### suffix)
 - Payment method selected at pay-time (CompletePaymentPage), not at quote-time (CheckoutPage)
+- Midtrans VA banks: BCA/BNI/BRI/CIMB only (Mandiri/Permata excluded — different API structure)
+- store/result page is customer-only — no routing/provider/strategy data shown
+- app.base-url driven by APP_BASE_URL env var; fallback http://localhost:5173 for local dev
 
 ## Blockers
 - Backend needs restart to activate all session changes

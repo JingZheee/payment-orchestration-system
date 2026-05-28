@@ -26,6 +26,9 @@ public class EmailNotificationService {
     @Value("${notification.email.from}")
     private String fromAddress;
 
+    @Value("${app.base-url:http://localhost:5173}")
+    private String appBaseUrl;
+
     private static final DateTimeFormatter DATE_FMT =
             DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm 'UTC'").withZone(ZoneId.of("UTC"));
 
@@ -113,43 +116,72 @@ public class EmailNotificationService {
         String date   = DATE_FMT.format(tx.getUpdatedAt());
         String ref    = isPremium ? policy.getPolicyNumber() : policy.getClaimReference();
         String refLabel = isPremium ? "Policy Number" : "Claim Reference";
-        String bodyText = isPremium
-                ? "We were unable to process your insurance premium payment after multiple attempts. Your policy is not yet active. Please retry your payment or contact our support team."
-                : "We were unable to complete your claim disbursement after multiple attempts. Please contact our support team for assistance.";
-        return """
-            <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb;">
-              <div style="background:#991B1B;padding:32px 32px 24px;text-align:center;">
-                <div style="font-size:28px;font-weight:700;color:#fff;letter-spacing:-0.5px;">Payment Failed</div>
-                <div style="font-size:14px;color:#fca5a5;margin-top:6px;">All retry attempts have been exhausted</div>
-              </div>
-              <div style="padding:32px;">
-                <p style="font-size:16px;color:#1c1c1e;margin:0 0 8px;">Dear <strong>%s</strong>,</p>
-                <p style="font-size:14px;color:#6b7280;margin:0 0 24px;line-height:1.6;">%s</p>
-                <table style="width:100%%;border-collapse:collapse;font-size:14px;">
-                  %s
-                  %s
-                  %s
-                  %s
-                </table>
-                <div style="margin:24px 0;padding:16px;background:#FEF2F2;border-radius:8px;border:1px solid #FCA5A5;">
-                  <p style="font-size:13px;color:#991B1B;margin:0;line-height:1.6;">
-                    <strong>What to do next:</strong> Please contact our support team or retry your payment from the InsureRoute portal.
-                    Quote your transaction ID: <strong>%s</strong>
-                  </p>
+
+        if (isPremium) {
+            String paymentLink = appBaseUrl + "/store/complete?policyId=" + policy.getId();
+            return """
+                <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb;">
+                  <div style="background:#991B1B;padding:32px 32px 24px;text-align:center;">
+                    <div style="font-size:28px;font-weight:700;color:#fff;letter-spacing:-0.5px;">Payment Failed</div>
+                    <div style="font-size:14px;color:#fca5a5;margin-top:6px;">All retry attempts have been exhausted</div>
+                  </div>
+                  <div style="padding:32px;">
+                    <p style="font-size:16px;color:#1c1c1e;margin:0 0 8px;">Dear <strong>%s</strong>,</p>
+                    <p style="font-size:14px;color:#6b7280;margin:0 0 24px;line-height:1.6;">
+                      We were unable to process your insurance premium payment after multiple attempts.
+                      Your policy is not yet active. Please click the button below to try again — your details have been saved.
+                    </p>
+                    <table style="width:100%%;border-collapse:collapse;font-size:14px;margin-bottom:28px;">
+                      %s
+                      %s
+                      %s
+                    </table>
+                    <div style="text-align:center;margin-bottom:24px;">
+                      <a href="%s" style="display:inline-block;background:#FCB900;color:#261900;font-weight:700;font-size:15px;text-decoration:none;padding:14px 40px;border-radius:8px;letter-spacing:0.01em;">
+                        Retry Payment →
+                      </a>
+                    </div>
+                    <p style="font-size:13px;color:#9ca3af;margin:0;border-top:1px solid #f3f4f6;padding-top:20px;line-height:1.6;">
+                      This is an automated notification. If you continue to experience issues, please contact our support team.
+                    </p>
+                  </div>
                 </div>
-                <p style="font-size:13px;color:#9ca3af;margin:0;border-top:1px solid #f3f4f6;padding-top:20px;line-height:1.6;">
-                  This is an automated notification. No further retry attempts will be made.
-                </p>
-              </div>
-            </div>
-            """.formatted(
-                policy.getHolderName(), bodyText,
-                row(refLabel,          ref),
-                row("Amount",          amount),
-                row("Payment Provider", tx.getProvider().name()),
-                row("Date",            date),
-                tx.getId()
-        );
+                """.formatted(
+                    policy.getHolderName(),
+                    row(refLabel, ref),
+                    row("Amount",  amount),
+                    row("Date",    date),
+                    paymentLink
+            );
+        } else {
+            return """
+                <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb;">
+                  <div style="background:#991B1B;padding:32px 32px 24px;text-align:center;">
+                    <div style="font-size:28px;font-weight:700;color:#fff;letter-spacing:-0.5px;">Disbursement Failed</div>
+                    <div style="font-size:14px;color:#fca5a5;margin-top:6px;">All retry attempts have been exhausted</div>
+                  </div>
+                  <div style="padding:32px;">
+                    <p style="font-size:16px;color:#1c1c1e;margin:0 0 8px;">Dear <strong>%s</strong>,</p>
+                    <p style="font-size:14px;color:#6b7280;margin:0 0 24px;line-height:1.6;">
+                      We were unable to complete your claim disbursement after multiple attempts. Please contact our support team and quote your claim reference below.
+                    </p>
+                    <table style="width:100%%;border-collapse:collapse;font-size:14px;margin-bottom:24px;">
+                      %s
+                      %s
+                      %s
+                    </table>
+                    <p style="font-size:13px;color:#9ca3af;margin:0;border-top:1px solid #f3f4f6;padding-top:20px;line-height:1.6;">
+                      This is an automated notification. No further retry attempts will be made.
+                    </p>
+                  </div>
+                </div>
+                """.formatted(
+                    policy.getHolderName(),
+                    row(refLabel, ref),
+                    row("Amount",  amount),
+                    row("Date",    date)
+            );
+        }
     }
 
     private String buildPremiumHtml(DemoPolicy policy, PaymentSucceededEvent event) {
@@ -240,7 +272,6 @@ public class EmailNotificationService {
                   %s
                   %s
                   %s
-                  %s
                 </table>
                 <div style="text-align:center;margin-bottom:24px;">
                   <a href="%s" style="display:inline-block;background:#FCB900;color:#261900;font-weight:700;font-size:15px;text-decoration:none;padding:14px 40px;border-radius:8px;letter-spacing:0.01em;">
@@ -263,7 +294,6 @@ public class EmailNotificationService {
                 row("Quote Reference", policy.getPolicyNumber()),
                 row("Insurance Plan",  policy.getInsuranceType()),
                 row("Premium Amount",  amount),
-                row("Payment Method",  policy.getPaymentMethod()),
                 paymentLink
         );
     }

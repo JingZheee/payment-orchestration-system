@@ -61,7 +61,10 @@ public class MidtransAdapter implements PaymentProviderPort {
                 ? request.getCustomerEmail()
                 : "customer@example.com";
 
-        Map<String, Object> body = buildCoreApiBody(method, request.getMerchantOrderId(), grossAmount, customerEmail);
+        String bankCode = (request.getMetadata() != null)
+                ? request.getMetadata().getOrDefault("bankCode", "bca")
+                : "bca";
+        Map<String, Object> body = buildCoreApiBody(method, request.getMerchantOrderId(), grossAmount, customerEmail, bankCode);
 
         try {
             Map<?, ?> response = webClientBuilder.build()
@@ -168,7 +171,7 @@ public class MidtransAdapter implements PaymentProviderPort {
         }
     }
 
-    private Map<String, Object> buildCoreApiBody(String method, String orderId, long grossAmount, String email) {
+    private Map<String, Object> buildCoreApiBody(String method, String orderId, long grossAmount, String email, String bankCode) {
         Map<String, Object> transactionDetails = Map.of("order_id", orderId, "gross_amount", grossAmount);
         Map<String, Object> customerDetails = Map.of("email", email);
 
@@ -186,11 +189,12 @@ public class MidtransAdapter implements PaymentProviderPort {
             body.put("customer_details", customerDetails);
             return body;
         } else {
-            // VIRTUAL_ACCOUNT → BCA bank transfer
+            // VIRTUAL_ACCOUNT — bank selectable by caller (bca/bni/bri/cimb)
+            String bank = (bankCode != null && !bankCode.isBlank()) ? bankCode : "bca";
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("payment_type", "bank_transfer");
             body.put("transaction_details", transactionDetails);
-            body.put("bank_transfer", Map.of("bank", "bca"));
+            body.put("bank_transfer", Map.of("bank", bank));
             body.put("customer_details", customerDetails);
             return body;
         }

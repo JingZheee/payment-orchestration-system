@@ -36,6 +36,7 @@ export interface StorePayRequest {
   policyId: string;
   redirectUrl: string;
   paymentMethod: string;
+  bankCode?: string;
 }
 
 export interface CheckoutResponse {

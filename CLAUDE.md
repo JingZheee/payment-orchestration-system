@@ -327,9 +327,9 @@ Weights are configurable in `application.yml` under `routing.scorer.*`.
 
 | Field | Value |
 |---|---|
-| **Current module** | InsureStore — RETRY_EXHAUSTED re-payment bug fix |
-| **Current task** | Restart backend → smoke test RETRY_EXHAUSTED re-pay: set mock to ALWAYS_FAIL → exhaust retries → switch to ALWAYS_SUCCESS → click Retry → verify policy reaches ACTIVATED |
-| **Last completed** | DlqConsumer now syncs demoPolicy.status="RETRY_EXHAUSTED"; PaymentService FAILED paths now set transactionId; both bugs that caused infinite RETRY_EXHAUSTED loop are fixed |
+| **Current module** | InsureStore — UX polish + email improvements |
+| **Current task** | Restart backend → smoke test RETRY_EXHAUSTED re-pay → verify failure email has "Retry Payment" button with correct policyId link |
+| **Last completed** | VA bank picker (BCA/BNI/BRI/CIMB dropdown with brand colours); store/result routing section removed; failure email gets "Retry Payment" button; quote email Payment Method row removed; APP_BASE_URL wired through docker-compose.prod.yml |
 | **Blockers** | Backend needs restart; Xendit sandbox keys not in application-dev.yml |
 
 ### Admin API Endpoints — Payment Methods

@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Alert, Button, Divider, Form, Input, Spin, Tag, Typography } from 'antd';
+import { Alert, Button, Divider, Form, Input, Select, Spin, Tag, Typography } from 'antd';
 import { ArrowLeftOutlined, CheckCircleFilled, LockOutlined } from '@ant-design/icons';
 import { Region, Currency, PaymentType } from '../../shared/types/enums';
 import type { InitiatePaymentRequest, InitiatePaymentResponse } from '../../shared/types/transaction';
@@ -207,6 +207,76 @@ function OrderSummary({ policy, currency }: { policy: DemoPolicy; currency: stri
   );
 }
 
+// ── VA bank picker ────────────────────────────────────────────────────────────
+
+const VA_BANKS = [
+  { code: 'bca',  label: 'BCA',  name: 'Bank Central Asia',      color: '#003DA5' },
+  { code: 'bni',  label: 'BNI',  name: 'Bank Negara Indonesia',  color: '#F37021' },
+  { code: 'bri',  label: 'BRI',  name: 'Bank Rakyat Indonesia',  color: '#00529C' },
+  { code: 'cimb', label: 'CIMB', name: 'CIMB Niaga',             color: '#C8102E' },
+];
+
+function BankLogo({ code, size = 32 }: { code: string; size?: number }) {
+  const bank = VA_BANKS.find(b => b.code === code);
+  if (!bank) return null;
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: size * 0.28,
+      background: bank.color, flexShrink: 0,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      color: '#fff', fontWeight: 800,
+      fontSize: bank.label.length > 3 ? size * 0.28 : size * 0.33,
+      letterSpacing: '-0.02em',
+    }}>
+      {bank.label}
+    </div>
+  );
+}
+
+function BankPicker({ selected, onSelect }: { selected: string; onSelect: (code: string) => void }) {
+  return (
+    <div style={{ marginTop: -2, borderLeft: '3px solid #0F766E', paddingLeft: 14, paddingBottom: 4 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+        Select Bank
+      </div>
+      <Select
+        value={selected}
+        onChange={onSelect}
+        size="large"
+        style={{ width: '100%' }}
+        popupMatchSelectWidth
+        labelRender={({ value }) => {
+          const bank = VA_BANKS.find(b => b.code === value);
+          if (!bank) return <span>{String(value)}</span>;
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <BankLogo code={bank.code} size={24} />
+              <div>
+                <span style={{ fontWeight: 700, fontSize: 14, color: '#1C1C1E' }}>{bank.label}</span>
+                <span style={{ fontSize: 12, color: '#6B7280', marginLeft: 8 }}>{bank.name}</span>
+              </div>
+            </div>
+          );
+        }}
+        options={VA_BANKS.map(b => ({ value: b.code, label: b.name }))}
+        optionRender={(opt) => {
+          const bank = VA_BANKS.find(b => b.code === opt.value);
+          if (!bank) return <span>{opt.label}</span>;
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 0' }}>
+              <BankLogo code={bank.code} size={36} />
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: '#1C1C1E', lineHeight: 1.3 }}>{bank.label}</div>
+                <div style={{ fontSize: 12, color: '#6B7280' }}>{bank.name}</div>
+              </div>
+            </div>
+          );
+        }}
+      />
+    </div>
+  );
+}
+
 // ── Payment Form Panel (right panel, pre-payment) ─────────────────────────────
 
 function PaymentFormPanel({
@@ -214,13 +284,15 @@ function PaymentFormPanel({
 }: {
   policy: DemoPolicy;
   currency: string;
-  onSubmit: (paymentMethod: string, customerEmail: string) => void;
+  onSubmit: (paymentMethod: string, customerEmail: string, bankCode?: string) => void;
   isPending: boolean;
   payError: string | null;
 }) {
   const [form] = Form.useForm();
   const methods = REGION_METHODS[policy.region] ?? [];
   const [selectedMethod, setSelectedMethod] = useState(policy.paymentMethod || methods[0] || '');
+  const [selectedBank, setSelectedBank] = useState('bca');
+  const isVaSelected = selectedMethod === 'VIRTUAL_ACCOUNT';
 
   return (
     <div>
@@ -244,12 +316,16 @@ function PaymentFormPanel({
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {methods.map(m => (
-            <MethodRow
-              key={m}
-              method={m}
-              selected={selectedMethod === m}
-              onSelect={() => setSelectedMethod(m)}
-            />
+            <Fragment key={m}>
+              <MethodRow
+                method={m}
+                selected={selectedMethod === m}
+                onSelect={() => setSelectedMethod(m)}
+              />
+              {m === 'VIRTUAL_ACCOUNT' && isVaSelected && (
+                <BankPicker selected={selectedBank} onSelect={setSelectedBank} />
+              )}
+            </Fragment>
           ))}
         </div>
       </div>
@@ -260,7 +336,7 @@ function PaymentFormPanel({
       <Form
         form={form}
         layout="vertical"
-        onFinish={({ customerEmail }) => onSubmit(selectedMethod, customerEmail)}
+        onFinish={({ customerEmail }) => onSubmit(selectedMethod, customerEmail, isVaSelected ? selectedBank : undefined)}
         initialValues={{ customerEmail: policy.holderEmail }}
       >
         <Form.Item
@@ -348,11 +424,12 @@ function AlreadyProcessedPanel({
 // ── Success panel (after payment) ─────────────────────────────────────────────
 
 function SuccessPanel({
-  result, currency, navigate,
+  result, currency, navigate, bankLabel,
 }: {
   result: InitiatePaymentResponse;
   currency: string;
   navigate: ReturnType<typeof useNavigate>;
+  bankLabel?: string;
 }) {
   const isVa = !!result.vaNumber;
   const isRedirect = !isVa && !!result.redirectUrl;
@@ -379,13 +456,13 @@ function SuccessPanel({
           padding: '16px 20px', marginBottom: 20, textAlign: 'center',
         }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#1D4ED8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
-            BCA Virtual Account Number
+            {bankLabel ?? 'BCA'} Virtual Account Number
           </div>
           <Text copyable style={{ fontSize: 22, fontWeight: 800, fontFamily: 'monospace', color: '#1E40AF', letterSpacing: '0.1em' }}>
             {result.vaNumber}
           </Text>
           <div style={{ fontSize: 11, color: '#6B7280', marginTop: 8 }}>
-            Pay via BCA mobile / ATM
+            Pay via {bankLabel ?? 'BCA'} mobile / ATM
           </div>
         </div>
       )}
@@ -466,6 +543,7 @@ export default function PaymentCheckoutPage() {
   const qc = useQueryClient();
   const [result, setResult] = useState<InitiatePaymentResponse | null>(null);
   const [payError, setPayError] = useState<string | null>(null);
+  const [bankLabel, setBankLabel] = useState<string | undefined>(undefined);
 
   const { data: allPolicies = [], isLoading } = useDemoPolicies();
   const policy: DemoPolicy | undefined =
@@ -491,8 +569,11 @@ export default function PaymentCheckoutPage() {
     },
   });
 
-  function handleSubmit(paymentMethod: string, customerEmail: string) {
+  function handleSubmit(paymentMethod: string, customerEmail: string, bankCode?: string) {
     if (!policy) return;
+    if (bankCode) {
+      setBankLabel(VA_BANKS.find(b => b.code === bankCode)?.label);
+    }
     const request: InitiatePaymentRequest = {
       policyId: policy.id,
       merchantOrderId: `INS-${policy.id.slice(0, 8).toUpperCase()}-${Date.now()}`,
@@ -505,6 +586,7 @@ export default function PaymentCheckoutPage() {
       redirectUrl: window.location.href,
       policyNumber: policy.policyNumber ?? undefined,
       claimReference: policy.claimReference ?? undefined,
+      metadata: bankCode ? { bankCode } : undefined,
     };
     paymentMutation.mutate({ request, key: crypto.randomUUID() });
   }
@@ -602,7 +684,7 @@ export default function PaymentCheckoutPage() {
             justifyContent: 'center',
           }}>
             {result ? (
-              <SuccessPanel result={result} currency={currency} navigate={navigate} />
+              <SuccessPanel result={result} currency={currency} navigate={navigate} bankLabel={bankLabel} />
             ) : policy!.status !== 'PENDING' ? (
               <AlreadyProcessedPanel policy={policy!} navigate={navigate} />
             ) : (

@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -138,6 +139,11 @@ public class InsureStoreController {
         String merchantOrderId = "INS-" + policy.getId().toString().substring(0, 8).toUpperCase()
                 + (isRetry ? "-R" + (System.currentTimeMillis() % 10000) : "");
 
+        Map<String, String> metadata = null;
+        if (req.bankCode() != null && !req.bankCode().isBlank()) {
+            metadata = Map.of("bankCode", req.bankCode().toLowerCase());
+        }
+
         InitiatePaymentRequest paymentReq = InitiatePaymentRequest.builder()
                 .policyId(policy.getId())
                 .merchantOrderId(merchantOrderId)
@@ -150,6 +156,7 @@ public class InsureStoreController {
                 .description(policy.getInsuranceType() + " premium payment")
                 .redirectUrl(appendPolicyId(req.redirectUrl(), policy.getId()))
                 .policyNumber(policy.getPolicyNumber())
+                .metadata(metadata)
                 .build();
 
         InitiatePaymentResponse payRes = paymentService.initiatePayment(

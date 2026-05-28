@@ -51,6 +51,9 @@ notification:
   email:
     from: noreply@paymentorchestration.com
 
+app:
+  base-url: ${APP_BASE_URL:http://localhost:3000}
+
 management:
   endpoints:
     web:

@@ -10,6 +10,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.Map;
 import java.util.UUID;
 
 @Getter
@@ -53,4 +54,6 @@ public class InitiatePaymentRequest {
     private String policyNumber;
 
     private String claimReference;
+
+    private Map<String, String> metadata;
 }

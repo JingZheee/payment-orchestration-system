@@ -51,6 +51,7 @@ export interface InitiatePaymentRequest {
   customerEmail: string;
   description?: string;
   redirectUrl: string;
+  metadata?: Record<string, string>;
 }
 
 export interface InitiatePaymentResponse {
