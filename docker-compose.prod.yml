@@ -48,12 +48,10 @@ services:
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER}
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASS}
-      SPRING_MAIL_HOST: ${MAIL_HOST}
-      SPRING_MAIL_PORT: ${MAIL_PORT}
-      SPRING_MAIL_USERNAME: ${MAIL_USERNAME}
-      SPRING_MAIL_PASSWORD: ${MAIL_PASSWORD}
-      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "true"
-      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "true"
+      SPRING_MAIL_HOST: mailpit
+      SPRING_MAIL_PORT: 1025
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "false"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "false"
       JWT_SECRET: ${JWT_SECRET}
       PROVIDERS_BILLPLZ_API-KEY: ${BILLPLZ_API_KEY}
       PROVIDERS_BILLPLZ_COLLECTION-ID: ${BILLPLZ_COLLECTION_ID}
@@ -81,6 +79,15 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - pos-network
+
+  mailpit:
+    image: axllent/mailpit
+    container_name: pos_mailpit
+    ports:
+      - "127.0.0.1:8025:8025"   # Web UI — only accessible via SSH tunnel
     restart: unless-stopped
     networks:
       - pos-network
