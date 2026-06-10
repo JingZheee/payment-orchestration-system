@@ -68,6 +68,11 @@ export const API = {
     RESULT:   (policyId: string) => `/store/result?policyId=${encodeURIComponent(policyId)}`,
   },
 
+  POLICY: {
+    LOOKUP: '/store/policy/lookup',
+    STATUS: (policyId: string) => `/store/policy/${encodeURIComponent(policyId)}`,
+  },
+
   USERS: {
     LIST:   '/admin/users',
     BY_ID:  (id: string) => `/admin/users/${id}`,

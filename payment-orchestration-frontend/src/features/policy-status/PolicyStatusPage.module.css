@@ -1,0 +1,269 @@
+.page {
+  min-height: 100vh;
+  background: #F3F4F6;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header ───────────────────────────────────────────────── */
+
+.header {
+  background: white;
+  border-bottom: 1px solid #E5E7EB;
+  height: 64px;
+  padding: 0 32px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #FCB900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1C1C1E;
+  font-weight: 900;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.logoName {
+  font-size: 15px;
+  font-weight: 900;
+  color: #1C1C1E;
+  line-height: 1.2;
+}
+
+.logoSub {
+  font-size: 10px;
+  color: #9CA3AF;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* ── Content ──────────────────────────────────────────────── */
+
+.content {
+  flex: 1;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 36px 24px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* ── Hero ─────────────────────────────────────────────────── */
+
+.heroRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pageTitle {
+  font-size: 22px;
+  font-weight: 800;
+  color: #1C1C1E;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.pendingBanner {
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 13px;
+  color: #92400E;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.policyNumberBox {
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.policyNumberLabel {
+  font-size: 10px;
+  font-weight: 700;
+  color: #B45309;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+}
+
+.policyNumber {
+  font-size: 20px;
+  font-weight: 900;
+  font-family: monospace;
+  color: #78350F;
+  letter-spacing: 0.04em;
+}
+
+/* ── Card ─────────────────────────────────────────────────── */
+
+.card {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.cardHeader {
+  padding: 18px 24px 14px;
+  border-bottom: 1px solid #F3F4F6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cardHeaderIcon {
+  font-size: 16px;
+}
+
+.cardTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1C1C1E;
+}
+
+.cardBody {
+  padding: 22px 24px;
+}
+
+/* ── Detail grid ──────────────────────────────────────────── */
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px 32px;
+}
+
+.detailItem {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.detailLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: #9CA3AF;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.detailValue {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1C1C1E;
+  word-break: break-all;
+}
+
+.detailValueMono {
+  font-family: monospace;
+  font-size: 12px;
+  color: #374151;
+  word-break: break-all;
+}
+
+.detailValueMuted {
+  font-size: 13px;
+  color: #9CA3AF;
+  font-weight: 400;
+}
+
+.routingReason {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #F3F4F6;
+}
+
+/* ── Timeline ─────────────────────────────────────────────── */
+
+.eventItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 4px;
+}
+
+.eventType {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1C1C1E;
+}
+
+.eventDesc {
+  font-size: 13px;
+  color: #6B7280;
+  line-height: 1.55;
+}
+
+.eventTime {
+  font-size: 11px;
+  color: #9CA3AF;
+  margin-top: 3px;
+}
+
+/* ── Action row ───────────────────────────────────────────── */
+
+.actionRow {
+  display: flex;
+  gap: 12px;
+}
+
+/* ── Footer ───────────────────────────────────────────────── */
+
+.footer {
+  text-align: center;
+  padding: 16px 0 28px;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #9CA3AF;
+}
+
+/* ── Responsive ───────────────────────────────────────────── */
+
+@media (max-width: 540px) {
+  .detailGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .actionRow {
+    flex-direction: column;
+  }
+
+  .content {
+    padding: 24px 16px 40px;
+  }
+}

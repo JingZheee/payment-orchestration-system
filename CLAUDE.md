@@ -327,9 +327,9 @@ Weights are configurable in `application.yml` under `routing.scorer.*`.
 
 | Field | Value |
 |---|---|
-| **Current module** | InsureStore — UX polish + email improvements |
-| **Current task** | Restart backend → smoke test RETRY_EXHAUSTED re-pay → verify failure email has "Retry Payment" button with correct policyId link |
-| **Last completed** | VA bank picker (BCA/BNI/BRI/CIMB dropdown with brand colours); store/result routing section removed; failure email gets "Retry Payment" button; quote email Payment Method row removed; APP_BASE_URL wired through docker-compose.prod.yml |
+| **Current module** | Customer Policy Status Dashboard |
+| **Current task** | Restart backend + frontend → smoke test: pay → success email → click "View Policy Status →" → verify 3-card layout (policy details, payment details, event timeline) renders correctly |
+| **Last completed** | PolicyLookupPage + PolicyStatusPage built; GET /store/policy/lookup + GET /store/policy/{policyId} backend endpoints; PolicyStatusResponse DTO with events list; success + failure emails updated with status links; PRD updated to v1.9 |
 | **Blockers** | Backend needs restart; Xendit sandbox keys not in application-dev.yml |
 
 ### Admin API Endpoints — Payment Methods

@@ -1,7 +1,7 @@
 # Product Requirements Document
 # Payment Orchestration System (POS)
-**Version:** 1.8
-**Date:** 2026-05-27
+**Version:** 1.9
+**Date:** 2026-06-10
 **Type:** Final Year Project (FYP)
 
 ---
@@ -95,6 +95,8 @@ The MVP goal is a fully functional routing engine integrated with real sandbox p
 - ✅ InsureStore — `/complete-payment?policyId=UUID` page: shows quote summary; "Pay [amount]" button initiates payment via the routing engine; idempotent re-pay — PENDING state returns the **existing** provider checkout URL (no new transaction created, per industry standard); FAILED/RETRY_EXHAUSTED state shows retry banner and allows a fresh attempt with a new merchant order ID; ACTIVATED auto-redirects to payment-result; ACTIVATED/DISBURSED rejected with 409
 - ✅ InsureStore — provider routing is fully region-aware: MY quotes route to Billplz, ID to Midtrans, PH to Xendit/Mock — the same `RoutingEngine` used by all other payment flows; no special-casing in the store controller
 - ✅ InsureStore — payment result page at `/payment-result?policyId=UUID`: shows payment status from DB (SUCCESS/FAILED/PENDING), provider used, routing strategy, processing fee (region-formatted), and policy number with copy button; works for all three providers
+- ✅ Customer policy status dashboard — public `/store/policy/:policyId` page showing policy details, payment info, and append-only event timeline; customers navigate directly from email link (UUID acts as access token) or via lookup form (email + policy number); status auto-refreshes every 5 seconds for PENDING payments
+- ✅ Policy lookup form — `/store/policy` accepts email + policy number, verifies ownership, redirects to UUID-based status page; success email gains "View Policy Status →" button; failure email gains "View policy status online" link below the retry button
 
 ### Providers
 - ✅ Billplz sandbox (Malaysia — FPX bank transfer)
@@ -330,6 +332,21 @@ The MVP goal is a fully functional routing engine integrated with real sandbox p
 
 ---
 
+### US-22: Customer Policy Status Self-Service
+**As a** policyholder who has purchased insurance or had a payment fail,
+**I want** to check my policy and payment status online without calling support,
+**so that** I can see what happened, why, and what to do next (e.g. retry a failed payment).
+
+*Example (success):* Ahmad receives his confirmation email → clicks "View Policy Status →" → arrives at `/store/policy/{uuid}` → sees: "Active" badge, policy number, insurance type, MYR amount, provider used, routing reason, and a chronological event timeline (Payment Initiated → Webhook Received → Policy Activated) with UTC timestamps.
+
+*Example (failure):* Customer's payment fails → failure email includes both "Retry Payment →" and "View policy status online" link → customer clicks status link → sees: "Failed" badge, red event timeline, and an amber "Retry Payment →" button that returns them to `/store/complete?policyId=xxx`.
+
+*Example (lookup fallback):* Customer can't find the email → navigates to `/store/policy` → enters email + policy number → verified against DB → redirected to the UUID status page.
+
+**Implementation:** Two new public endpoints under `/api/v1/store/**` (already permit-all): `GET /store/policy/lookup?email=&policyNumber=` returns `{ policyId }` UUID; `GET /store/policy/{policyId}` returns full status including event timeline. UUID acts as an implicit access token — 122 bits of entropy, not enumerable. Frontend auto-refreshes every 5 seconds when status is PENDING or PROCESSING.
+
+---
+
 ### US-21: Payment Resumption and Retry
 **As a** prospective policyholder who started a payment but didn't complete it,
 **I want** to re-open my payment email link and resume exactly where I left off — or try again if my payment failed —
@@ -391,7 +408,8 @@ payment-orchestration-frontend/src/
     ├── reconciliation/    (/reconciliation — recon statements + anomaly filter)
     ├── dead-letter-queue/ (/dead-letter-queue — RETRY_EXHAUSTED transactions)
     ├── payment-demo/      (/payment-demo — trigger test payments, show routing decision)
-    └── routing/           (/routing — Routing Engine page: composite score formula, live simulator, strategy comparison)
+    ├── routing/           (/routing — Routing Engine page: composite score formula, live simulator, strategy comparison)
+    └── policy-status/     (/store/policy, /store/policy/:policyId — customer policy lookup form + status dashboard)
 ```
 
 ### Key Design Patterns
@@ -898,6 +916,112 @@ FAILED          payment rejected; customer can retry via same email link        
 
 ---
 
+### Feature 13: Customer Policy Status Dashboard
+
+A public, self-service status page at `/store/policy/:policyId` that shows a policyholder everything about their purchase — policy details, payment routing decision, and a full event timeline — without requiring any login.
+
+**Access model:** The `policyId` UUID is embedded in every email (quote, success, failure). It acts as an implicit access token — 122 bits of entropy make it non-enumerable. A lookup form at `/store/policy` provides a fallback: the customer enters their registered email + policy number, which are verified against the DB, then redirected to the UUID URL.
+
+#### Routes
+
+| Path | Component | Purpose |
+|---|---|---|
+| `/store/policy` | `PolicyLookupPage` | Lookup form — email + policy number → redirects to UUID URL |
+| `/store/policy/:policyId` | `PolicyStatusPage` | Full status detail — 3 cards + action buttons |
+
+#### Three-Card Page Layout
+
+**Card 1 — Policy Details** (always shown)
+- Grid: policyholder name, email, insurance plan, premium amount + currency, region, payment method, applied-on date
+
+**Card 2 — Payment Details** (only when a transaction exists)
+- Provider, routing strategy (human-readable), routing reason (full text), fee charged, transaction ID (monospace)
+
+**Card 3 — Activity Timeline** (only when events exist)
+- antd `<Timeline>` component; each row: colored dot + human-readable event type + description + UTC timestamp
+- Dot colors: green (success/activated), red (failed/exhausted), amber (retry/delayed), blue (initiated/selected), purple (webhook)
+
+#### Status Badge
+
+| Policy Status | Badge Label | Color |
+|---|---|---|
+| `ACTIVATED` | Active | Green (#DCFCE7 / #166534) |
+| `DISBURSED` | Disbursed | Green |
+| `PENDING` / `PROCESSING` | Pending | Amber — spinning icon; page auto-refreshes every 5 s |
+| `QUOTE` | Not Paid | Grey |
+| `FAILED` | Failed | Red (#FEE2E2 / #991B1B) |
+| `RETRY_EXHAUSTED` | Retries Exhausted | Red |
+
+#### Action Buttons (Conditional)
+
+- `FAILED` or `RETRY_EXHAUSTED` → amber **"Retry Payment →"** button → navigates to `/store/complete?policyId=xxx` — the same flow as the failure email retry link; `POST /store/pay` handles re-initiation with a fresh `merchantOrderId`
+- Always → **"Browse Plans"** → `/store`
+
+#### Backend — Two New Public Endpoints
+
+Both fall under `/api/v1/store/**` which is already `permitAll()` in `SecurityConfig`.
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/store/policy/lookup?email=&policyNumber=` | Verify ownership; return `{ policyId: UUID }` |
+| GET | `/store/policy/{policyId}` | Full status + event timeline via `PolicyStatusResponse` |
+
+Spring MVC resolves literal `/policy/lookup` before the parameterized `/policy/{policyId}` — no routing conflict.
+
+**`PolicyStatusResponse` DTO:**
+```json
+{
+  "policyId": "uuid",
+  "policyNumber": "POL-MY-1234567",
+  "holderName": "Ahmad bin Yusof",
+  "holderEmail": "ahmad@example.com",
+  "insuranceType": "Life",
+  "amount": 99.00,
+  "currency": "MYR",
+  "region": "MY",
+  "paymentMethod": "FPX",
+  "paymentType": "PREMIUM_COLLECTION",
+  "status": "ACTIVATED",
+  "transactionId": "txn-uuid",
+  "provider": "BILLPLZ",
+  "routingStrategy": "LOWEST_FEE",
+  "routingReason": "Rule #2 (priority=2): PREMIUM_COLLECTION → LOWEST_FEE",
+  "fee": 0.30,
+  "createdAt": "2026-06-10T10:00:00Z",
+  "events": [
+    { "eventType": "PAYMENT_INITIATED", "description": "Payment initiated via Billplz", "createdAt": "..." },
+    { "eventType": "WEBHOOK_RECEIVED",  "description": "Webhook received from Billplz: PAID", "createdAt": "..." },
+    { "eventType": "PREMIUM_ACTIVATED", "description": "Policy activated after successful payment", "createdAt": "..." }
+  ]
+}
+```
+
+#### Email Integration
+
+| Email | Change |
+|---|---|
+| Success (`PREMIUM_COLLECTION`) | "View Policy Status →" button added below the payment details table |
+| Failure (premium) | "View policy status online" text link added below the existing "Retry Payment →" button |
+| Quote email | No link — policy status is not meaningful before payment is attempted |
+
+#### Frontend Files (FeeRates pattern — TSX + module.css in separate files)
+
+```
+features/policy-status/
+  PolicyLookupPage.tsx
+  PolicyLookupPage.module.css
+  PolicyStatusPage.tsx
+  PolicyStatusPage.module.css
+  hooks/
+    usePolicyStatus.ts          (usePolicyStatus with 5s auto-refresh + usePolicyLookup mutation)
+  services/
+    policyStatusService.ts
+```
+
+**Demo moment:** Success email arrives → click "View Policy Status →" → full 3-card layout: policy details, Billplz routing decision, and event timeline with every step timestamped. Switch to failure scenario → "Retries Exhausted" badge → red timeline → click "Retry Payment →" → back to checkout with same policy pre-loaded.
+
+---
+
 ### Feature 11: Routing Engine Page
 
 A dedicated admin page (`/routing`) that makes the scoring algorithm fully transparent — both as a static reference and as a live simulator. Moved out of the Dashboard so it gets the full page width it deserves and is discoverable via the sidebar.
@@ -1287,6 +1411,8 @@ Request mirrors `/payments/initiate` with `claimReference` (required) and `polic
 | POST | `/store/quote` | Save application as quote; email payment link to customer; return `{ policyId, quoteReference }` |
 | POST | `/store/pay` | Initiate payment for an existing QUOTE record; validates status=QUOTE before calling routing engine |
 | GET | `/store/result?policyId=UUID` | Fetch result for any policy state — works for QUOTE (no transaction), PENDING, SUCCESS, FAILED |
+| GET | `/store/policy/lookup?email=&policyNumber=` | Lookup policy by email + policy number; returns `{ policyId: UUID }` for redirect to status page |
+| GET | `/store/policy/{policyId}` | Full policy status + event timeline (`PolicyStatusResponse`); UUID is the implicit access token |
 
 ### Admin — Notification Queue
 | Method | Path | Description |
@@ -1334,6 +1460,9 @@ The system is considered MVP-complete when an examiner can watch a 10-minute dem
 - ✅ Successful non-localhost payments auto-open the provider's hosted payment page in a new tab
 - ✅ Branded HTML email sent to `holder_email` within seconds of PREMIUM_COLLECTION or CLAIMS_DISBURSEMENT payment success; SMTP failure never affects the payment transaction
 - ✅ Fee rates are fully CRUD-manageable at runtime — create and delete rows via API/UI without migrations
+- ✅ Customer policy status page (`/store/policy/:policyId`) shows policy details, payment routing decision, and append-only event timeline with no login required; auto-refreshes every 5 seconds when PENDING
+- ✅ Policy lookup form (`/store/policy`) verifies ownership by email + policy number and redirects to UUID status URL
+- ✅ Success and failure emails include a direct "View Policy Status" link pointing to `/store/policy/{policyId}`
 
 ### Demo Quality Goals
 - ✅ Failover demo is reproducible on demand (Mock provider toggle)

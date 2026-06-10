@@ -119,6 +119,7 @@ public class EmailNotificationService {
 
         if (isPremium) {
             String paymentLink = appBaseUrl + "/store/complete?policyId=" + policy.getId();
+            String statusLink  = appBaseUrl + "/store/policy/" + policy.getId();
             return """
                 <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb;">
                   <div style="background:#991B1B;padding:32px 32px 24px;text-align:center;">
@@ -136,10 +137,13 @@ public class EmailNotificationService {
                       %s
                       %s
                     </table>
-                    <div style="text-align:center;margin-bottom:24px;">
+                    <div style="text-align:center;margin-bottom:16px;">
                       <a href="%s" style="display:inline-block;background:#FCB900;color:#261900;font-weight:700;font-size:15px;text-decoration:none;padding:14px 40px;border-radius:8px;letter-spacing:0.01em;">
                         Retry Payment →
                       </a>
+                    </div>
+                    <div style="text-align:center;margin-bottom:24px;">
+                      <a href="%s" style="font-size:13px;color:#6b7280;text-decoration:underline;">View policy status online</a>
                     </div>
                     <p style="font-size:13px;color:#9ca3af;margin:0;border-top:1px solid #f3f4f6;padding-top:20px;line-height:1.6;">
                       This is an automated notification. If you continue to experience issues, please contact our support team.
@@ -151,7 +155,8 @@ public class EmailNotificationService {
                     row(refLabel, ref),
                     row("Amount",  amount),
                     row("Date",    date),
-                    paymentLink
+                    paymentLink,
+                    statusLink
             );
         } else {
             return """
@@ -185,8 +190,9 @@ public class EmailNotificationService {
     }
 
     private String buildPremiumHtml(DemoPolicy policy, PaymentSucceededEvent event) {
-        String amount = formatAmount(event.getAmount(), event.getCurrency().name());
-        String date   = DATE_FMT.format(event.getSucceededAt());
+        String amount     = formatAmount(event.getAmount(), event.getCurrency().name());
+        String date       = DATE_FMT.format(event.getSucceededAt());
+        String statusLink = appBaseUrl + "/store/policy/" + policy.getId();
         return """
             <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb;">
               <div style="background:#FCB900;padding:32px 32px 24px;text-align:center;">
@@ -198,14 +204,19 @@ public class EmailNotificationService {
                 <p style="font-size:14px;color:#6b7280;margin:0 0 24px;line-height:1.6;">
                   Your payment of <strong>%s</strong> was successfully processed. Your insurance policy is now active and your coverage has begun.
                 </p>
-                <table style="width:100%%;border-collapse:collapse;font-size:14px;">
+                <table style="width:100%%;border-collapse:collapse;font-size:14px;margin-bottom:24px;">
                   %s
                   %s
                   %s
                   %s
                   %s
                 </table>
-                <p style="font-size:13px;color:#9ca3af;margin:24px 0 0;border-top:1px solid #f3f4f6;padding-top:20px;line-height:1.6;">
+                <div style="text-align:center;margin-bottom:24px;">
+                  <a href="%s" style="display:inline-block;background:#f9fafb;border:1px solid #e5e7eb;color:#374151;font-weight:600;font-size:14px;text-decoration:none;padding:12px 32px;border-radius:8px;">
+                    View Policy Status →
+                  </a>
+                </div>
+                <p style="font-size:13px;color:#9ca3af;margin:0;border-top:1px solid #f3f4f6;padding-top:20px;line-height:1.6;">
                   This is an automated confirmation. Please keep this for your records.
                 </p>
               </div>
@@ -216,7 +227,8 @@ public class EmailNotificationService {
                 row("Insurance Type",  policy.getInsuranceType()),
                 row("Amount Paid",     amount),
                 row("Payment Provider", event.getProvider().name()),
-                row("Date",            date)
+                row("Date",            date),
+                statusLink
         );
     }
 

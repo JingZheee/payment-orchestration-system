@@ -19,6 +19,8 @@ import InsureStorePage from './features/buy-insurance/InsureStorePage';
 import CheckoutPage from './features/buy-insurance/CheckoutPage';
 import PaymentResultPage from './features/buy-insurance/PaymentResultPage';
 import CompletePaymentPage from './features/buy-insurance/CompletePaymentPage';
+import PolicyLookupPage from './features/policy-status/PolicyLookupPage';
+import PolicyStatusPage from './features/policy-status/PolicyStatusPage';
 
 export default function App() {
   return (
@@ -33,6 +35,8 @@ export default function App() {
       <Route path="/store/checkout" element={<CheckoutPage />} />
       <Route path="/store/complete" element={<CompletePaymentPage />} />
       <Route path="/store/result" element={<PaymentResultPage />} />
+      <Route path="/store/policy" element={<PolicyLookupPage />} />
+      <Route path="/store/policy/:policyId" element={<PolicyStatusPage />} />
 
       <Route element={<RequireAuth />}>
         {/* Full-page checkout — no sidebar */}

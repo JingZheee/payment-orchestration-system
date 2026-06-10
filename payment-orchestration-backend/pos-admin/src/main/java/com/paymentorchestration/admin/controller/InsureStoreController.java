@@ -1,6 +1,7 @@
 package com.paymentorchestration.admin.controller;
 
 import com.paymentorchestration.admin.dto.DemoCheckoutResponse;
+import com.paymentorchestration.admin.dto.PolicyStatusResponse;
 import com.paymentorchestration.admin.dto.StorePayRequest;
 import com.paymentorchestration.admin.dto.StoreProductResponse;
 import com.paymentorchestration.admin.dto.StoreQuoteRequest;
@@ -15,6 +16,7 @@ import com.paymentorchestration.domain.entity.DemoPolicy;
 import com.paymentorchestration.domain.entity.Transaction;
 import com.paymentorchestration.domain.repository.DemoPolicyRepository;
 import com.paymentorchestration.domain.repository.StoreProductRepository;
+import com.paymentorchestration.domain.repository.TransactionEventRepository;
 import com.paymentorchestration.domain.repository.TransactionRepository;
 import com.paymentorchestration.payment.dto.InitiatePaymentRequest;
 import com.paymentorchestration.payment.dto.InitiatePaymentResponse;
@@ -38,6 +40,7 @@ public class InsureStoreController {
     private final StoreProductRepository storeProductRepository;
     private final DemoPolicyRepository demoPolicyRepository;
     private final TransactionRepository transactionRepository;
+    private final TransactionEventRepository transactionEventRepository;
     private final PaymentService paymentService;
     private final EmailNotificationService emailNotificationService;
 
@@ -191,6 +194,47 @@ public class InsureStoreController {
                         "No transaction found for policy: " + policyId));
 
         return ResponseEntity.ok(ApiResponse.ok(StoreResultResponse.from(t, policy)));
+    }
+
+    /**
+     * Looks up a policy by email + policy number and returns its UUID.
+     * Used by the customer lookup form to obtain a bookmarkable policyId URL.
+     */
+    @GetMapping("/policy/lookup")
+    public ResponseEntity<ApiResponse<Map<String, String>>> lookupPolicy(
+            @RequestParam String email,
+            @RequestParam String policyNumber) {
+
+        DemoPolicy policy = demoPolicyRepository
+                .findByPolicyNumberAndHolderEmailIgnoreCase(policyNumber.trim(), email.trim())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "No policy found for the provided email and policy number."));
+
+        return ResponseEntity.ok(ApiResponse.ok(Map.of("policyId", policy.getId().toString())));
+    }
+
+    /**
+     * Returns full policy status including the event timeline.
+     * Accessible directly via UUID — no auth required (UUID is hard to guess).
+     */
+    @GetMapping("/policy/{policyId}")
+    public ResponseEntity<ApiResponse<PolicyStatusResponse>> getPolicyStatus(
+            @PathVariable UUID policyId) {
+
+        DemoPolicy policy = demoPolicyRepository.findById(policyId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Policy not found: " + policyId));
+
+        Transaction tx = null;
+        List<com.paymentorchestration.domain.entity.TransactionEvent> events = List.of();
+
+        if (policy.getTransactionId() != null) {
+            tx = transactionRepository.findById(policy.getTransactionId()).orElse(null);
+            events = transactionEventRepository
+                    .findByTransactionIdOrderByCreatedAtAsc(policy.getTransactionId());
+        }
+
+        return ResponseEntity.ok(ApiResponse.ok(PolicyStatusResponse.from(policy, tx, events)));
     }
 
     private static String appendPolicyId(String baseUrl, UUID policyId) {
