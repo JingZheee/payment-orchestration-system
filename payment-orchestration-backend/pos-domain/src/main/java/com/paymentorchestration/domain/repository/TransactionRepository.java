@@ -19,6 +19,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID>,
 
     Optional<Transaction> findByIdempotencyKey(String idempotencyKey);
 
+    Optional<Transaction> findByMerchantOrderId(String merchantOrderId);
+
     Optional<Transaction> findByProviderTransactionId(String providerTransactionId);
 
     Page<Transaction> findByStatus(PaymentStatus status, Pageable pageable);

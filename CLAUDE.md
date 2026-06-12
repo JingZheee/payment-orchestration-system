@@ -327,10 +327,10 @@ Weights are configurable in `application.yml` under `routing.scorer.*`.
 
 | Field | Value |
 |---|---|
-| **Current module** | Customer Policy Status Dashboard |
-| **Current task** | Restart backend + frontend → smoke test: pay → success email → click "View Policy Status →" → verify 3-card layout (policy details, payment details, event timeline) renders correctly |
-| **Last completed** | PolicyLookupPage + PolicyStatusPage built; GET /store/policy/lookup + GET /store/policy/{policyId} backend endpoints; PolicyStatusResponse DTO with events list; success + failure emails updated with status links; PRD updated to v1.9 |
-| **Blockers** | Backend needs restart; Xendit sandbox keys not in application-dev.yml |
+| **Current module** | Reconciliation |
+| **Current task** | Restart backend → download template from GET /admin/recon/template → fill in actual_fee column (add one deliberate discrepancy) → upload via POST /admin/recon/import → verify recon_statements rows saved in DB and anomaly flagged |
+| **Last completed** | Reconciliation import full implementation: ReconImportService (Apache POI), POST /import + GET /summary + GET /template endpoints, rowsNoFee counter to distinguish blank-fee vs unmatched, Reconciliation.tsx Upload UI + import result modal + real aggregate KPI strip; PRD updated to v2.0 |
+| **Blockers** | Import returning matched=0 — likely actual_fee column blank in test file; improved logging now distinguishes rowsNoFee vs rowsUnmatched; needs re-test with filled column |
 
 ### Admin API Endpoints — Payment Methods
 ```

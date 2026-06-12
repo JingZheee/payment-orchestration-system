@@ -1,7 +1,7 @@
 # Product Requirements Document
 # Payment Orchestration System (POS)
-**Version:** 1.9
-**Date:** 2026-06-10
+**Version:** 2.0
+**Date:** 2026-06-12
 **Type:** Final Year Project (FYP)
 
 ---
@@ -97,6 +97,7 @@ The MVP goal is a fully functional routing engine integrated with real sandbox p
 - ✅ InsureStore — payment result page at `/payment-result?policyId=UUID`: shows payment status from DB (SUCCESS/FAILED/PENDING), provider used, routing strategy, processing fee (region-formatted), and policy number with copy button; works for all three providers
 - ✅ Customer policy status dashboard — public `/store/policy/:policyId` page showing policy details, payment info, and append-only event timeline; customers navigate directly from email link (UUID acts as access token) or via lookup form (email + policy number); status auto-refreshes every 5 seconds for PENDING payments
 - ✅ Policy lookup form — `/store/policy` accepts email + policy number, verifies ownership, redirects to UUID-based status page; success email gains "View Policy Status →" button; failure email gains "View policy status online" link below the retry button
+- ✅ Reconciliation settlement import — admin uploads a provider settlement `.xlsx` file; system matches rows to internal transactions by `merchant_order_id`, computes `variance = actual_fee − expected_fee` using the fee snapshotted at transaction time (immune to fee rate changes), auto-flags anomalies where `|variance_pct| > 5%`; returns import summary (matched / unmatched / missing fee / skipped / anomalies); downloadable pre-filled template generated from unreconciled transactions; aggregate KPI strip shows real totals across all records, not just current page
 
 ### Providers
 - ✅ Billplz sandbox (Malaysia — FPX bank transfer)
@@ -1022,6 +1023,110 @@ features/policy-status/
 
 ---
 
+### Feature 14: Reconciliation Settlement Import
+
+The reconciliation module closes the financial audit loop by comparing what the system *expected* to pay providers against what providers *actually* charged, using real settlement files.
+
+#### Why Excel Import (Not Auto-Generate)
+
+The `expected_fee` is already snapshotted on every transaction at initiation time (`transactions.fee`), so there is always an internal record of what we predicted. The missing piece is the *actual* fee from the provider's perspective — which is only available via the provider's settlement file (downloaded from their portal at end of day). Because each real provider (Billplz, Midtrans, Xendit) has a different proprietary export format, the system uses a single **standardized import template** that the admin fills in — eliminating the need for 3 separate parser implementations while keeping the reconciliation flow realistic.
+
+**Key temporal correctness guarantee:** `expected_fee` is read from `transactions.fee`, not from the live `provider_fee_rates` table. This means reconciliation is immune to fee rate changes — if an admin updates a rate today, yesterday's recon statements still compare against the fee that was active when each transaction was created.
+
+#### Import Flow
+
+```
+Admin clicks "Download Template"
+  → GET /api/v1/admin/recon/template
+  → Backend queries transactions WHERE no recon_statement exists yet AND fee IS NOT NULL
+  → Returns XLSX pre-filled with: merchant_order_id, provider, payment_method, amount,
+    expected_fee, settlement_date — actual_fee column intentionally blank
+  → Up to 50 most recent unreconciled transactions
+
+Admin fills in actual_fee column from provider settlement portal
+  → One deliberate discrepancy added for demo purposes
+
+Admin uploads completed file
+  → POST /api/v1/admin/recon/import (multipart/form-data, Content-Type: xlsx)
+  → Per row:
+      - Read merchant_order_id + actual_fee
+      - Skip if actual_fee blank (rowsNoFee counter)
+      - Lookup Transaction by merchant_order_id → skip if not found (rowsUnmatched)
+      - Skip if recon_statement already exists for this transaction (rowsSkipped — safe re-upload)
+      - expected_fee = transaction.fee  (historical snapshot, immune to rate changes)
+      - variance = actual_fee − expected_fee
+      - variance_pct = variance / expected_fee
+      - anomaly = |variance_pct × 100| > threshold (default 5%, configurable)
+      - Build ReconStatement, add to batch
+  → Bulk-insert all matched rows (@Transactional — all or nothing)
+  → Return ReconImportResult
+```
+
+#### Import Result Summary
+
+```json
+{
+  "rowsProcessed": 10,
+  "rowsMatched": 9,
+  "rowsNoFee": 0,
+  "rowsUnmatched": 1,
+  "rowsSkipped": 0,
+  "anomaliesFound": 1
+}
+```
+
+Displayed in a modal after upload with color-coded badges per field.
+
+#### Aggregate KPI Strip
+
+The three summary cards at the top of the Reconciliation page now read from `GET /api/v1/admin/recon/summary` (real DB aggregates) rather than counting the current page only:
+
+| Card | Value |
+|---|---|
+| Total Statements | `COUNT(*)` across all `recon_statements` |
+| Total Anomalies | `COUNT(*) WHERE is_anomaly = true` |
+| Total Variance | `SUM(ABS(variance)) WHERE variance IS NOT NULL` |
+
+#### Configuration
+
+```yaml
+# application.yml
+recon:
+  anomaly-threshold-pct: 5.0   # flag as anomaly if |variance_pct| > this value (percent)
+```
+
+#### Backend Components
+
+| Component | Module | Purpose |
+|---|---|---|
+| `ReconImportService` | pos-admin | Excel parsing (Apache POI), transaction matching, variance computation, template generation |
+| `ReconImportResult` | pos-admin (DTO) | Import summary: processed, matched, noFee, unmatched, skipped, anomaliesFound |
+| `ReconSummaryDto` | pos-admin (DTO) | Aggregate KPIs: totalStatements, totalAnomalies, totalVariance |
+| `ReconStatementController` | pos-admin | 3 new endpoints: POST /import, GET /summary, GET /template |
+
+New repository methods:
+- `ReconStatementRepository.existsByTransactionId(UUID)` — duplicate check
+- `ReconStatementRepository.countByAnomalyTrue()` — summary KPI
+- `ReconStatementRepository.sumAbsVariance()` — summary KPI
+- `ReconStatementRepository.findUnreconciledTransactions(Pageable)` — template pre-fill
+- `TransactionRepository.findByMerchantOrderId(String)` — row matching
+
+**Dependency added:** `org.apache.poi:poi-ooxml:5.3.0` in `pos-admin/pom.xml`.
+
+#### Frontend Components
+
+| File | Change |
+|---|---|
+| `Reconciliation.tsx` | Upload dragger + Download Template button + import result Modal + real aggregate KPI strip |
+| `reconService.ts` | `importFile(File)` + `getSummary()` methods added |
+| `useReconSummary.ts` | New hook — fetches `/recon/summary`, invalidated after import |
+| `recon.ts` | `ReconImportResult` + `ReconSummary` interfaces added |
+| `endpoints.ts` | `RECON.IMPORT`, `RECON.SUMMARY`, `RECON.TEMPLATE` added |
+
+**Demo moment:** Admin clicks "Download Template" → Excel opens with real transaction rows pre-filled, `actual_fee` column blank → admin types in fees, changes one row to an incorrect value → uploads → modal shows "9 matched, 1 anomaly found" → table refreshes with anomaly row highlighted in red → KPI strip updates live.
+
+---
+
 ### Feature 11: Routing Engine Page
 
 A dedicated admin page (`/routing`) that makes the scoring algorithm fully transparent — both as a static reference and as a live simulator. Moved out of the Dashboard so it gets the full page width it deserves and is discoverable via the sidebar.
@@ -1192,6 +1297,9 @@ routing:
 notification:
   email:
     from: noreply@paymentorchestration.com
+
+recon:
+  anomaly-threshold-pct: 5.0   # flag recon row as anomaly if |variance %| exceeds this
 
 # application-dev.yml (dev secrets — gitignored)
 spring.datasource.url: jdbc:postgresql://localhost:5432/pos_dev
@@ -1414,6 +1522,54 @@ Request mirrors `/payments/initiate` with `claimReference` (required) and `polic
 | GET | `/store/policy/lookup?email=&policyNumber=` | Lookup policy by email + policy number; returns `{ policyId: UUID }` for redirect to status page |
 | GET | `/store/policy/{policyId}` | Full policy status + event timeline (`PolicyStatusResponse`); UUID is the implicit access token |
 
+### Admin — Reconciliation
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/admin/recon` | Bearer | Paginated recon statements. Optional `?provider=BILLPLZ`. |
+| GET | `/admin/recon/anomalies` | Bearer | Anomalies only. Optional `?provider=`. |
+| GET | `/admin/recon/summary` | Bearer | Aggregate KPIs: `{ totalStatements, totalAnomalies, totalVariance }` |
+| POST | `/admin/recon/import` | Bearer | Upload settlement `.xlsx` file (`multipart/form-data`, field name `file`). Returns `ReconImportResult`. |
+| GET | `/admin/recon/template` | Bearer | Download pre-filled template XLSX from unreconciled transactions. `Content-Disposition: attachment; filename=settlement_template.xlsx` |
+
+**Import Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "rowsProcessed": 10,
+    "rowsMatched": 9,
+    "rowsNoFee": 0,
+    "rowsUnmatched": 1,
+    "rowsSkipped": 0,
+    "anomaliesFound": 1
+  }
+}
+```
+
+**Summary Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "totalStatements": 128,
+    "totalAnomalies": 3,
+    "totalVariance": "4.2500"
+  }
+}
+```
+
+**Template XLSX column layout:**
+
+| Col | Header | Pre-filled? | Notes |
+|---|---|---|---|
+| A | `merchant_order_id` | ✅ | Used to match against `transactions` table on import |
+| B | `provider` | ✅ | Informational only — not used during import |
+| C | `payment_method` | ✅ | Informational only |
+| D | `amount` | ✅ | Informational only |
+| E | `expected_fee` | ✅ | `transactions.fee` at initiation time |
+| F | `settlement_date` | ✅ | Date part of `transactions.created_at` |
+| G | `actual_fee` | ❌ blank | **Admin fills this in** from provider settlement portal |
+
 ### Admin — Notification Queue
 | Method | Path | Description |
 |---|---|---|
@@ -1463,6 +1619,9 @@ The system is considered MVP-complete when an examiner can watch a 10-minute dem
 - ✅ Customer policy status page (`/store/policy/:policyId`) shows policy details, payment routing decision, and append-only event timeline with no login required; auto-refreshes every 5 seconds when PENDING
 - ✅ Policy lookup form (`/store/policy`) verifies ownership by email + policy number and redirects to UUID status URL
 - ✅ Success and failure emails include a direct "View Policy Status" link pointing to `/store/policy/{policyId}`
+- ✅ Reconciliation settlement file import: uploading an XLSX creates `recon_statement` rows matched to real transactions; anomalies auto-flagged where `|variance_pct| > 5%`; re-uploading the same file is safe (duplicates skipped); import result modal distinguishes matched / unmatched / blank-fee rows
+- ✅ Reconciliation KPI strip reflects real aggregate totals (not current-page counts) via `/admin/recon/summary`
+- ✅ Reconciliation template download pre-fills unreconciled transactions so the admin only needs to add `actual_fee`; temporal correctness guaranteed — `expected_fee` reads from `transactions.fee` (snapshot at initiation) not from live `provider_fee_rates`
 
 ### Demo Quality Goals
 - ✅ Failover demo is reproducible on demand (Mock provider toggle)
@@ -1537,7 +1696,7 @@ The system is considered MVP-complete when an examiner can watch a 10-minute dem
 - ✅ Fee Rates: inline-editable table per provider/region; Add Rate modal (provider auto-locks region, method dropdown from DB) + row-level delete with confirm popover; full CRUD without migrations
 - ✅ Payment Methods: CRUD per region, active toggle (DB-driven)
 - ✅ Metrics: success rate + latency charts
-- ✅ Reconciliation: recon statement table + anomaly filter
+- ✅ Reconciliation: recon statement table + anomaly filter + settlement file import (xlsx upload → match → variance → anomaly detection) + template download + aggregate KPI strip
 - ✅ Dead Letter Queue: RETRY_EXHAUSTED transactions with re-queue action
 - ✅ Payment Demo: DB-backed policy/claim table + payment form + routing result card + gateway redirect
 - ✅ Notification Queue Panel: live queue depth counter + consumer on/off toggle (on Providers page)
@@ -1602,13 +1761,18 @@ The system is considered MVP-complete when an examiner can watch a 10-minute dem
 ### Routing Score Formula
 ```
 score(provider) =
-  (success_rate_last_1h × 0.50) +
-  (1 - normalized_fee × 0.30) +
-  (1 - normalized_latency × 0.20)
+  (success_rate_last_1h      × 0.40) +
+  ((1 - normalized_fee)      × 0.25) +
+  ((1 - normalized_latency)  × 0.15) +
+  (fee_accuracy              × 0.20)
 
 where:
   normalized_fee     = provider_fee / max_fee_among_eligible_providers
   normalized_latency = provider_avg_latency / max_latency_among_eligible_providers
+  fee_accuracy       = AVG(1 − |variance| / expected_fee) from recon_statements in last 1h
+                       (defaults to 1.0 when no recon history exists)
+
+Weights are configurable in application.yml → routing.scorer.*
 ```
 
 ### Database Module Map

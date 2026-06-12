@@ -41,6 +41,9 @@ export const API = {
   RECON: {
     LIST:      '/admin/recon',
     ANOMALIES: '/admin/recon/anomalies',
+    SUMMARY:   '/admin/recon/summary',
+    IMPORT:    '/admin/recon/import',
+    TEMPLATE:  '/admin/recon/template',
   },
 
   PAYMENT_METHODS: {

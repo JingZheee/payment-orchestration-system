@@ -1,8 +1,13 @@
 import { useState } from 'react';
-import { Table, Select, Tag } from 'antd';
+import { Table, Select, Tag, Upload, Button, Modal, message } from 'antd';
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table';
+import type { UploadRequestOption } from 'rc-upload/lib/interface';
+import { useQueryClient } from '@tanstack/react-query';
 import { useRecon } from './hooks/useRecon';
-import type { ReconStatement } from '../../shared/types/recon';
+import { useReconSummary } from './hooks/useReconSummary';
+import { reconService } from './services/reconService';
+import { API } from '../../lib/endpoints';
+import type { ReconStatement, ReconImportResult } from '../../shared/types/recon';
 import { Provider } from '../../shared/types/enums';
 
 const PROVIDER_STYLE: Record<string, { color: string; bg: string }> = {
@@ -25,7 +30,7 @@ function VarianceCell({ variance, variancePct }: { variance: number | null; vari
   const color = isZero ? '#166534' : abs < 0.5 ? '#92400E' : '#991B1B';
   const bg    = isZero ? '#DCFCE7' : abs < 0.5 ? '#FEF3C7' : '#FEE2E2';
   return (
-    <div style={{ display: 'flex', flex: 'column', gap: 2 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <span style={{
         display: 'inline-block', padding: '2px 8px', borderRadius: 6,
         fontSize: 12, fontWeight: 700, background: bg, color,
@@ -45,14 +50,55 @@ export default function Reconciliation() {
   const [anomaliesOnly, setAnomaliesOnly] = useState(false);
   const [provider, setProvider] = useState<Provider | undefined>();
   const [page, setPage] = useState(0);
+  const [uploading, setUploading] = useState(false);
+  const [importResult, setImportResult] = useState<ReconImportResult | null>(null);
   const pageSize = 20;
 
+  const queryClient = useQueryClient();
   const { data, isFetching } = useRecon({ anomaliesOnly, provider, page, size: pageSize });
+  const { data: summary } = useReconSummary();
 
-  // Summary stats from current page (lightweight — no separate endpoint)
   const rows = data?.content ?? [];
-  const anomalyCount  = rows.filter(r => r.anomaly).length;
-  const totalVariance = rows.reduce((s, r) => s + Math.abs(Number(r.variance ?? 0)), 0);
+
+  const handleUpload = async (options: UploadRequestOption) => {
+    const file = options.file as File;
+    setUploading(true);
+    try {
+      const result = await reconService.importFile(file);
+      setImportResult(result);
+      // Refresh both the table and the summary KPIs
+      queryClient.invalidateQueries({ queryKey: ['recon'] });
+      queryClient.invalidateQueries({ queryKey: ['recon-summary'] });
+      if (result.anomaliesFound > 0) {
+        message.warning(`Import complete — ${result.anomaliesFound} anomaly(s) detected.`);
+      } else {
+        message.success('Import complete — no anomalies found.');
+      }
+    } catch {
+      message.error('Import failed. Check that the file matches the template format.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDownloadTemplate = () => {
+    const apiBase = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:9080/api/v1';
+    const token = localStorage.getItem('pos_access_token');
+    const url = `${apiBase}${API.RECON.TEMPLATE}`;
+    fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+      .then(r => r.blob())
+      .then(blob => {
+        const objectUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = objectUrl;
+        a.download = 'settlement_template.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(objectUrl);
+      })
+      .catch(() => message.error('Failed to download template.'));
+  };
 
   const columns: ColumnsType<ReconStatement> = [
     {
@@ -172,29 +218,29 @@ export default function Reconciliation() {
         </p>
       </div>
 
-      {/* Summary strip */}
+      {/* Summary strip — real aggregate data from /summary endpoint */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
         {[
           {
             label: 'Total Statements',
-            value: data?.totalElements.toLocaleString() ?? '—',
+            value: summary?.totalStatements.toLocaleString() ?? '—',
             icon: 'receipt_long',
             iconBg: 'rgba(252,185,0,0.1)',
             iconColor: '#7B5800',
           },
           {
-            label: 'Anomalies (this page)',
-            value: anomalyCount,
+            label: 'Total Anomalies',
+            value: summary?.totalAnomalies.toLocaleString() ?? '—',
             icon: 'warning',
-            iconBg: 'rgba(239,68,68,0.1)',
-            iconColor: '#991B1B',
+            iconBg: (summary?.totalAnomalies ?? 0) > 0 ? 'rgba(239,68,68,0.1)' : 'rgba(134,239,172,0.15)',
+            iconColor: (summary?.totalAnomalies ?? 0) > 0 ? '#991B1B' : '#166534',
           },
           {
-            label: 'Total Variance (this page)',
-            value: totalVariance.toFixed(4),
+            label: 'Total Variance',
+            value: summary != null ? Number(summary.totalVariance).toFixed(4) : '—',
             icon: 'balance',
-            iconBg: totalVariance > 1 ? 'rgba(239,68,68,0.1)' : 'rgba(134,239,172,0.15)',
-            iconColor: totalVariance > 1 ? '#991B1B' : '#166534',
+            iconBg: (summary?.totalVariance ?? 0) > 1 ? 'rgba(239,68,68,0.1)' : 'rgba(134,239,172,0.15)',
+            iconColor: (summary?.totalVariance ?? 0) > 1 ? '#991B1B' : '#166534',
           },
         ].map(({ label, value, icon, iconBg, iconColor }) => (
           <div key={label} style={{
@@ -220,13 +266,62 @@ export default function Reconciliation() {
         ))}
       </div>
 
+      {/* Import section */}
+      <div style={{
+        background: '#FFFFFF', borderRadius: 16, padding: 24,
+        boxShadow: '0 4px 40px -12px rgba(80,69,50,0.08)',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#1C1C1E' }}>Import Settlement File</div>
+            <div style={{ fontSize: 13, color: '#6B7280', marginTop: 2 }}>
+              Download the template, fill in the <strong>actual_fee</strong> column from the provider portal, then upload.
+            </div>
+          </div>
+          <Button
+            icon={<span className="material-symbols-outlined" style={{ fontSize: 16, verticalAlign: 'middle' }}>download</span>}
+            onClick={handleDownloadTemplate}
+            style={{ borderRadius: 8, fontWeight: 600, fontSize: 13 }}
+          >
+            Download Template
+          </Button>
+        </div>
+
+        <Upload.Dragger
+          name="file"
+          accept=".xlsx"
+          multiple={false}
+          showUploadList={false}
+          customRequest={handleUpload as (options: UploadRequestOption) => void}
+          disabled={uploading}
+          style={{ borderRadius: 12, borderColor: '#FCB900' }}
+        >
+          <div style={{ padding: '12px 0' }}>
+            {uploading ? (
+              <div style={{ color: '#6B7280', fontSize: 14 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 32, display: 'block', marginBottom: 8, color: '#FCB900' }}>
+                  hourglass_top
+                </span>
+                Processing settlement file…
+              </div>
+            ) : (
+              <div style={{ color: '#6B7280', fontSize: 14 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 32, display: 'block', marginBottom: 8, color: '#9CA3AF' }}>
+                  upload_file
+                </span>
+                Drag &amp; drop your <strong>.xlsx</strong> settlement file here, or click to browse
+              </div>
+            )}
+          </div>
+        </Upload.Dragger>
+      </div>
+
       {/* Filters + tabs */}
       <div style={{
         background: '#FFFFFF', borderRadius: 16, padding: '16px 24px',
         boxShadow: '0 4px 40px -12px rgba(80,69,50,0.08)',
         display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap',
       }}>
-        {/* Tab buttons */}
         <div style={{ display: 'flex', background: '#F6F3F5', borderRadius: 10, padding: 4, gap: 2 }}>
           {[
             { label: 'All Statements', value: false },
@@ -281,7 +376,6 @@ export default function Reconciliation() {
           rowKey="id"
           loading={isFetching}
           rowClassName={(r) => r.anomaly ? 'recon-anomaly-row' : ''}
-          style={{ ['--anomaly-bg' as string]: 'rgba(254,226,226,0.4)' }}
           pagination={{
             current: page + 1,
             pageSize,
@@ -293,6 +387,49 @@ export default function Reconciliation() {
           scroll={{ x: 1100 }}
         />
       </div>
+
+      {/* Import result modal */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 20, color: importResult?.anomaliesFound ? '#991B1B' : '#166534' }}>
+              {importResult?.anomaliesFound ? 'warning' : 'check_circle'}
+            </span>
+            Import Complete
+          </div>
+        }
+        open={importResult !== null}
+        onOk={() => setImportResult(null)}
+        onCancel={() => setImportResult(null)}
+        cancelButtonProps={{ style: { display: 'none' } }}
+        okText="Done"
+        okButtonProps={{ style: { background: '#FCB900', borderColor: '#FCB900', color: '#1C1C1E', fontWeight: 700 } }}
+      >
+        {importResult && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 8 }}>
+            {[
+              { label: 'Rows processed',      value: importResult.rowsProcessed },
+              { label: 'Matched',             value: importResult.rowsMatched,   color: '#166534', bg: '#DCFCE7' },
+              { label: 'Actual fee missing',  value: importResult.rowsNoFee,     color: importResult.rowsNoFee > 0 ? '#92400E' : '#166534', bg: importResult.rowsNoFee > 0 ? '#FEF3C7' : '#DCFCE7' },
+              { label: 'Order ID not found',  value: importResult.rowsUnmatched, color: importResult.rowsUnmatched > 0 ? '#92400E' : '#166534', bg: importResult.rowsUnmatched > 0 ? '#FEF3C7' : '#DCFCE7' },
+              { label: 'Already on file',     value: importResult.rowsSkipped },
+              { label: 'Anomalies found',     value: importResult.anomaliesFound, color: importResult.anomaliesFound > 0 ? '#991B1B' : '#166534', bg: importResult.anomaliesFound > 0 ? '#FEE2E2' : '#DCFCE7' },
+            ].map(({ label, value, color, bg }) => (
+              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 14, color: '#6B7280' }}>{label}</span>
+                <span style={{
+                  fontSize: 15, fontWeight: 700,
+                  padding: '2px 12px', borderRadius: 999,
+                  background: bg ?? '#F3F4F6',
+                  color: color ?? '#1C1C1E',
+                }}>
+                  {value}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Modal>
 
       <style>{`.recon-anomaly-row td { background: rgba(254,226,226,0.25) !important; }`}</style>
     </div>

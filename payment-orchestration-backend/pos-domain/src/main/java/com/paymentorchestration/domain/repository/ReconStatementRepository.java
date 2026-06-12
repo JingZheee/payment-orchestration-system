@@ -13,6 +13,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 public interface ReconStatementRepository extends JpaRepository<ReconStatement, Long> {
 
@@ -23,6 +24,21 @@ public interface ReconStatementRepository extends JpaRepository<ReconStatement, 
     Page<ReconStatement> findByAnomalyTrueOrderByCreatedAtDesc(Pageable pageable);
 
     Page<ReconStatement> findByProviderAndAnomalyTrueOrderByCreatedAtDesc(Provider provider, Pageable pageable);
+
+    boolean existsByTransactionId(UUID transactionId);
+
+    long countByAnomalyTrue();
+
+    @Query("SELECT COALESCE(SUM(ABS(r.variance)), 0) FROM ReconStatement r WHERE r.variance IS NOT NULL")
+    BigDecimal sumAbsVariance();
+
+    @Query("""
+           SELECT t FROM Transaction t
+           WHERE NOT EXISTS (SELECT 1 FROM ReconStatement r WHERE r.transactionId = t.id)
+             AND t.fee IS NOT NULL
+           ORDER BY t.createdAt DESC
+           """)
+    List<com.paymentorchestration.domain.entity.Transaction> findUnreconciledTransactions(Pageable pageable);
 
     /**
      * Returns [paymentMethod, count] pairs for volume-weighted fee calculation, scoped to a region.

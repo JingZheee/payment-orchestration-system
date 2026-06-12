@@ -1,8 +1,8 @@
 # Progress Snapshot
-Last updated: 2026-06-10
+Last updated: 2026-06-12
 
 ## Completed
-- [x] PRD.md v1.9 — all features documented including customer policy status dashboard
+- [x] PRD.md v2.0 — all features documented including reconciliation import
 - [x] Maven multi-module backend — all 7 modules, Flyway V1–V26, all entities/repos/adapters
 - [x] Spring Security + JWT; CORS, 401/403 fix
 - [x] DB-driven payment methods — PaymentMethodEntity, composite PK; enum deleted everywhere
@@ -28,18 +28,18 @@ Last updated: 2026-06-10
 - [x] InsureStore — PaymentResultPage; POST /store/pay idempotent (PENDING→existing URL, FAILED→retry)
 - [x] Midtrans VA bank selection — BankPicker (BCA/BNI/BRI/CIMB) in InsureStore + PaymentDemo
 - [x] Failure email — "Retry Payment →" button; success email — "View Policy Status →" button
-- [x] app.base-url config injected into EmailNotificationService; wired through docker-compose.prod.yml
 - [x] Customer policy status dashboard — PolicyLookupPage + PolicyStatusPage (3-card layout)
 - [x] Policy status backend — GET /store/policy/lookup + GET /store/policy/{policyId} (public)
-- [x] PolicyStatusResponse DTO with full event timeline; DemoPolicyRepository lookup method added
-- [x] Policy status auto-refresh every 5s when PENDING; Retry Payment button for FAILED/RETRY_EXHAUSTED
-- [x] Email links — success email "View Policy Status →"; failure email "View policy status online"
+- [x] Reconciliation import — ReconImportService (Apache POI), POST /import, GET /template, GET /summary
+- [x] Reconciliation template — pre-filled XLSX from unreconciled transactions, actual_fee blank
+- [x] Reconciliation anomaly detection — auto-flag when |variance_pct| > 5% (configurable)
+- [x] Reconciliation KPI strip — real aggregate totals from /summary, not current-page counts
+- [x] Import result modal — rowsNoFee vs rowsUnmatched distinguished; improved logging
 
 ## Up next (start here next session)
-- [ ] Restart backend + frontend — pick up all session changes; smoke test policy status page
-- [ ] Smoke test: pay → success email arrives → click "View Policy Status →" → see 3-card layout + timeline
-- [ ] Smoke test: RETRY_EXHAUSTED → failure email → click "Retry Payment" + "View policy status" links
+- [ ] End-to-end test reconciliation import: restart backend, download template, fill actual_fee column, upload, verify recon_statements rows created in DB
 - [ ] Add Xendit sandbox keys to application-dev.yml, smoke test PH invoice + disbursement
+- [ ] Smoke test policy status page: pay → success email → "View Policy Status →" → 3-card layout
 - [ ] Demo data seeding — 100+ realistic transactions across all 3 regions for dashboard KPIs
 - [ ] Viva prep — run 10-minute demo script end-to-end, note rough edges
 
@@ -49,15 +49,13 @@ Last updated: 2026-06-10
 - RabbitMQ (not Kafka); active retry (30s→60s→120s→DLQ) is deliberate demo trade-off
 - No DB mocking in tests — Testcontainers with real PostgreSQL only
 - Payment methods are DB-managed strings (not Java enum); composite PK (code, region)
-- Frontend: React 18 + Vite + antd v5, feature-based structure, TSX + module.css in separate files
+- Frontend: React 18 + Vite + antd v5, feature-based structure
 - Quote-based checkout: form creates QUOTE record + email; payment only on email link click
 - POST /store/pay is idempotent for PENDING (returns existing URL, no new transaction)
-- FAILED/RETRY_EXHAUSTED allowed to re-initiate with fresh merchantOrderId (-R#### suffix)
-- Payment method selected at pay-time (CompletePaymentPage), not at quote-time (CheckoutPage)
-- Policy status page uses UUID as implicit access token — no login required, UUID is hard to guess
-- Retry Payment on status page navigates to /store/complete — no new backend endpoint needed
-- store/result page is customer-only — no routing/provider/strategy data shown
+- Policy status page uses UUID as implicit access token — no login required
+- Reconciliation uses transactions.fee as expected_fee — immune to fee rate changes
+- Reconciliation import uses single standardized template (not provider-specific parsers)
 
 ## Blockers
-- Backend needs restart to activate all session changes
+- Reconciliation import returning matched=0 when actual_fee column is blank — improved logging added; need to fill column and re-test
 - Xendit sandbox keys must be added to application-dev.yml before PH payments can be tested

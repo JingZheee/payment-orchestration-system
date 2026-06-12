@@ -1,5 +1,20 @@
 import type { Provider, Region } from './enums';
 
+export interface ReconSummary {
+  totalStatements: number;
+  totalAnomalies: number;
+  totalVariance: number;
+}
+
+export interface ReconImportResult {
+  rowsProcessed: number;
+  rowsMatched: number;
+  rowsUnmatched: number;
+  rowsSkipped: number;
+  rowsNoFee: number;
+  anomaliesFound: number;
+}
+
 export interface ReconStatement {
   id: number;
   transactionId: string;
