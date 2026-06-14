@@ -61,10 +61,11 @@ public class MockProviderAdapter implements PaymentProviderPort {
 
         transactionStore.put(providerTxnId, resultStatus);
 
+        boolean needsRedirect = resultStatus == PaymentStatus.PROCESSING;
         return PaymentResult.builder()
                 .providerTransactionId(providerTxnId)
                 .status(resultStatus)
-                .redirectUrl("http://localhost:9080/mock/pay/" + providerTxnId)
+                .redirectUrl(needsRedirect ? "http://localhost:9080/mock/pay/" + providerTxnId : null)
                 .fee(calculateFee(request.getAmount(), request.getRegion(), request.getPaymentMethod()))
                 .rawResponse("{\"mock\":true,\"mode\":\"" + mode + "\",\"status\":\"" + resultStatus + "\"}")
                 .build();

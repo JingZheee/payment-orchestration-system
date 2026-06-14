@@ -8,6 +8,7 @@ import { useRecon } from './hooks/useRecon';
 import { useReconSummary } from './hooks/useReconSummary';
 import { reconService } from './services/reconService';
 import { API } from '../../lib/endpoints';
+import api from '../../lib/axios';
 import type { ReconStatement, ReconImportResult } from '../../shared/types/recon';
 import { Provider } from '../../shared/types/enums';
 
@@ -83,13 +84,9 @@ export default function Reconciliation() {
   };
 
   const handleDownloadTemplate = () => {
-    const apiBase = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:9080/api/v1';
-    const token = localStorage.getItem('pos_access_token');
-    const url = `${apiBase}${API.RECON.TEMPLATE}`;
-    fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
-      .then(r => r.blob())
-      .then(blob => {
-        const objectUrl = URL.createObjectURL(blob);
+    api.get(API.RECON.TEMPLATE, { responseType: 'blob' })
+      .then(({ data }) => {
+        const objectUrl = URL.createObjectURL(data);
         const a = document.createElement('a');
         a.href = objectUrl;
         a.download = 'settlement_template.xlsx';
