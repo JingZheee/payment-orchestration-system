@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Button, Timeline, Spin, Tag } from 'antd';
+import { Button, Timeline, Spin } from 'antd';
 import { CopyOutlined, SyncOutlined } from '@ant-design/icons';
 import styles from './PolicyStatusPage.module.css';
 import { usePolicyStatus } from './hooks/usePolicyStatus';
