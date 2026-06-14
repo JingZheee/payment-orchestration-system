@@ -73,7 +73,7 @@ public class BillplzAdapter implements PaymentProviderPort {
         formData.add("email", request.getCustomerEmail() != null ? request.getCustomerEmail() : "customer@example.com");
         formData.add("name", "Customer");
         formData.add("amount", String.valueOf(amountInCents));
-        formData.add("callback_url", "https://expansion-palm-molecule.ngrok-free.dev/api/v1/webhooks/BILLPLZ");
+        formData.add("callback_url", "https://paymentorch.ddnsking.com/api/v1/webhooks/BILLPLZ");
         formData.add("redirect_url", request.getRedirectUrl() != null ? request.getRedirectUrl() : "http://localhost:5173/store/result");
         formData.add("description", request.getDescription() != null ? request.getDescription() : request.getMerchantOrderId());
         formData.add("reference_1", request.getTransactionId().toString());
