@@ -1,9 +1,9 @@
 # Progress Snapshot
-Last updated: 2026-06-12
+Last updated: 2026-06-14
 
 ## Completed
 - [x] PRD.md v2.0 — all features documented including reconciliation import
-- [x] Maven multi-module backend — all 7 modules, Flyway V1–V26, all entities/repos/adapters
+- [x] Maven multi-module backend — all 7 modules, Flyway V1–V27, all entities/repos/adapters
 - [x] Spring Security + JWT; CORS, 401/403 fix
 - [x] DB-driven payment methods — PaymentMethodEntity, composite PK; enum deleted everywhere
 - [x] AdminPaymentMethodController — GET/POST/PUT/DELETE with soft-delete
@@ -35,9 +35,12 @@ Last updated: 2026-06-12
 - [x] Reconciliation anomaly detection — auto-flag when |variance_pct| > 5% (configurable)
 - [x] Reconciliation KPI strip — real aggregate totals from /summary, not current-page counts
 - [x] Import result modal — rowsNoFee vs rowsUnmatched distinguished; improved logging
+- [x] Fix latency metric — V27 adds provider_latency_ms to transactions; PaymentService times the provider.initiatePayment() call; MetricsAggregator reads this column instead of updatedAt - createdAt
+- [x] Fix success rate metric — MetricsAggregator now computes over terminal states only (SUCCESS + FAILED + RETRY_EXHAUSTED), excluding in-flight PENDING/PROCESSING from the denominator
+- [x] PRD updated — correct weights (40/25/15/20), expanded formula definitions, V26+V27 in migration table
 
 ## Up next (start here next session)
-- [ ] End-to-end test reconciliation import: restart backend, download template, fill actual_fee column, upload, verify recon_statements rows created in DB
+- [ ] End-to-end test reconciliation import: restart backend, download template, fill actual_fee column, upload, verify recon_statements rows saved and anomaly flagged
 - [ ] Add Xendit sandbox keys to application-dev.yml, smoke test PH invoice + disbursement
 - [ ] Smoke test policy status page: pay → success email → "View Policy Status →" → 3-card layout
 - [ ] Demo data seeding — 100+ realistic transactions across all 3 regions for dashboard KPIs
@@ -54,7 +57,8 @@ Last updated: 2026-06-12
 - POST /store/pay is idempotent for PENDING (returns existing URL, no new transaction)
 - Policy status page uses UUID as implicit access token — no login required
 - Reconciliation uses transactions.fee as expected_fee — immune to fee rate changes
-- Reconciliation import uses single standardized template (not provider-specific parsers)
+- Latency = provider API call duration only (provider_latency_ms column); user think time excluded
+- Success rate = terminal transactions only; PENDING/PROCESSING excluded from denominator
 
 ## Blockers
 - Reconciliation import returning matched=0 when actual_fee column is blank — improved logging added; need to fill column and re-test

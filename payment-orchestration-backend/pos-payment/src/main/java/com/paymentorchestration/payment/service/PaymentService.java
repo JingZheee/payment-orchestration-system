@@ -31,6 +31,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -141,7 +142,9 @@ public class PaymentService {
                     .metadata(request.getMetadata())
                     .build();
 
+            Instant callStart = Instant.now();
             result = provider.initiatePayment(providerRequest);
+            transaction.setProviderLatencyMs(Duration.between(callStart, Instant.now()).toMillis());
         } catch (ProviderException e) {
             log.warn("[payment] provider {} threw: {}", decision.getProvider(), e.getMessage());
             transaction.setStatus(PaymentStatus.FAILED);

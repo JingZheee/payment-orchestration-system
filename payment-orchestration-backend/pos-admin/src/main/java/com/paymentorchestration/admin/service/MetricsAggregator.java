@@ -16,7 +16,6 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -62,18 +61,27 @@ public class MetricsAggregator {
             List<Transaction> group = entry.getValue();
 
             int total = group.size();
-            long successCount = group.stream()
+
+            // Only count transactions that have reached a terminal state
+            List<Transaction> terminal = group.stream()
+                    .filter(t -> t.getStatus() == PaymentStatus.SUCCESS
+                              || t.getStatus() == PaymentStatus.FAILED
+                              || t.getStatus() == PaymentStatus.RETRY_EXHAUSTED)
+                    .toList();
+
+            long successCount = terminal.stream()
                     .filter(t -> t.getStatus() == PaymentStatus.SUCCESS)
                     .count();
 
-            BigDecimal successRate = total > 0
-                    ? BigDecimal.valueOf(successCount)
-                            .divide(BigDecimal.valueOf(total), 4, RoundingMode.HALF_UP)
-                    : BigDecimal.ZERO;
+            BigDecimal successRate = terminal.isEmpty()
+                    ? new BigDecimal("0.5")
+                    : BigDecimal.valueOf(successCount)
+                            .divide(BigDecimal.valueOf(terminal.size()), 4, RoundingMode.HALF_UP);
 
+            // Use the timed provider API call duration, not updatedAt - createdAt
             long avgLatencyMs = (long) group.stream()
-                    .mapToLong(t -> Duration.between(t.getCreatedAt(), t.getUpdatedAt()).toMillis())
-                    .filter(ms -> ms >= 0)
+                    .filter(t -> t.getProviderLatencyMs() != null && t.getProviderLatencyMs() >= 0)
+                    .mapToLong(Transaction::getProviderLatencyMs)
                     .average()
                     .orElse(0);
 

@@ -15,24 +15,24 @@ const STATUS_CONFIG: Record<string, { bg: string; fg: string; label: string }> =
   PROCESSING:      { bg: '#FEF3C7', fg: '#92400E', label: 'Processing' },
   QUOTE:           { bg: '#F3F4F6', fg: '#374151', label: 'Not Paid' },
   FAILED:          { bg: '#FEE2E2', fg: '#991B1B', label: 'Failed' },
-  RETRY_EXHAUSTED: { bg: '#FEE2E2', fg: '#991B1B', label: 'Retries Exhausted' },
+  RETRY_EXHAUSTED: { bg: '#FEE2E2', fg: '#991B1B', label: 'Payment Failed' },
 };
 
-function eventColor(type: string): string {
-  if (type.includes('SUCCEEDED') || type.includes('SUCCESS') || type.includes('ACTIVATED')) return '#059669';
-  if (type.includes('FAILED') || type.includes('EXHAUSTED')) return '#DC2626';
-  if (type.includes('RETRY') || type.includes('DELAYED')) return '#D97706';
-  if (type.includes('WEBHOOK')) return '#7C3AED';
-  if (type.includes('INITIATED') || type.includes('SELECTED')) return '#1D4ED8';
-  return '#6B7280';
-}
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  FPX:             'Online Banking (FPX)',
+  VIRTUAL_ACCOUNT: 'Bank Transfer (Virtual Account)',
+  QRIS:            'QRIS Scan & Pay',
+  GOPAY:           'GoPay',
+  EWALLET:         'E-Wallet',
+  CARD:            'Credit / Debit Card',
+  GCASH:           'GCash',
+  MAYA:            'Maya',
+  GRABPAY:         'GrabPay',
+};
 
-function formatEventType(type: string): string {
-  return type.split('_').map(w => w.charAt(0) + w.slice(1).toLowerCase()).join(' ');
-}
-
-function formatStrategy(s: string): string {
-  return s.split('_').map(w => w.charAt(0) + w.slice(1).toLowerCase()).join(' ');
+function formatPaymentMethod(method: string | null | undefined): string {
+  if (!method) return '—';
+  return PAYMENT_METHOD_LABELS[method] ?? method.replace(/_/g, ' ');
 }
 
 function fmtAmount(amount: number, currency: string): string {
@@ -86,49 +86,128 @@ function PolicyCard({ policy }: { policy: PolicyStatus }) {
 
 function PaymentCard({ policy }: { policy: PolicyStatus }) {
   if (!policy.transactionId) return null;
+
+  const initiatedEvent = policy.events.find(e => e.eventType === 'INITIATED');
+  const paymentDate = initiatedEvent?.createdAt ?? policy.createdAt;
+
   return (
     <div className={styles.card}>
       <div className={styles.cardHeader}>
         <span className={styles.cardHeaderIcon}>💳</span>
-        <span className={styles.cardTitle}>Payment Details</span>
+        <span className={styles.cardTitle}>Payment Summary</span>
       </div>
       <div className={styles.cardBody}>
         <div className={styles.detailGrid}>
-          <DetailItem label="Provider"         value={policy.provider} />
-          <DetailItem label="Routing Strategy" value={policy.routingStrategy ? formatStrategy(policy.routingStrategy) : null} />
-          <DetailItem label="Fee Charged"      value={policy.fee != null ? fmtAmount(Number(policy.fee), policy.currency) : null} />
-          <DetailItem label="Transaction ID"   value={policy.transactionId} mono />
+          <DetailItem label="Payment Method" value={formatPaymentMethod(policy.paymentMethod)} />
+          <DetailItem label="Date"           value={fmtDate(paymentDate)} />
+          <DetailItem label="Amount Paid"    value={fmtAmount(Number(policy.amount), policy.currency)} />
+          {policy.fee != null && (
+            <DetailItem label="Service Fee"  value={fmtAmount(Number(policy.fee), policy.currency)} />
+          )}
         </div>
-        {policy.routingReason && (
-          <div className={styles.routingReason}>
-            <div className={styles.detailLabel}>Routing Reason</div>
-            <div className={styles.detailValue} style={{ fontWeight: 400, fontSize: 13, color: '#4B5563', marginTop: 5, lineHeight: 1.6 }}>
-              {policy.routingReason}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
 }
 
-function TimelineCard({ policy }: { policy: PolicyStatus }) {
-  if (policy.events.length === 0) return null;
+interface Milestone {
+  label: string;
+  sub?: string;
+  time: string | null;
+  color: string;
+  pending?: boolean;
+}
+
+function buildMilestones(policy: PolicyStatus): Milestone[] {
+  const milestones: Milestone[] = [];
+  const find = (type: string) => policy.events.find(e => e.eventType === type);
+
+  milestones.push({
+    label: 'Application Received',
+    sub: 'Your insurance application has been submitted.',
+    time: policy.createdAt,
+    color: '#059669',
+  });
+
+  const initiated = find('INITIATED');
+  if (initiated) {
+    milestones.push({
+      label: 'Payment Submitted',
+      sub: 'Your payment is being processed.',
+      time: initiated.createdAt,
+      color: '#1D4ED8',
+    });
+  }
+
+  const activated = find('PREMIUM_ACTIVATED');
+  const disbursed  = find('CLAIM_DISBURSED');
+
+  if (activated) {
+    milestones.push({
+      label: 'Payment Confirmed',
+      sub: 'Your payment has been received.',
+      time: activated.createdAt,
+      color: '#059669',
+    });
+    milestones.push({
+      label: 'Policy Activated',
+      sub: 'Your coverage is now active. Keep your policy number for your records.',
+      time: activated.createdAt,
+      color: '#059669',
+    });
+  } else if (disbursed) {
+    milestones.push({
+      label: 'Payment Confirmed',
+      sub: 'Your claim payment has been processed.',
+      time: disbursed.createdAt,
+      color: '#059669',
+    });
+    milestones.push({
+      label: 'Claim Disbursed',
+      sub: 'Funds will be credited to your account within 1–3 business days.',
+      time: disbursed.createdAt,
+      color: '#059669',
+    });
+  } else if (policy.status === 'FAILED' || policy.status === 'RETRY_EXHAUSTED') {
+    milestones.push({
+      label: 'Payment Failed',
+      sub: 'We were unable to process your payment. Please try again.',
+      time: null,
+      color: '#DC2626',
+    });
+  } else if (policy.status === 'PENDING' || policy.status === 'PROCESSING') {
+    milestones.push({
+      label: 'Payment in Progress',
+      sub: 'We are waiting for confirmation from your bank. This usually takes a few minutes.',
+      time: null,
+      color: '#D97706',
+      pending: true,
+    });
+  }
+
+  return milestones;
+}
+
+function MilestonesCard({ policy }: { policy: PolicyStatus }) {
+  const milestones = buildMilestones(policy);
   return (
     <div className={styles.card}>
       <div className={styles.cardHeader}>
         <span className={styles.cardHeaderIcon}>📋</span>
-        <span className={styles.cardTitle}>Activity Timeline</span>
+        <span className={styles.cardTitle}>Application Progress</span>
       </div>
       <div className={styles.cardBody}>
         <Timeline
-          items={policy.events.map(ev => ({
-            color: eventColor(ev.eventType),
+          items={milestones.map(m => ({
+            color: m.color,
             children: (
               <div className={styles.eventItem}>
-                <div className={styles.eventType}>{formatEventType(ev.eventType)}</div>
-                {ev.description && <div className={styles.eventDesc}>{ev.description}</div>}
-                <div className={styles.eventTime}>{fmtDate(ev.createdAt)}</div>
+                <div className={styles.eventType} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {m.pending && <SyncOutlined spin style={{ fontSize: 12, color: m.color }} />}
+                  {m.label}
+                </div>
+                {m.sub && <div className={styles.eventDesc}>{m.sub}</div>}
+                {m.time && <div className={styles.eventTime}>{fmtDate(m.time)}</div>}
               </div>
             ),
           }))}
@@ -261,7 +340,7 @@ export default function PolicyStatusPage() {
 
         <PolicyCard policy={policy} />
         <PaymentCard policy={policy} />
-        <TimelineCard policy={policy} />
+        <MilestonesCard policy={policy} />
 
         {/* Actions */}
         <div className={styles.actionRow}>

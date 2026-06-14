@@ -213,6 +213,8 @@ providers:
 | V19 | seed data | insurance-specific routing rules seeded |
 | V20 | `payment_methods` (new) | Composite PK (code, region); 13 seed rows; composite FK from transactions, provider_fee_rates, recon_statements |
 | V21 | `demo_policies` (new) | id UUID PK, holder_name, holder_email, insurance_type, policy_number, claim_reference, amount, currency, region, payment_method, payment_type, status DEFAULT 'PENDING', transaction_id UUID; 6 seed rows |
+| V26 | `demo_policies` (alter) | payment_method made nullable |
+| V27 | `transactions` (alter) | provider_latency_ms BIGINT added; stores duration of initiatePayment() API call; used by MetricsAggregator for latency scoring |
 
 ---
 
@@ -327,10 +329,10 @@ Weights are configurable in `application.yml` under `routing.scorer.*`.
 
 | Field | Value |
 |---|---|
-| **Current module** | Reconciliation |
+| **Current module** | Reconciliation / Metrics |
 | **Current task** | Restart backend → download template from GET /admin/recon/template → fill in actual_fee column (add one deliberate discrepancy) → upload via POST /admin/recon/import → verify recon_statements rows saved in DB and anomaly flagged |
-| **Last completed** | Reconciliation import full implementation: ReconImportService (Apache POI), POST /import + GET /summary + GET /template endpoints, rowsNoFee counter to distinguish blank-fee vs unmatched, Reconciliation.tsx Upload UI + import result modal + real aggregate KPI strip; PRD updated to v2.0 |
-| **Blockers** | Import returning matched=0 — likely actual_fee column blank in test file; improved logging now distinguishes rowsNoFee vs rowsUnmatched; needs re-test with filled column |
+| **Last completed** | Metrics quality fixes: V27 migration adds provider_latency_ms to transactions; PaymentService now times the provider.initiatePayment() call and stores it; MetricsAggregator reads provider_latency_ms (not updatedAt−createdAt) and computes success rate over terminal states only; PRD updated with correct weights (40/25/15/20) and expanded formula definitions |
+| **Blockers** | Reconciliation import returning matched=0 when actual_fee column blank — improved logging added; needs re-test with filled column; Xendit sandbox keys not yet in application-dev.yml |
 
 ### Admin API Endpoints — Payment Methods
 ```

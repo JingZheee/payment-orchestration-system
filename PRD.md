@@ -64,7 +64,7 @@ The MVP goal is a fully functional routing engine integrated with real sandbox p
 - ✅ Admin transaction filter by `paymentType`
 - ✅ Payment initiation with intelligent provider routing
 - ✅ Routing engine with three strategies: region-based, success-rate-based, lowest-fee
-- ✅ Composite provider scoring (success rate 50%, fee 30%, latency 20%)
+- ✅ Composite provider scoring (success rate 40%, fee 25%, latency 15%, fee accuracy 20%)
 - ✅ Configurable routing rules (priority-ordered, region/amount/currency filters)
 - ✅ Routing rule simulation — test a hypothetical payment against live rules
 - ✅ Automatic failover when primary provider is unavailable
@@ -416,10 +416,10 @@ payment-orchestration-frontend/src/
 ### Key Design Patterns
 - **Port & Adapter** — `PaymentProviderPort` is the core contract; all 4 providers implement it
 - **Strategy Pattern** — `RoutingStrategy` interface with `RegionBasedStrategy`, `SuccessRateStrategy`, `LowestFeeStrategy`
-- **Composite Scoring** — `ProviderScorer` assigns weighted scores: success rate (50%) + fee (30%) + latency (20%)
+- **Composite Scoring** — `ProviderScorer` assigns weighted scores: success rate (40%) + fee (25%) + latency (15%) + fee accuracy (20%)
 - **Idempotency Filter** — servlet filter intercepts requests with `Idempotency-Key` header before hitting service layer
 - **Immutable Event Log** — `transaction_events` table is append-only; no updates, only inserts
-- **Scheduled Metrics** — `MetricsAggregator` runs every 15 minutes to compute rolling success rates per provider per region over a 60-minute window. Window and tick are intentionally wide for the demo context: with low transaction volume (tens of transactions, not thousands), a 5-minute window would almost always be empty and produce meaningless scores. Production systems (e.g. Razorpay) use a 5-minute primary window with a 1-minute tick, which only makes sense at scale where each provider sees hundreds of transactions per minute.
+- **Scheduled Metrics** — `MetricsAggregator` runs every 15 minutes to compute rolling metrics per provider per region over a 60-minute window. Window and tick are intentionally wide for the demo context: with low transaction volume (tens of transactions, not thousands), a 5-minute window would almost always be empty and produce meaningless scores. Production systems (e.g. Razorpay) use a 5-minute primary window with a 1-minute tick, which only makes sense at scale where each provider sees hundreds of transactions per minute. **Latency** is measured as the duration of the `provider.initiatePayment()` API call only — stored in `transactions.provider_latency_ms` at the time of each payment — rather than `updatedAt − createdAt`, which would include user think time for async/redirect flows. **Success rate** is computed over terminal-state transactions only (SUCCESS + FAILED + RETRY_EXHAUSTED), excluding in-flight PENDING/PROCESSING rows whose final status is unknown, to prevent the denominator from being inflated mid-window.
 - **Message Queue (Async)** — RabbitMQ decouples webhook receipt from processing, and drives the retry pipeline via TTL + DLQ
 
 ### RabbitMQ Topology
@@ -1287,9 +1287,10 @@ The `/payment-demo` page is a simulated insurance back-office system, not just a
 # application.yml (non-sensitive)
 routing:
   scorer:
-    success-rate-weight: 0.50
-    fee-weight: 0.30
-    latency-weight: 0.20
+    success-rate-weight: 0.40
+    fee-weight: 0.25
+    latency-weight: 0.15
+    fee-accuracy-weight: 0.20
   metrics:
     window-minutes: 60          # 60-min window suits demo-scale volume; production would use 5 min
     refresh-interval-minutes: 15 # aggregation tick; production would run every 1 min at scale
@@ -1671,7 +1672,7 @@ The system is considered MVP-complete when an examiner can watch a 10-minute dem
 **Goal:** Routing engine is intelligent. Real sandbox providers connected.
 
 - ✅ `SuccessRateStrategy` + `LowestFeeStrategy` reading from `provider_metrics`
-- ✅ `ProviderScorer`: composite score (50/30/20 weights)
+- ✅ `ProviderScorer`: composite score (40/25/15/20 weights — success rate / fee / latency / fee accuracy)
 - ✅ `MetricsAggregator` scheduled job
 - ✅ Billplz adapter + `/webhooks/billplz`
 - ✅ Midtrans adapter + `/webhooks/midtrans`
@@ -1767,10 +1768,25 @@ score(provider) =
   (fee_accuracy              × 0.20)
 
 where:
-  normalized_fee     = provider_fee / max_fee_among_eligible_providers
-  normalized_latency = provider_avg_latency / max_latency_among_eligible_providers
-  fee_accuracy       = AVG(1 − |variance| / expected_fee) from recon_statements in last 1h
-                       (defaults to 1.0 when no recon history exists)
+  success_rate_last_1h
+    = SUCCESS / (SUCCESS + FAILED + RETRY_EXHAUSTED) in the last 60-min window
+      (terminal states only — in-flight PENDING/PROCESSING excluded from denominator)
+      (defaults to 0.5 when no data)
+
+  normalized_fee
+    = volume-weighted avg fee / max_fee_among_eligible_providers
+      volume weights derived from recon_statements payment method distribution per provider+region
+      (falls back to context payment method fee when no recon history)
+
+  normalized_latency
+    = provider_avg_latency_ms / max_latency_among_eligible_providers
+      avg_latency_ms = average of transactions.provider_latency_ms in the window
+      provider_latency_ms = duration of provider.initiatePayment() API call only
+      (excludes user think time and webhook delivery lag; defaults to 500ms when no data)
+
+  fee_accuracy
+    = AVG(1 − |variance| / expected_fee) from recon_statements since window_start
+      (defaults to 1.0 when no recon history exists)
 
 Weights are configurable in application.yml → routing.scorer.*
 ```
@@ -1803,6 +1819,8 @@ Weights are configurable in application.yml → routing.scorer.*
 | V23 | `transactions` (alter) | Adds `va_number VARCHAR(100)` — populated for Midtrans VIRTUAL_ACCOUNT payments only; null for all other providers and methods |
 | V24 | `store_products` (new) | id UUID PK, code VARCHAR(30) UNIQUE, name, insurance_type, tagline, amount DECIMAL(10,2), billing_period, features TEXT (pipe-separated), badge, sort_order INT, active BOOLEAN; 5 MY seed rows (life/medical/motor/travel/accident) |
 | V25 | `store_products` (alter) | Adds `region VARCHAR(2)` and `currency VARCHAR(3)`; defaults existing rows to MY/MYR; seeds 5 ID (IDR) and 5 PH (PHP) products with `_id` and `_ph` code suffixes |
+| V26 | `demo_policies` (alter) | Makes `payment_method` nullable — required for CLAIMS_DISBURSEMENT records where method is determined at payout time |
+| V27 | `transactions` (alter) | Adds `provider_latency_ms BIGINT` (nullable) — stores the duration of the `initiatePayment()` API call in milliseconds; null for transactions created before this migration; used by `MetricsAggregator` for accurate provider latency scoring |
 
 ### RabbitMQ Queue Topology (Implementation Reference)
 ```yaml

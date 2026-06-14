@@ -89,6 +89,9 @@ public class Transaction {
     @Column(name = "retry_count", nullable = false)
     private int retryCount = 0;
 
+    @Column(name = "provider_latency_ms")
+    private Long providerLatencyMs;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
