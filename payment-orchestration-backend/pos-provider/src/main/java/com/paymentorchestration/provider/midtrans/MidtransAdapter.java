@@ -64,7 +64,7 @@ public class MidtransAdapter implements PaymentProviderPort {
         String bankCode = (request.getMetadata() != null)
                 ? request.getMetadata().getOrDefault("bankCode", "bca")
                 : "bca";
-        Map<String, Object> body = buildCoreApiBody(method, request.getMerchantOrderId(), grossAmount, customerEmail, bankCode);
+        Map<String, Object> body = buildCoreApiBody(method, request.getMerchantOrderId(), grossAmount, customerEmail, bankCode, request.getRedirectUrl());
 
         try {
             Map<?, ?> response = webClientBuilder.build()
@@ -135,6 +135,9 @@ public class MidtransAdapter implements PaymentProviderPort {
                 "gross_amount", grossAmount));
         body.put("customer_details", Map.of("email", customerEmail));
         body.put("enabled_payments", List.of("credit_card"));
+        if (request.getRedirectUrl() != null) {
+            body.put("callbacks", Map.of("finish", request.getRedirectUrl()));
+        }
 
         try {
             Map<?, ?> response = webClientBuilder.build()
@@ -171,7 +174,7 @@ public class MidtransAdapter implements PaymentProviderPort {
         }
     }
 
-    private Map<String, Object> buildCoreApiBody(String method, String orderId, long grossAmount, String email, String bankCode) {
+    private Map<String, Object> buildCoreApiBody(String method, String orderId, long grossAmount, String email, String bankCode, String redirectUrl) {
         Map<String, Object> transactionDetails = Map.of("order_id", orderId, "gross_amount", grossAmount);
         Map<String, Object> customerDetails = Map.of("email", email);
 
@@ -185,7 +188,10 @@ public class MidtransAdapter implements PaymentProviderPort {
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("payment_type", "gopay");
             body.put("transaction_details", transactionDetails);
-            body.put("gopay", Map.of("enable_callback", true));
+            Map<String, Object> gopay = new LinkedHashMap<>();
+            gopay.put("enable_callback", true);
+            if (redirectUrl != null) gopay.put("callback_url", redirectUrl);
+            body.put("gopay", gopay);
             body.put("customer_details", customerDetails);
             return body;
         } else {
