@@ -1,5 +1,5 @@
 # Progress Snapshot
-Last updated: 2026-06-14
+Last updated: 2026-06-29
 
 ## Completed
 - [x] PRD.md v2.0 — all features documented including reconciliation import
@@ -38,6 +38,7 @@ Last updated: 2026-06-14
 - [x] Fix latency metric — V27 adds provider_latency_ms to transactions; PaymentService times the provider.initiatePayment() call; MetricsAggregator reads this column instead of updatedAt - createdAt
 - [x] Fix success rate metric — MetricsAggregator now computes over terminal states only (SUCCESS + FAILED + RETRY_EXHAUSTED), excluding in-flight PENDING/PROCESSING from the denominator
 - [x] PRD updated — correct weights (40/25/15/20), expanded formula definitions, V26+V27 in migration table
+- [x] RBAC enforcement — SecurityConfig now splits /api/v1/admin/** by HTTP method (GET: ADMIN+VIEWER, writes: ADMIN only); frontend hides write controls for VIEWER across 7 pages (role.ts utility)
 
 ## Up next (start here next session)
 - [ ] End-to-end test reconciliation import: restart backend, download template, fill actual_fee column, upload, verify recon_statements rows saved and anomaly flagged

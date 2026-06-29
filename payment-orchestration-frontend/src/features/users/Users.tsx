@@ -5,6 +5,7 @@ import { useUsers, useCreateUser, useUpdateUserRole, useDeleteUser } from './hoo
 import type { UserRecord } from '../../shared/types/user';
 import { UserRole } from '../../shared/types/enums';
 import PageHeader from '../../shared/components/PageHeader';
+import { isAdmin } from '../../lib/role';
 import TableCard from '../../shared/components/TableCard';
 import styles from './Users.module.css';
 
@@ -100,7 +101,7 @@ export default function Users() {
       title: '',
       key: 'actions',
       width: 100,
-      render: (_: unknown, row: UserRecord) => (
+      render: (_: unknown, row: UserRecord) => isAdmin() ? (
         <div className={styles.actionBtns}>
           <button
             className={styles.actionBtn}
@@ -122,7 +123,7 @@ export default function Users() {
             </button>
           </Popconfirm>
         </div>
-      ),
+      ) : null,
     },
   ];
 
@@ -133,12 +134,12 @@ export default function Users() {
       <PageHeader
         title="Users"
         subtitle="Manage admin, viewer, and merchant accounts."
-        actions={
+        actions={isAdmin() ? (
           <button className={styles.addBtn} onClick={openCreate}>
             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>person_add</span>
             Add User
           </button>
-        }
+        ) : undefined}
       />
 
       <TableCard>

@@ -329,9 +329,9 @@ Weights are configurable in `application.yml` under `routing.scorer.*`.
 
 | Field | Value |
 |---|---|
-| **Current module** | Reconciliation / Metrics |
+| **Current module** | Reconciliation / Auth |
 | **Current task** | Restart backend → download template from GET /admin/recon/template → fill in actual_fee column (add one deliberate discrepancy) → upload via POST /admin/recon/import → verify recon_statements rows saved in DB and anomaly flagged |
-| **Last completed** | Metrics quality fixes: V27 migration adds provider_latency_ms to transactions; PaymentService now times the provider.initiatePayment() call and stores it; MetricsAggregator reads provider_latency_ms (not updatedAt−createdAt) and computes success rate over terminal states only; PRD updated with correct weights (40/25/15/20) and expanded formula definitions |
+| **Last completed** | RBAC enforcement — SecurityConfig splits /api/v1/admin/** by HTTP method so VIEWER cannot POST/PUT/PATCH/DELETE; src/lib/role.ts + 7 frontend pages updated to hide write controls for VIEWER role |
 | **Blockers** | Reconciliation import returning matched=0 when actual_fee column blank — improved logging added; needs re-test with filled column; Xendit sandbox keys not yet in application-dev.yml |
 
 ### Admin API Endpoints — Payment Methods

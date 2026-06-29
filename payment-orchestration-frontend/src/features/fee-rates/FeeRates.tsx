@@ -7,6 +7,7 @@ import { useProviderSummaries } from '../providers/hooks/useProviders';
 import type { FeeRate, FeeRateCreateRequest, FeeRateUpdateRequest } from '../../shared/types/feeRate';
 import { FeeType, Provider, Region } from '../../shared/types/enums';
 import PageHeader from '../../shared/components/PageHeader';
+import { isAdmin } from '../../lib/role';
 import TableCard from '../../shared/components/TableCard';
 import InfoBanner from '../../shared/components/InfoBanner';
 import styles from './FeeRates.module.css';
@@ -206,7 +207,7 @@ export default function FeeRates() {
       title: '',
       key: 'action',
       width: 88,
-      render: (_: unknown, row: FeeRate) => (
+      render: (_: unknown, row: FeeRate) => isAdmin() ? (
         <div className={styles.actionGroup}>
           <button className={styles.actionBtn} onClick={() => openEdit(row)}>
             <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
@@ -223,7 +224,7 @@ export default function FeeRates() {
             </button>
           </Popconfirm>
         </div>
-      ),
+      ) : null,
     },
   ];
 
@@ -264,11 +265,11 @@ export default function FeeRates() {
         onChange={setActiveTab}
         items={tabItems}
         tabBarExtraContent={{
-          right: (
+          right: isAdmin() ? (
             <Button onClick={openCreate} type="primary" style={okButtonStyle}>
               Add Rate
             </Button>
-          ),
+          ) : undefined,
         }}
       />
 

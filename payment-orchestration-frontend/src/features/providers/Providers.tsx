@@ -5,6 +5,7 @@ import NotificationQueuePanel from './NotificationQueuePanel';
 import PageHeader from '../../shared/components/PageHeader';
 import InfoBanner from '../../shared/components/InfoBanner';
 import { formatDate } from '../../shared/utils/format';
+import { isAdmin } from '../../lib/role';
 import styles from './Providers.module.css';
 
 const REGION_LABEL: Record<string, string> = {
@@ -76,6 +77,7 @@ function ProviderCard({ p }: { p: ProviderSummary }) {
         <Switch
           checked={p.enabled}
           loading={toggleMutation.isPending}
+          disabled={!isAdmin()}
           onChange={(checked) => {
             toggleMutation.mutateAsync({ provider: p.provider, enabled: checked });
             message.success(`${p.label} ${checked ? 'enabled' : 'disabled'}`);

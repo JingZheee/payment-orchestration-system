@@ -13,6 +13,7 @@ import InfoBanner from '../../shared/components/InfoBanner';
 import EmptyState from '../../shared/components/EmptyState';
 import TransactionDetailDrawer from '../transactions/components/TransactionDetailDrawer';
 import { formatAmount, formatDate } from '../../shared/utils/format';
+import { isAdmin } from '../../lib/role';
 import styles from './DeadLetterQueue.module.css';
 
 export default function DeadLetterQueue() {
@@ -106,26 +107,28 @@ export default function DeadLetterQueue() {
       width: 150,
       render: (_: unknown, row) => (
         <div className={styles.actionCell} onClick={(e) => e.stopPropagation()}>
-          <Popconfirm
-            title="Re-queue this transaction?"
-            description="Resets status to PROCESSING and schedules a fresh retry. Only do this after the provider issue is resolved."
-            okText="Re-queue"
-            cancelText="Cancel"
-            okButtonProps={{
-              style: { background: '#FCB900', borderColor: '#FCB900', color: '#1C1C1E', fontWeight: 600 },
-            }}
-            onConfirm={() => handleRequeue(row)}
-          >
-            <Button
-              size="small"
-              icon={<ReloadOutlined />}
-              loading={requeueingId === row.id}
-              disabled={!!requeueingId && requeueingId !== row.id}
-              className={styles.requeueBtn}
+          {isAdmin() && (
+            <Popconfirm
+              title="Re-queue this transaction?"
+              description="Resets status to PROCESSING and schedules a fresh retry. Only do this after the provider issue is resolved."
+              okText="Re-queue"
+              cancelText="Cancel"
+              okButtonProps={{
+                style: { background: '#FCB900', borderColor: '#FCB900', color: '#1C1C1E', fontWeight: 600 },
+              }}
+              onConfirm={() => handleRequeue(row)}
             >
-              Re-queue
-            </Button>
-          </Popconfirm>
+              <Button
+                size="small"
+                icon={<ReloadOutlined />}
+                loading={requeueingId === row.id}
+                disabled={!!requeueingId && requeueingId !== row.id}
+                className={styles.requeueBtn}
+              >
+                Re-queue
+              </Button>
+            </Popconfirm>
+          )}
           <button
             className={styles.chevronBtn}
             onClick={() => setSelectedId(row.id)}

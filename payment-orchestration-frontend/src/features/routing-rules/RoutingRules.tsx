@@ -19,6 +19,7 @@ import {
 } from './hooks/useRoutingRules';
 import { routingRuleService } from './services/routingRuleService';
 import PageHeader from '../../shared/components/PageHeader';
+import { isAdmin } from '../../lib/role';
 import TableCard from '../../shared/components/TableCard';
 import InfoBanner from '../../shared/components/InfoBanner';
 import EmptyState from '../../shared/components/EmptyState';
@@ -151,22 +152,24 @@ function SortableRuleCard({
           {rule.enabled ? 'Active' : 'Off'}
         </span>
 
-        <div className={styles.actions}>
-          <button className={styles.actionBtn} onClick={() => onEdit(rule)}>
-            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
-          </button>
-          <Popconfirm
-            title="Delete this rule?"
-            description="This cannot be undone."
-            okText="Delete"
-            okButtonProps={{ danger: true }}
-            onConfirm={() => onDelete(rule.id)}
-          >
-            <button className={styles.deleteBtn} disabled={isDeleting}>
-              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
+        {isAdmin() && (
+          <div className={styles.actions}>
+            <button className={styles.actionBtn} onClick={() => onEdit(rule)}>
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
             </button>
-          </Popconfirm>
-        </div>
+            <Popconfirm
+              title="Delete this rule?"
+              description="This cannot be undone."
+              okText="Delete"
+              okButtonProps={{ danger: true }}
+              onConfirm={() => onDelete(rule.id)}
+            >
+              <button className={styles.deleteBtn} disabled={isDeleting}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
+              </button>
+            </Popconfirm>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -318,7 +321,7 @@ export default function RoutingRules() {
       <PageHeader
         title="Routing Rules"
         subtitle="Drag rows to set priority within each region. First matching enabled rule wins."
-        actions={
+        actions={isAdmin() ? (
           <Button
             type="primary"
             icon={<PlusOutlined />}
@@ -331,7 +334,7 @@ export default function RoutingRules() {
           >
             Add Rule
           </Button>
-        }
+        ) : undefined}
       />
 
       <InfoBanner>

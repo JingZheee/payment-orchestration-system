@@ -8,6 +8,7 @@ import { useRecon } from './hooks/useRecon';
 import { useReconSummary } from './hooks/useReconSummary';
 import { reconService } from './services/reconService';
 import { API } from '../../lib/endpoints';
+import { isAdmin } from '../../lib/role';
 import api from '../../lib/axios';
 import type { ReconStatement, ReconImportResult } from '../../shared/types/recon';
 import { Provider } from '../../shared/types/enums';
@@ -264,8 +265,8 @@ export default function Reconciliation() {
         ))}
       </div>
 
-      {/* Import section */}
-      <div style={{
+      {/* Import section — admin only */}
+      {isAdmin() && <div style={{
         background: '#FFFFFF', borderRadius: 16, padding: 24,
         boxShadow: '0 4px 40px -12px rgba(80,69,50,0.08)',
       }}>
@@ -312,7 +313,7 @@ export default function Reconciliation() {
             )}
           </div>
         </Upload.Dragger>
-      </div>
+      </div>}
 
       {/* Filters + tabs */}
       <div style={{

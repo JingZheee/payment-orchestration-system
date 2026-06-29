@@ -10,6 +10,7 @@ import {
 import type { PaymentMethodConfig } from '../../shared/types/paymentMethod';
 import { Region } from '../../shared/types/enums';
 import PageHeader from '../../shared/components/PageHeader';
+import { isAdmin } from '../../lib/role';
 import TableCard from '../../shared/components/TableCard';
 import styles from './PaymentMethods.module.css';
 
@@ -112,7 +113,7 @@ export default function PaymentMethods() {
       title: '',
       key: 'actions',
       width: 100,
-      render: (_: unknown, row: PaymentMethodConfig) => (
+      render: (_: unknown, row: PaymentMethodConfig) => isAdmin() ? (
         <div className={styles.actionBtns}>
           <button className={styles.actionBtn} onClick={() => openEdit(row)}>
             <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
@@ -130,7 +131,7 @@ export default function PaymentMethods() {
             </button>
           </Popconfirm>
         </div>
-      ),
+      ) : null,
     },
   ];
 
@@ -177,12 +178,12 @@ export default function PaymentMethods() {
         onChange={setActiveTab}
         items={tabItems}
         tabBarExtraContent={{
-          right: (
+          right: isAdmin() ? (
             <button className={styles.addBtn} onClick={openCreate}>
               <span className="material-symbols-outlined" style={{ fontSize: 18 }}>add</span>
               Add Method
             </button>
-          ),
+          ) : undefined,
         }}
       />
 
