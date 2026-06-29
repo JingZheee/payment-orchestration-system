@@ -18,6 +18,7 @@ export const authService = {
     localStorage.removeItem('pos_access_token');
     localStorage.removeItem('pos_refresh_token');
     localStorage.removeItem('pos_role');
+    localStorage.removeItem('pos_email');
     window.location.href = '/login';
   },
 };

@@ -19,6 +19,7 @@ export default function Login() {
       localStorage.setItem('pos_access_token', accessToken);
       localStorage.setItem('pos_refresh_token', refreshToken);
       localStorage.setItem('pos_role', role);
+      localStorage.setItem('pos_email', values.email);
       navigate(from, { replace: true });
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })

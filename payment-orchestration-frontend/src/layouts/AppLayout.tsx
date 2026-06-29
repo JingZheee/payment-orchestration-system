@@ -199,24 +199,6 @@ export default function AppLayout() {
 
           {/* Right actions */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-            <div style={{ display: 'flex', gap: 4 }}>
-              {(['notifications', 'settings'] as const).map((icon) => (
-                <button
-                  key={icon}
-                  style={{
-                    padding: 8, background: 'transparent', border: 'none',
-                    cursor: 'pointer', borderRadius: '50%', color: '#6B7280',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    transition: 'background 0.15s',
-                  }}
-                >
-                  <MIcon name={icon} size={22} />
-                </button>
-              ))}
-            </div>
-
-            <div style={{ width: 1, height: 32, background: '#F6F3F5' }} />
-
             {/* User */}
             <Dropdown
               trigger={['click']}
@@ -226,7 +208,7 @@ export default function AppLayout() {
                     key: 'email',
                     label: (
                       <span style={{ fontSize: 12, color: '#6B7280' }}>
-                        {localStorage.getItem('pos_role') ?? 'ADMIN'}
+                        {localStorage.getItem('pos_email') ?? ''}
                       </span>
                     ),
                     disabled: true,
@@ -244,7 +226,12 @@ export default function AppLayout() {
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#1C1C1E', lineHeight: 1.3 }}>Admin</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#1C1C1E', lineHeight: 1.3 }}>
+                    {localStorage.getItem('pos_email')?.split('@')[0] ?? 'User'}
+                  </div>
+                  <div style={{ fontSize: 10, color: '#9CA3AF', lineHeight: 1.2, textTransform: 'capitalize' }}>
+                    {(localStorage.getItem('pos_role') ?? '').toLowerCase()}
+                  </div>
                 </div>
                 <div style={{
                   width: 36, height: 36, borderRadius: '50%',
@@ -252,7 +239,7 @@ export default function AppLayout() {
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   color: '#7B5800', fontWeight: 700, fontSize: 14,
                 }}>
-                  A
+                  {(localStorage.getItem('pos_email') ?? 'U')[0].toUpperCase()}
                 </div>
               </div>
             </Dropdown>
