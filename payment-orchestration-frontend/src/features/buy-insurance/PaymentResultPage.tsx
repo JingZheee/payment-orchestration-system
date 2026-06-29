@@ -200,19 +200,19 @@ export default function PaymentResultPage() {
             >
               Buy Another Plan
             </Button>
-            {isPaid && (
+            {(isPaid || isPending) && policyId && (
               <Button
                 type="primary"
                 block
                 size="large"
                 icon={<ArrowRightOutlined />}
-                onClick={() => navigate('/admin/dashboard')}
+                onClick={() => navigate(`/store/policy/${policyId}`)}
                 style={{
                   height: 46, borderRadius: 10, fontWeight: 600,
                   background: '#FCB900', borderColor: '#FCB900', color: '#1C1C1E',
                 }}
               >
-                View Dashboard
+                Check My Policy
               </Button>
             )}
           </div>

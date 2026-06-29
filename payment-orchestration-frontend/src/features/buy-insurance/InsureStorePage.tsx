@@ -65,6 +65,7 @@ function Navbar({
   region: RegionCode; onRegionChange: (r: RegionCode) => void;
   category: string;   onCategoryChange: (c: string) => void;
 }) {
+  const navigate = useNavigate();
   const activeCategoryLabel = CATEGORY_ITEMS.find(c => c.key === category)?.label ?? 'Products';
 
   return (
@@ -120,8 +121,17 @@ function Navbar({
         ))}
       </nav>
 
-      {/* Right: region selector + SSL */}
+      {/* Right: check policy + region selector + SSL */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <Button
+          onClick={() => navigate('/store/policy')}
+          style={{
+            height: 36, borderRadius: 8, fontWeight: 600, fontSize: 13,
+            borderColor: '#FCB900', color: '#92400E', background: '#FFFBEB',
+          }}
+        >
+          Check My Policy
+        </Button>
         <Select
           value={region}
           onChange={(val: RegionCode) => onRegionChange(val)}
