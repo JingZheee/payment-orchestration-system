@@ -1,7 +1,7 @@
 # Product Requirements Document
 # Payment Orchestration System (POS)
-**Version:** 2.0
-**Date:** 2026-06-12
+**Version:** 2.1
+**Date:** 2026-06-29
 **Type:** Final Year Project (FYP)
 
 ---
@@ -66,7 +66,7 @@ The MVP goal is a fully functional routing engine integrated with real sandbox p
 - ✅ Routing engine with three strategies: region-based, success-rate-based, lowest-fee
 - ✅ Composite provider scoring (success rate 40%, fee 25%, latency 15%, fee accuracy 20%)
 - ✅ Configurable routing rules (priority-ordered, region/amount/currency filters)
-- ✅ Routing rule simulation — test a hypothetical payment against live rules
+- ✅ Routing rule simulation — test a hypothetical payment against live rules; new `/admin/dashboard/simulate` endpoint runs the actual routing engine (rule matching + global fallback + composite score) and returns the full decision with matched rule details
 - ✅ Automatic failover when primary provider is unavailable
 - ✅ Webhook handling with HMAC signature verification per provider
 - ✅ Async webhook processing via RabbitMQ (decoupled receipt from processing)
@@ -473,13 +473,25 @@ Exchanges & Queues:
 
 ### Feature 1: Routing Engine
 The heart of the system. Given a payment request, evaluates:
-1. **Active routing rules** (priority-ordered, first match wins)
-2. If no rule matches: **composite scoring** across all available providers for the region
-3. Returns a `RoutingDecision` with: chosen provider, fallback provider, strategy used, human-readable reason, composite score
+1. **Region-specific routing rules** (priority-ordered within the region, first match wins)
+2. **Global routing rules** (fallback — only evaluated if no region-specific rule matched)
+3. If no rule matches: **composite scoring** across all available providers for the region
+4. Returns a `RoutingDecision` with: chosen provider, strategy used, human-readable reason, composite score
+
+**Two-pass rule evaluation:** The engine separates rules into two groups before matching. Pass 1 walks only rules where `rule.region == request.region` (e.g. MY-only rules), ordered by priority ASC. If a rule matches, evaluation stops — global rules are never consulted. Pass 2 walks only rules where `rule.region IS NULL` (global rules), again ordered by priority ASC. This ensures a region-specific rule always beats a global rule regardless of their numeric priority values, so operators can create per-region overrides without worrying about priority clashes with global policies.
+
+**Global rules:** Rules with `region = null` apply to all regions. The two seeded global rules encode the core insurance business logic:
+- Priority 1 — `CLAIMS_DISBURSEMENT` → `SUCCESS_RATE` strategy (reliability first; failed payouts are unacceptable)
+- Priority 2 — `PREMIUM_COLLECTION` → `LOWEST_FEE` strategy (cost optimisation for high-volume inbound)
+
+These fire as a fallback when no region-specific rule matches the payment.
+
+**Routing rules include `paymentType` filter:** Each rule can optionally specify `PREMIUM_COLLECTION` or `CLAIMS_DISBURSEMENT`. A rule with `paymentType = null` matches any payment type.
 
 Routing Decision factors:
 - Provider `is_enabled` (hard gate — disabled providers score 0)
 - Provider supports the request's region and currency
+- Provider supports the request's `paymentType` (e.g. Billplz and Midtrans cannot handle `CLAIMS_DISBURSEMENT`)
 - Historical success rate (from `provider_metrics` rolling window)
 - Fee for this transaction amount
 - Average latency
@@ -1181,10 +1193,20 @@ A table showing what each of the 4 strategies would select for the same input:
 |---|---|
 | `GET /admin/dashboard/scores?region=MY&amount=500&currency=MYR&paymentType=CLAIMS_DISBURSEMENT` | Returns `ScoreDetail[]` for eligible providers only, sorted best-to-worst |
 | `GET /admin/dashboard/strategy-comparison?...&paymentType=CLAIMS_DISBURSEMENT` | Returns which provider each strategy would select |
+| `GET /admin/dashboard/simulate?region=MY&amount=500&currency=MYR&paymentType=PREMIUM_COLLECTION` | Runs the actual routing engine (two-pass rule matching + global fallback + composite score) and returns the full `RoutingDecision` (provider, strategy, reason, score) |
 
-Both endpoints filter eligible providers by `paymentType` using the `supportedPaymentTypes()` capability method on each adapter.
+Both `/scores` and `/strategy-comparison` filter eligible providers by `paymentType` using the `supportedPaymentTypes()` capability method on each adapter. The `/simulate` endpoint calls `routingEngine.route()` directly — the same code path used in production payment initiation.
 
-**Demo moment:** Select MY + CLAIMS_DISBURSEMENT → Billplz disappears from the eligible list, only Mock appears with full score breakdown. Switch to PH + CLAIMS_DISBURSEMENT → Xendit appears alongside Mock, both with real scores. This shows the examiner that the engine is not just region-aware but payment-type-aware.
+**Section 5 — Routing Decision Panel (above the score cards)**
+
+After a simulation runs, a panel is displayed showing the actual decision the routing engine made — what would happen if a real payment were initiated right now:
+
+- **Green background** when a routing rule matched: shows selected provider name (large), strategy badge (e.g. "SUCCESS_RATE"), and the matched rule's reason string in monospace font (e.g. "Rule #3: MY CLAIMS_DISBURSEMENT → SUCCESS_RATE")
+- **Amber background** when composite score was used as fallback (no rule matched): shows selected provider name, "COMPOSITE_SCORE" badge, and reason string
+
+This panel bridges the gap between "which provider would each strategy pick" (Section 4) and "what the engine actually decided" (real rule-matching logic). The examiner can see a rule fire and explain *why* that rule was triggered.
+
+**Demo moment:** Select MY + CLAIMS_DISBURSEMENT → Routing Decision panel shows green "Rule #1: MY CLAIMS_DISBURSEMENT → SUCCESS_RATE" — proving rule matching fires before composite score. Switch to a region/amount combo with no matching rule → panel turns amber and shows "Composite score selected [Provider]", demonstrating graceful fallback. Select MY + CLAIMS_DISBURSEMENT → Billplz disappears from the eligible provider list, only Mock appears with full score breakdown.
 
 ---
 
@@ -1264,7 +1286,10 @@ The `/payment-demo` page is a simulated insurance back-office system, not just a
 ### Authentication
 - Login → Spring Security validates credentials → returns short-lived JWT access token (15 min) + long-lived refresh token (7 days)
 - Refresh token stored in `users` table (server-side invalidation on logout)
-- All `/api/v1/admin/**` endpoints require `ADMIN` or `VIEWER` role
+- **RBAC enforcement (HTTP method-level):**
+  - `GET /api/v1/admin/**` — requires `ADMIN` or `VIEWER` role (read-only access)
+  - `POST /PUT /PATCH /DELETE /api/v1/admin/**` — requires `ADMIN` role only (VIEWER cannot mutate)
+  - The frontend mirrors this with an `isAdmin()` utility that hides write controls (add/edit/delete buttons, toggle switches, import sections) for VIEWER sessions — providing a clean read-only view without exposing unauthorized actions
 - All `/api/v1/payments/**` endpoints require `MERCHANT` role or `ADMIN`
 - All `/api/v1/webhooks/**` endpoints are public but HMAC-verified at the application layer
 
@@ -1459,13 +1484,16 @@ Request mirrors `/payments/initiate` with `claimReference` (required) and `polic
 | GET | `/admin/providers/{provider}/health` | Live health check |
 
 ### Admin — Dashboard
-| Method | Path |
-|---|---|
-| GET | `/admin/dashboard/summary` |
-| GET | `/admin/dashboard/volume-chart?granularity=hour` |
-| GET | `/admin/dashboard/provider-breakdown` |
-| GET | `/admin/dashboard/region-breakdown` |
-| GET | `/admin/dashboard/recent-failures` |
+| Method | Path | Description |
+|---|---|---|
+| GET | `/admin/dashboard/summary` | Totals: transaction count, success rate, active providers, regions |
+| GET | `/admin/dashboard/volume-chart?granularity=hour` | Time-series volume data |
+| GET | `/admin/dashboard/provider-breakdown` | Transaction count per provider |
+| GET | `/admin/dashboard/region-breakdown` | Transaction count per region |
+| GET | `/admin/dashboard/recent-failures` | Latest failed transactions |
+| GET | `/admin/dashboard/scores?region=MY&amount=500&currency=MYR&paymentType=PREMIUM_COLLECTION` | Returns `ScoreDetail[]` — composite score breakdown per eligible provider |
+| GET | `/admin/dashboard/strategy-comparison?region=MY&amount=500&currency=MYR&paymentType=PREMIUM_COLLECTION` | Returns `StrategyComparison[]` — what each of the 4 strategies would select |
+| GET | `/admin/dashboard/simulate?region=MY&amount=500&currency=MYR&paymentType=PREMIUM_COLLECTION` | Runs the actual routing engine (two-pass rule matching → global fallback → composite score); returns `RoutingDecision` with provider, strategy, reason, and score |
 
 ### Admin — Fee Rates
 | Method | Path | Description |

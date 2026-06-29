@@ -29,3 +29,10 @@ export interface StrategyComparison {
   selectedProvider: Provider | 'NONE';
   reason: string;
 }
+
+export interface SimulateDecision {
+  provider: Provider;
+  strategy: RoutingStrategy;
+  reason: string;
+  score: number | null;
+}

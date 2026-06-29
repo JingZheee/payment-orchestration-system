@@ -90,10 +90,23 @@ public class RoutingEngine {
     }
 
     private RoutingDecision matchRule(RoutingContext context, List<PaymentProviderPort> eligible) {
+        List<RoutingRule> allRules = ruleRepository.findByEnabledTrueOrderByPriorityAsc();
+
+        // Region-specific rules first, then global (null region) as fallback
+        RoutingDecision decision = tryRules(
+                allRules.stream().filter(r -> context.getRegion().equals(r.getRegion())).toList(),
+                context, eligible);
+        if (decision != null) return decision;
+
+        return tryRules(
+                allRules.stream().filter(r -> r.getRegion() == null).toList(),
+                context, eligible);
+    }
+
+    private RoutingDecision tryRules(List<RoutingRule> rules, RoutingContext context, List<PaymentProviderPort> eligible) {
         Map<Provider, PaymentProviderPort> byProvider = eligible.stream()
                 .collect(Collectors.toMap(PaymentProviderPort::getProvider, Function.identity()));
 
-        // Build a RoutingContext copy that carries the eligible providers for strategy use
         RoutingContext contextWithProviders = RoutingContext.builder()
                 .amount(context.getAmount())
                 .currency(context.getCurrency())
@@ -102,7 +115,7 @@ public class RoutingEngine {
                 .availableProviders(eligible)
                 .build();
 
-        for (RoutingRule rule : ruleRepository.findByEnabledTrueOrderByPriorityAsc()) {
+        for (RoutingRule rule : rules) {
             if (!matches(rule, context)) continue;
 
             // a) Specific provider override

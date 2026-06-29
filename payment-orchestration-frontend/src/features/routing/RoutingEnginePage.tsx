@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Select, InputNumber, Button, Spin, Tag, Tooltip } from 'antd';
 import { useProviderScores } from '../dashboard/hooks/useProviderScores';
 import { useStrategyComparison } from '../dashboard/hooks/useStrategyComparison';
+import { useSimulate } from '../dashboard/hooks/useSimulate';
 import { Region, Currency, RoutingStrategy, PaymentType, Provider } from '../../shared/types/enums';
 import type { ScoreDetail } from '../../shared/types/dashboard';
 import type { ScoreParams, CompareParams } from '../dashboard/services/dashboardService';
@@ -212,8 +213,9 @@ export default function RoutingEnginePage() {
 
   const scoresQuery = useProviderScores(simParams);
   const comparisonQuery = useStrategyComparison(simParams);
+  const simulateQuery = useSimulate(simParams);
 
-  const isLoading = scoresQuery.isFetching || comparisonQuery.isFetching;
+  const isLoading = scoresQuery.isFetching || comparisonQuery.isFetching || simulateQuery.isFetching;
   const hasResults = !!simParams && !isLoading;
 
   const scores = scoresQuery.data ?? [];
@@ -350,6 +352,51 @@ export default function RoutingEnginePage() {
               padding: 24, color: '#991B1B', fontSize: 14,
             }}>
               No eligible providers found for the selected region and payment type.
+            </div>
+          )}
+
+          {hasResults && simulateQuery.data && (
+            <div style={{
+              background: simulateQuery.data.strategy === 'COMPOSITE_SCORE'
+                ? 'linear-gradient(135deg, #FFFBEA 0%, #FFF7D6 100%)'
+                : 'linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)',
+              borderRadius: 16,
+              padding: '20px 24px',
+              border: simulateQuery.data.strategy === 'COMPOSITE_SCORE'
+                ? '1px solid rgba(252,185,0,0.4)'
+                : '1px solid rgba(22,163,74,0.3)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 28, color: simulateQuery.data.strategy === 'COMPOSITE_SCORE' ? '#7B5800' : '#166534' }}>
+                    {simulateQuery.data.strategy === 'COMPOSITE_SCORE' ? 'auto_awesome' : 'rule'}
+                  </span>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 2 }}>
+                      Routing Decision
+                    </div>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: '#1C1C1E' }}>
+                      {simulateQuery.data.provider}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 2 }}>
+                    Via
+                  </div>
+                  <div style={{
+                    display: 'inline-block', padding: '3px 12px', borderRadius: 999,
+                    fontSize: 12, fontWeight: 700,
+                    background: simulateQuery.data.strategy === 'COMPOSITE_SCORE' ? 'rgba(252,185,0,0.2)' : 'rgba(22,163,74,0.12)',
+                    color: simulateQuery.data.strategy === 'COMPOSITE_SCORE' ? '#7B5800' : '#166534',
+                  }}>
+                    {STRATEGY_META[simulateQuery.data.strategy]?.name ?? simulateQuery.data.strategy}
+                  </div>
+                </div>
+              </div>
+              <div style={{ marginTop: 12, fontSize: 12, color: '#6B7280', fontFamily: 'monospace', background: 'rgba(0,0,0,0.04)', borderRadius: 8, padding: '8px 12px' }}>
+                {simulateQuery.data.reason}
+              </div>
             </div>
           )}
 

@@ -1,4 +1,4 @@
-import type { Provider, Region, Currency, RoutingStrategy } from './enums';
+import type { Provider, Region, Currency, RoutingStrategy, PaymentType } from './enums';
 
 export interface RoutingRule {
   id: number;
@@ -9,6 +9,7 @@ export interface RoutingRule {
   maxAmount: number | null;
   preferredProvider: Provider | null;
   strategy: RoutingStrategy | null;
+  paymentType: PaymentType | null;
   enabled: boolean;
   createdAt: string;
 }
@@ -21,6 +22,7 @@ export interface RoutingRuleRequest {
   maxAmount: number | null;
   preferredProvider: Provider | null;
   strategy: RoutingStrategy | null;
+  paymentType: PaymentType | null;
   enabled: boolean;
 }
 

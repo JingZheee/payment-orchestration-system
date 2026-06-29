@@ -12,6 +12,7 @@ import com.paymentorchestration.provider.port.PaymentProviderPort;
 import com.paymentorchestration.routing.dto.RoutingContext;
 import com.paymentorchestration.routing.dto.RoutingDecision;
 import com.paymentorchestration.routing.dto.ScoreDetail;
+import com.paymentorchestration.routing.engine.RoutingEngine;
 import com.paymentorchestration.routing.scorer.ProviderScorer;
 import com.paymentorchestration.routing.strategy.ProviderRegionSupport;
 import com.paymentorchestration.routing.strategy.RoutingStrategy;
@@ -44,6 +45,7 @@ public class DashboardController {
     private final TransactionRepository transactionRepository;
     private final ProviderMetricsRepository providerMetricsRepository;
     private final ProviderScorer providerScorer;
+    private final RoutingEngine routingEngine;
     private final List<PaymentProviderPort> allProviders;
     private final List<RoutingStrategy> allStrategies;
 
@@ -172,6 +174,31 @@ public class DashboardController {
         }
 
         return ResponseEntity.ok(ApiResponse.ok(results));
+    }
+
+    // ── Routing engine simulation ───────────────────────────────────────────────
+
+    /**
+     * Runs the actual routing engine (rule matching + composite score fallback)
+     * and returns the full decision — which provider was selected, which strategy
+     * was used, and the human-readable reason (includes matched rule id/priority).
+     */
+    @GetMapping("/simulate")
+    public ResponseEntity<ApiResponse<RoutingDecision>> simulate(
+            @RequestParam Region region,
+            @RequestParam BigDecimal amount,
+            @RequestParam Currency currency,
+            @RequestParam(required = false) PaymentType paymentType) {
+
+        RoutingContext context = RoutingContext.builder()
+                .amount(amount)
+                .currency(currency)
+                .region(region)
+                .paymentType(paymentType)
+                .build();
+
+        RoutingDecision decision = routingEngine.route(context);
+        return ResponseEntity.ok(ApiResponse.ok(decision));
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────────

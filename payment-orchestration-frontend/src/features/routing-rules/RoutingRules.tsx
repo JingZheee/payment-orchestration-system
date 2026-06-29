@@ -12,7 +12,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useQueryClient } from '@tanstack/react-query';
-import { Provider, Region, Currency, RoutingStrategy } from '../../shared/types/enums';
+import { Provider, Region, Currency, RoutingStrategy, PaymentType } from '../../shared/types/enums';
 import type { RoutingRule, RoutingRuleRequest } from '../../shared/types/routing';
 import {
   useRoutingRules, useCreateRoutingRule, useUpdateRoutingRule, useDeleteRoutingRule,
@@ -36,11 +36,17 @@ const STRATEGY_LABELS: Record<RoutingStrategy, string> = {
 type RuleMode = 'provider' | 'strategy';
 type GroupKey = 'MY' | 'ID' | 'PH' | 'GLOBAL';
 
+const PAYMENT_TYPE_LABELS: Record<PaymentType, string> = {
+  [PaymentType.PREMIUM_COLLECTION]:  'Premium Collection',
+  [PaymentType.CLAIMS_DISBURSEMENT]: 'Claims Disbursement',
+};
+
 interface FormValues {
   region?: Region;
   currency?: Currency;
   minAmount?: number;
   maxAmount?: number;
+  paymentType?: PaymentType;
   mode: RuleMode;
   preferredProvider?: Provider;
   strategy?: RoutingStrategy;
@@ -54,6 +60,7 @@ function toRequest(v: FormValues, priority: number): RoutingRuleRequest {
     currency: v.currency ?? null,
     minAmount: v.minAmount ?? null,
     maxAmount: v.maxAmount ?? null,
+    paymentType: v.paymentType ?? null,
     preferredProvider: v.mode === 'provider' ? (v.preferredProvider ?? null) : null,
     strategy: v.mode === 'strategy' ? (v.strategy ?? null) : null,
     enabled: v.enabled,
@@ -66,6 +73,7 @@ function ruleToForm(r: RoutingRule): FormValues {
     currency: r.currency ?? undefined,
     minAmount: r.minAmount ?? undefined,
     maxAmount: r.maxAmount ?? undefined,
+    paymentType: r.paymentType ?? undefined,
     mode: r.strategy ? 'strategy' : 'provider',
     preferredProvider: r.preferredProvider ?? undefined,
     strategy: r.strategy ?? undefined,
@@ -112,9 +120,9 @@ function SortableRuleCard({
 
         <div className={styles.ruleFields}>
           <div className={styles.fieldGroupCurrency}>
-            <div className={styles.fieldLabel}>Currency</div>
-            {rule.currency
-              ? <span className={styles.fieldValue}>{rule.currency}</span>
+            <div className={styles.fieldLabel}>Payment Type</div>
+            {rule.paymentType
+              ? <span className={styles.fieldValue}>{PAYMENT_TYPE_LABELS[rule.paymentType]}</span>
               : <span className={styles.fieldMuted}>Any</span>}
           </div>
 
@@ -408,6 +416,11 @@ export default function RoutingRules() {
               <InputNumber min={0} style={{ width: '100%' }} placeholder="No maximum" />
             </Form.Item>
           </div>
+
+          <Form.Item name="paymentType" label="Payment Type">
+            <Select allowClear placeholder="Any payment type"
+              options={Object.values(PaymentType).map(t => ({ value: t, label: PAYMENT_TYPE_LABELS[t] }))} />
+          </Form.Item>
 
           <Form.Item name="mode" label="Route to" rules={[{ required: true }]}>
             <Select

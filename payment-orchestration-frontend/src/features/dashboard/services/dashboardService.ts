@@ -1,7 +1,7 @@
 import api from '../../../lib/axios';
 import { API } from '../../../lib/endpoints';
 import type { ApiResponse } from '../../../shared/types';
-import type { TransactionSummary, ScoreDetail, StrategyComparison } from '../../../shared/types/dashboard';
+import type { TransactionSummary, ScoreDetail, StrategyComparison, SimulateDecision } from '../../../shared/types/dashboard';
 import type { Region, Currency, PaymentType } from '../../../shared/types/enums';
 
 export interface ScoreParams {
@@ -35,6 +35,11 @@ export const dashboardService = {
       API.DASHBOARD.STRATEGY_COMPARISON,
       { params },
     );
+    return data.data;
+  },
+
+  simulate: async (params: CompareParams): Promise<SimulateDecision> => {
+    const { data } = await api.get<ApiResponse<SimulateDecision>>(API.DASHBOARD.SIMULATE, { params });
     return data.data;
   },
 };

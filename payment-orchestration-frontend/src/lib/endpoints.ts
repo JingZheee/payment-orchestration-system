@@ -9,6 +9,7 @@ export const API = {
     SUMMARY:             '/admin/dashboard/transactions/summary',
     SCORES:              '/admin/dashboard/scores',
     STRATEGY_COMPARISON: '/admin/dashboard/strategy-comparison',
+    SIMULATE:            '/admin/dashboard/simulate',
   },
 
   TRANSACTIONS: {

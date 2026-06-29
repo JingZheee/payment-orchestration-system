@@ -2,7 +2,7 @@
 Last updated: 2026-06-29
 
 ## Completed
-- [x] PRD.md v2.0 — all features documented including reconciliation import
+- [x] PRD.md v2.1 — all features documented including RBAC, two-pass routing, simulate endpoint
 - [x] Maven multi-module backend — all 7 modules, Flyway V1–V27, all entities/repos/adapters
 - [x] Spring Security + JWT; CORS, 401/403 fix
 - [x] DB-driven payment methods — PaymentMethodEntity, composite PK; enum deleted everywhere
@@ -35,10 +35,13 @@ Last updated: 2026-06-29
 - [x] Reconciliation anomaly detection — auto-flag when |variance_pct| > 5% (configurable)
 - [x] Reconciliation KPI strip — real aggregate totals from /summary, not current-page counts
 - [x] Import result modal — rowsNoFee vs rowsUnmatched distinguished; improved logging
-- [x] Fix latency metric — V27 adds provider_latency_ms to transactions; PaymentService times the provider.initiatePayment() call; MetricsAggregator reads this column instead of updatedAt - createdAt
-- [x] Fix success rate metric — MetricsAggregator now computes over terminal states only (SUCCESS + FAILED + RETRY_EXHAUSTED), excluding in-flight PENDING/PROCESSING from the denominator
-- [x] PRD updated — correct weights (40/25/15/20), expanded formula definitions, V26+V27 in migration table
-- [x] RBAC enforcement — SecurityConfig now splits /api/v1/admin/** by HTTP method (GET: ADMIN+VIEWER, writes: ADMIN only); frontend hides write controls for VIEWER across 7 pages (role.ts utility)
+- [x] Fix latency metric — V27 adds provider_latency_ms; MetricsAggregator reads this column
+- [x] Fix success rate metric — MetricsAggregator computes over terminal states only
+- [x] RBAC enforcement — SecurityConfig splits /api/v1/admin/** by HTTP method; role.ts + 7 frontend pages
+- [x] AppLayout cleanup — email-based name, role subtitle, removed notification/settings icons
+- [x] Routing engine two-pass logic — region-specific rules first, global fallback only if no match
+- [x] PaymentType in routing rules UI — TypeScript types, form modal, card display all wired
+- [x] Routing Decision panel — /admin/dashboard/simulate endpoint + green/amber panel on RoutingEnginePage
 
 ## Up next (start here next session)
 - [ ] End-to-end test reconciliation import: restart backend, download template, fill actual_fee column, upload, verify recon_statements rows saved and anomaly flagged
@@ -60,6 +63,7 @@ Last updated: 2026-06-29
 - Reconciliation uses transactions.fee as expected_fee — immune to fee rate changes
 - Latency = provider API call duration only (provider_latency_ms column); user think time excluded
 - Success rate = terminal transactions only; PENDING/PROCESSING excluded from denominator
+- Routing: region-specific rules always beat global rules regardless of priority number
 
 ## Blockers
 - Reconciliation import returning matched=0 when actual_fee column is blank — improved logging added; need to fill column and re-test
