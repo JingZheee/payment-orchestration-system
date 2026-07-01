@@ -13,5 +13,5 @@ public interface ProviderMetricsRepository extends JpaRepository<ProviderMetrics
 
     Optional<ProviderMetrics> findTopByProviderAndRegionOrderByWindowEndDesc(Provider provider, Region region);
 
-    List<ProviderMetrics> findByWindowStartAfter(Instant since);
+    List<ProviderMetrics> findByWindowEndAfter(Instant since);
 }
