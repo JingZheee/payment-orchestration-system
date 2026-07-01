@@ -70,7 +70,7 @@ public class AdminController {
     public ResponseEntity<ApiResponse<List<ProviderMetrics>>> getMetrics(
             @RequestParam(defaultValue = "60") long windowMinutes) {
         Instant since = Instant.now().minus(windowMinutes, ChronoUnit.MINUTES);
-        List<ProviderMetrics> metrics = providerMetricsRepository.findByWindowStartAfter(since);
+        List<ProviderMetrics> metrics = providerMetricsRepository.findByWindowEndAfter(since);
         return ResponseEntity.ok(ApiResponse.ok(metrics));
     }
 
