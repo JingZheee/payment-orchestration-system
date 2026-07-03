@@ -1,6 +1,13 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   postgres:
     image: postgres:15
+    logging: *default-logging
     environment:
       POSTGRES_DB: pos_prod
       POSTGRES_USER: pos
@@ -20,11 +27,14 @@ services:
 
   rabbitmq:
     image: rabbitmq:3-management
+    logging: *default-logging
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
       # Disable the built-in guest account
       RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "15672:15672"   # Management UI — public, login with RABBITMQ_USER/RABBITMQ_PASS
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
@@ -39,6 +49,7 @@ services:
   backend:
     build:
       context: ./payment-orchestration-backend
+    logging: *default-logging
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/pos_prod
       SPRING_DATASOURCE_USERNAME: pos
@@ -86,8 +97,11 @@ services:
   mailpit:
     image: axllent/mailpit
     container_name: pos_mailpit
+    logging: *default-logging
+    environment:
+      MP_UI_AUTH: ${MAILPIT_UI_AUTH}   # format: user:password
     ports:
-      - "127.0.0.1:8025:8025"   # Web UI — only accessible via SSH tunnel
+      - "8025:8025"   # Web UI — public, protected by MP_UI_AUTH basic auth
     restart: unless-stopped
     networks:
       - pos-network
@@ -95,6 +109,7 @@ services:
   frontend:
     build:
       context: ./payment-orchestration-frontend
+    logging: *default-logging
     ports:
       - "8080:80"
     depends_on:

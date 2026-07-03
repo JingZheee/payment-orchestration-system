@@ -331,7 +331,7 @@ Weights are configurable in `application.yml` under `routing.scorer.*`.
 |---|---|
 | **Current module** | Reconciliation / Testing |
 | **Current task** | Restart backend → download template from GET /admin/recon/template → fill in actual_fee column (add one deliberate discrepancy) → upload via POST /admin/recon/import → verify recon_statements rows saved in DB and anomaly flagged |
-| **Last completed** | PRD v2.1 — documented RBAC enforcement, routing two-pass logic, paymentType in rules UI, Routing Decision panel + /admin/dashboard/simulate endpoint |
+| **Last completed** | VPS ops: exposed Mailpit (MP_UI_AUTH) + RabbitMQ mgmt UI publicly, added Docker log-rotation limits, fixed deploy.yml to prune build cache every deploy (was filling the 9.7G disk) |
 | **Blockers** | Reconciliation import returning matched=0 when actual_fee column blank — improved logging added; needs re-test with filled column; Xendit sandbox keys not yet in application-dev.yml |
 
 ### Admin API Endpoints — Payment Methods
